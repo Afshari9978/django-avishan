@@ -1,0 +1,8 @@
+Click==7.0
+Django==2.2.3
+django-cors-headers==2.4.0
+gunicorn==19.9.0
+kavenegar==1.1.2
+Khayyam==3.0.17
+Pillow==6.0.0
+PyJWT==1.7.0
