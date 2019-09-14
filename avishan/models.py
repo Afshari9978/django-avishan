@@ -110,7 +110,7 @@ class AvishanModel(models.Model):
 
                 raise ErrorMessageException("Chosen " + cls.__name__ + " doesnt exist")  # todo: esme farsi bara model
             if avishan_raise_exception:
-                from avishan.utils.data_functions import save_traceback
+                from .utils.data_functions import save_traceback
                 save_traceback()
                 raise e
             return None
@@ -210,7 +210,7 @@ class AvishanModel(models.Model):
     def __clean_input_data_for_model(cls, input_dict: dict, previous_object_trace: str) -> Tuple[
         dict, dict]:
         from django.db.models import DateField, DateTimeField, TimeField, OneToOneField, ForeignKey, ManyToManyField
-        from avishan.avishan.exceptions import ErrorMessageException
+        from .exceptions import ErrorMessageException
 
         object_trace = previous_object_trace + cls.class_snake_case_name()
         create_kwargs = {}
@@ -268,9 +268,9 @@ class AvishanModel(models.Model):
     @classmethod
     def __get_object_from_dict(cls, input_dict: dict, previous_object_trace: str, reach_to_object: bool = True) -> \
             'AvishanModel':
-        from avishan.avishan.exceptions import AuthException, ErrorMessageException
+        from .exceptions import AuthException, ErrorMessageException
         from avishan_wrapper import current_request
-        from avishan.utils import status
+        from .utils import status
         object_trace = previous_object_trace + cls.class_snake_case_name()
 
         defined_action = cls.define_object_action(input_dict)
@@ -283,7 +283,7 @@ class AvishanModel(models.Model):
             except cls.DoesNotExist:
                 current_request['response']['object_trace'] = object_trace
                 current_request['response']['available_data'] = input_dict
-                from avishan.utils.data_functions import save_traceback
+                from .utils.data_functions import save_traceback
                 save_traceback()
                 raise ErrorMessageException('Object not found with available data.',
                                             status_code=status.HTTP_406_NOT_ACCEPTABLE)
@@ -308,7 +308,7 @@ class AvishanModel(models.Model):
     def to_dict(self: 'AvishanModel', compact: bool = False, except_list: list = None,
                 visible_list: list = None) -> dict:
         from datetime import time
-        from avishan.utils.model_functions import filter_added_properties, filter_private_fields, filter_compact_fields, \
+        from .utils.model_functions import filter_added_properties, filter_private_fields, filter_compact_fields, \
             filter_except_list
         # todo objectifire kamel
         # todo __dict__ ?

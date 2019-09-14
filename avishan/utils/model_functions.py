@@ -6,7 +6,7 @@ from typing import Union, List, Optional, Type
 from django.db.models import QuerySet, Model
 from django.db.models.fields.files import ImageFieldFile, FieldFile
 
-from avishan.models import AvishanModel, Image
+from ..models import AvishanModel, Image
 from ..utils.bch_datetime import BchDatetime
 
 

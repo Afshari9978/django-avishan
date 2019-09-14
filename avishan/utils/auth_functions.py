@@ -1,6 +1,6 @@
 import jwt
 
-from avishan.utils.data_functions import save_traceback
+from .data_functions import save_traceback
 from avishan_config import JWT_KEY
 from ..exceptions import AuthException
 from .bch_datetime import BchDatetime

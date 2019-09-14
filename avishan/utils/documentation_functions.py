@@ -2,8 +2,8 @@ from typing import TextIO, Type
 
 from django.db.models import Field
 
-from avishan.models import AvishanModel
-from avishan.utils.model_functions import find_models, get_app_names
+from ..models import AvishanModel
+from .model_functions import find_models, get_app_names
 
 
 def create_raml_documentation(project_name: str):

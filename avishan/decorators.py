@@ -3,7 +3,7 @@ import pprint
 
 from django.http import JsonResponse
 
-from avishan.avishan.utils.data_functions import save_traceback
+from .utils.data_functions import save_traceback
 from .exceptions import AvishanException
 from avishan_wrapper import current_request
 
@@ -44,7 +44,7 @@ class AvishanCalculateTime(object):
         pass
 
     def __call__(self, view_function):
-        from avishan.avishan.utils.bch_datetime import BchDatetime
+        from .utils.bch_datetime import BchDatetime
 
         def wrapper(*args, **kwargs):
             start_time = BchDatetime()

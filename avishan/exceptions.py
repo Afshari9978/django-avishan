@@ -1,7 +1,7 @@
 import sys
 
-from avishan.avishan.utils.bch_datetime import BchDatetime
-from avishan.avishan.utils.data_functions import save_traceback
+from .utils.bch_datetime import BchDatetime
+from .utils.data_functions import save_traceback
 from .utils import status
 import traceback
 from avishan_wrapper import current_request
@@ -47,7 +47,7 @@ class AvishanException(Exception):
                 'error_message': 'خطای سرور'
             }
 
-        from avishan.models import ExceptionRecord
+        from .models import ExceptionRecord
         ExceptionRecord.objects.create(
             class_title=self.class_title,
             datetime=self.datetime,
