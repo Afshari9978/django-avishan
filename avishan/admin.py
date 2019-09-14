@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.contrib.admin.sites import AlreadyRegistered
 
-from avishan.utils.model_functions import find_non_abstract_models
+from avishan.avishan.utils.model_functions import find_non_abstract_models
 from .models import *
 
 # todo auto add classes for admin

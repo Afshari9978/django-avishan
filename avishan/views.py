@@ -2,7 +2,7 @@ import random
 
 from django.http import JsonResponse
 
-from avishan.utils.model_functions import find_models, find_model_by_plural_name
+from avishan.avishan.utils.model_functions import find_models, find_model_by_plural_name
 from .decorators import AvishanDecorator
 from .exceptions import ErrorMessageException, AuthException
 from .utils.validator_functions import validate_phone_number

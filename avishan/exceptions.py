@@ -1,7 +1,7 @@
 import sys
 
-from avishan.utils.bch_datetime import BchDatetime
-from avishan.utils.data_functions import save_traceback
+from avishan.avishan.utils.bch_datetime import BchDatetime
+from avishan.avishan.utils.data_functions import save_traceback
 from .utils import status
 import traceback
 from avishan_wrapper import current_request

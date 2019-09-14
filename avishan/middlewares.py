@@ -4,7 +4,7 @@ from django.core.handlers.wsgi import WSGIRequest
 from django.http import JsonResponse, QueryDict
 
 # todo: try for import config
-from avishan.utils.data_functions import save_traceback
+from avishan.avishan.utils.data_functions import save_traceback
 from avishan_config import USER_RESPONSE_DICT_FIELDS, MONITORED_URLS_START, NOT_MONITORED_URLS, \
     MONITORED_ANONYMOUS_URLS
 from .exceptions import AuthException

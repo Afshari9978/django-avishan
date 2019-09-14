@@ -2,14 +2,9 @@ import json
 import pprint
 
 from django.http import JsonResponse
-from django.db.utils import OperationalError
-from typing import Union
 
-from avishan.middlewares import must_have_token, must_monitor
-from avishan.utils.data_functions import save_traceback
-from .exceptions import AuthException, ErrorMessageException, ValidatorException, AvishanException
-from .models import UserGroup
-from .utils import status
+from avishan.avishan.utils.data_functions import save_traceback
+from .exceptions import AvishanException
 from avishan_wrapper import current_request
 
 
@@ -49,7 +44,7 @@ class AvishanCalculateTime(object):
         pass
 
     def __call__(self, view_function):
-        from avishan.utils.bch_datetime import BchDatetime
+        from avishan.avishan.utils.bch_datetime import BchDatetime
 
         def wrapper(*args, **kwargs):
             start_time = BchDatetime()
