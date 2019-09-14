@@ -1,0 +1,21 @@
+import os
+from setuptools import setup
+
+here = os.path.abspath(os.path.dirname(__file__))
+README = open(os.path.join(here, 'README.rst')).read()
+
+setup(
+    name='avishan',
+    version='0.1.0',
+    packages=['avishan'],
+    description='Avishan is a set of tools for building fast, comfortable and reliable django apps',
+    long_description=README,
+    author='Morteza Afshari',
+    author_email='afshari9978@gmail.com',
+    url='https://gitlab.com/afshari9978/avishan',
+    license='MIT',
+    install_requires=[
+        'Django>=2.2',
+        'avishan_wrapper>=0.1.0'
+    ]
+)
