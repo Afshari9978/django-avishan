@@ -1,13 +1,13 @@
 import os
-from setuptools import setup
+from setuptools import setup, find_packages
 
 here = os.path.abspath(os.path.dirname(__file__))
 README = open(os.path.join(here, 'README.rst')).read()
 
 setup(
-    name='avishan',
+    name='django-avishan',
     version='0.1.0',
-    packages=['avishan'],
+    packages=find_packages(),
     description='Avishan is a set of tools for building fast, comfortable and reliable django apps',
     long_description=README,
     author='Morteza Afshari',
