@@ -1,0 +1,51 @@
+Metadata-Version: 1.0
+Name: django-avishan
+Version: 0.1.3
+Summary: Avishan is a set of tools for building fast, comfortable and reliable django apps
+Home-page: https://gitlab.com/afshari9978/avishan
+Author: Morteza Afshari
+Author-email: afshari9978@gmail.com
+License: MIT
+Description: =======
+        Avishan
+        =======
+        
+        Avishan is a set of tools for building fast, comfortable and reliable django apps. For memory management reasons, you should also install `Avishan wrapper
+        <https://gitlab.com/Afshari9978/avishan_wrapper.git>`_ as mentioned in itself page.
+        
+        Quick start
+        -----------
+        
+        1. Add "avishan" to end of your INSTALLED_APPS setting like this, and "AvishanMiddleware" to **end** of MIDDLEWARE too::
+        
+            INSTALLED_APPS = [
+                ...
+                'avishan',
+            ]
+        
+            MIDDLEWARE = [
+                ...
+                'avishan.middlewares.AvishanMiddleware',
+            ]
+        
+        2. Include the avishan URLconf in your project urls.py like this::
+        
+            path('', include('avishan.urls')),
+        
+        3. Run this commands to create the avishan models::
+        
+            python manage.py migrate
+            python manage.py avishan_init
+        
+        4. Now follow part below for more detail about every single usage.
+        
+        
+        What does it do for me?
+        -------------------------
+        - Token based authentication
+        - Data body parser for POST/PUT/... Http requests
+        - Exception reports
+        - Fully implemented third-party libraries like Kavenagar & Chabok
+        - Automated django admin tools
+        
+Platform: UNKNOWN
