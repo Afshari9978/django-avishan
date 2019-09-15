@@ -580,3 +580,6 @@ class ExceptionRecord(AvishanModel):
     list_display = ('class_title', 'date_created', 'user', 'checked')
     list_filter = ('class_title', 'user', 'request_url', 'checked')
     date_hierarchy = 'date_created'
+
+
+# todo: create a request copy model. to keep request full data

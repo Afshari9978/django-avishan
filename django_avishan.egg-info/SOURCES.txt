@@ -30,6 +30,7 @@ avishan/migrations/0007_exceptionrecord_checked.py
 avishan/migrations/0008_auto_20190905_1748.py
 avishan/migrations/0009_auto_20190911_1929.py
 avishan/migrations/0010_auto_20190913_1817.py
+avishan/migrations/0011_remove_exceptionrecord_datetime.py
 avishan/migrations/__init__.py
 avishan/utils/__init__.py
 avishan/utils/auth_functions.py
