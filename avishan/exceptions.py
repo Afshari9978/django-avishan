@@ -13,7 +13,6 @@ class AvishanException(Exception):
         self.user_group = current_request['user_group']
         self.request_url = current_request['request'].path
         self.request_method = current_request['request'].method
-        self.datetime = BchDatetime().to_datetime()
         self.request_headers = None
 
         for key, value in current_request['request'].META.items():
@@ -50,7 +49,6 @@ class AvishanException(Exception):
         from .models import ExceptionRecord
         ExceptionRecord.objects.create(
             class_title=self.class_title,
-            datetime=self.datetime,
             user=self.user,
             user_group=self.user_group,
             status_code=self.status_code,
