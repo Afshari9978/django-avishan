@@ -564,7 +564,6 @@ class ActivationCode(AvishanModel):
 
 class ExceptionRecord(AvishanModel):
     class_title = models.CharField(max_length=255)
-    datetime = models.DateTimeField()
     user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
     user_group = models.ForeignKey(UserGroup, on_delete=models.SET_NULL, null=True, blank=True)
     status_code = models.IntegerField()
