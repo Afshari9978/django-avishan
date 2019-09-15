@@ -170,6 +170,7 @@ class AvishanModel(models.Model):
             in_time_kwargs = kwargs
             many_to_many_kwargs = {}
         # todo: remove identifier attributes to prevent update on them
+        # todo: check for change. if not changed, dont update
         for key, value in in_time_kwargs.items():
             # todo check values
             self.__setattr__(key, value)
@@ -381,7 +382,7 @@ class AvishanModel(models.Model):
     def update_or_create_object(cls, fixed_kwargs: dict, new_additional_kwargs: dict) -> bool:
         try:
             found = cls.get(avishan_raise_exception=True, **fixed_kwargs)
-            found.update(**new_additional_kwargs)
+            found.update(**{**fixed_kwargs, **new_additional_kwargs})
             return False
         except cls.DoesNotExist:
             cls.create(**{**fixed_kwargs, **new_additional_kwargs})
@@ -564,7 +565,6 @@ class ActivationCode(AvishanModel):
 
 class ExceptionRecord(AvishanModel):
     class_title = models.CharField(max_length=255)
-    datetime = models.DateTimeField()
     user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
     user_group = models.ForeignKey(UserGroup, on_delete=models.SET_NULL, null=True, blank=True)
     status_code = models.IntegerField()
@@ -577,6 +577,6 @@ class ExceptionRecord(AvishanModel):
     exception_args = models.TextField(null=True)
     checked = models.BooleanField(default=False)
 
-    list_display = ('class_title', 'datetime', 'user', 'checked')
+    list_display = ('class_title', 'date_created', 'user', 'checked')
     list_filter = ('class_title', 'user', 'request_url', 'checked')
-    date_hierarchy = 'datetime'
+    date_hierarchy = 'date_created'

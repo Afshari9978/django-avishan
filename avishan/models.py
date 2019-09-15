@@ -577,6 +577,6 @@ class ExceptionRecord(AvishanModel):
     exception_args = models.TextField(null=True)
     checked = models.BooleanField(default=False)
 
-    list_display = ('class_title', 'datetime', 'user', 'checked')
+    list_display = ('class_title', 'date_created', 'user', 'checked')
     list_filter = ('class_title', 'user', 'request_url', 'checked')
-    date_hierarchy = 'datetime'
+    date_hierarchy = 'date_created'
