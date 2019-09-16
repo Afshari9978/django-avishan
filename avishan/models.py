@@ -379,7 +379,8 @@ class AvishanModel(models.Model):
         return cls._meta.app_label
 
     @classmethod
-    def update_or_create_object(cls, fixed_kwargs: dict, new_additional_kwargs: dict) -> Tuple['AvishanModel', bool ]:
+    def update_or_create_object(cls, fixed_kwargs: dict, new_additional_kwargs: dict) -> Tuple[
+        Type['AvishanModel'], bool]:
         try:
             found = cls.get(avishan_raise_exception=True, **fixed_kwargs)
             return found.update(**{**fixed_kwargs, **new_additional_kwargs}), False
@@ -578,6 +579,5 @@ class ExceptionRecord(AvishanModel):
     list_display = ('class_title', 'date_created', 'user', 'checked')
     list_filter = ('class_title', 'user', 'request_url', 'checked')
     date_hierarchy = 'date_created'
-
 
 # todo: create a request copy model. to keep request full data
