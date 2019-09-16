@@ -115,7 +115,11 @@ def filter_except_list(field_names, except_list):
 
 def find_models(app_name: str = None) -> List[Type[AvishanModel]]:
     if not app_name:
-        return AvishanModel.__subclasses__()
+        total = AvishanModel.__subclasses__()
+        for item in total[:]:
+            if len(item.__subclasses__()) > 0:
+                total += item.__subclasses__()
+        return list(set(total))
     return [x for x in find_models() if x._meta.app_label == app_name]
 
 
