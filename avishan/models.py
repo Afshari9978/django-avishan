@@ -379,14 +379,12 @@ class AvishanModel(models.Model):
         return cls._meta.app_label
 
     @classmethod
-    def update_or_create_object(cls, fixed_kwargs: dict, new_additional_kwargs: dict) -> bool:
+    def update_or_create_object(cls, fixed_kwargs: dict, new_additional_kwargs: dict) -> Tuple['AvishanModel', bool ]:
         try:
             found = cls.get(avishan_raise_exception=True, **fixed_kwargs)
-            found.update(**{**fixed_kwargs, **new_additional_kwargs})
-            return False
+            return found.update(**{**fixed_kwargs, **new_additional_kwargs}), False
         except cls.DoesNotExist:
-            cls.create(**{**fixed_kwargs, **new_additional_kwargs})
-            return True
+            return cls.create(**{**fixed_kwargs, **new_additional_kwargs}), True
 
     @classmethod
     def get_target_type_from_field(cls, field: Field) -> type:
