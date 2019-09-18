@@ -39,8 +39,12 @@ class AvishanMiddleware:
                     save_traceback()
                     raise AuthException(AuthException.TOKEN_ERROR)
                 self.decoded_token = decode_token(self.token)
-                user_user_group = UserUserGroup.get(avishan_raise_exception=True,
-                                                    id=self.decoded_token['user_user_group_id'])
+                try:
+                    user_user_group = UserUserGroup.get(avishan_raise_exception=True,
+                                                        id=self.decoded_token['user_user_group_id'])
+                except UserUserGroup.DoesNotExist:
+                    save_traceback()
+                    raise AuthException(AuthException.ACCOUNT_NOT_FOUND)
                 current_request['user'] = user_user_group.user
 
                 # prints user data to log
