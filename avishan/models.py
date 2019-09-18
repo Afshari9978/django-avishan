@@ -464,7 +464,6 @@ class UserGroup(AvishanModel):
 
 
 class User(AvishanModel):
-
     phone = models.CharField(max_length=255, unique=True)
     first_name = models.CharField(max_length=255, blank=True)
     last_name = models.CharField(max_length=255, blank=True)
@@ -577,8 +576,16 @@ class ExceptionRecord(AvishanModel):
     exception_args = models.TextField(null=True)
     checked = models.BooleanField(default=False)
 
-    list_display = ('class_title', 'date_created', 'user', 'checked')
+    list_display = ('class_title', 'date_created', 'get_title', 'user', 'checked')
     list_filter = ('class_title', 'user', 'request_url', 'checked')
     date_hierarchy = 'date_created'
 
+    @property
+    def get_title(self):
+        try:
+            if self.exception_args:
+                return self.exception_args
+            return dict(self.response)['error_message']
+        except:
+            return 'UNKNOWN'
 # todo: create a request copy model. to keep request full data

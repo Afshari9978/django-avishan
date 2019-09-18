@@ -35,7 +35,7 @@ class AvishanException(Exception):
         if not from_exception:
             self.status_code = current_request['status_code']
             self.class_title = self.__class__.__name__
-            self.exception_args = ""
+            self.exception_args = None
 
         else:
             self.class_title = from_exception.__class__.__name__
