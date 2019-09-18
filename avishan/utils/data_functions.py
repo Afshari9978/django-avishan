@@ -177,6 +177,7 @@ def send_chabok_push(phone_number: str, title: str, body: str):
         + '?access_token=' + CHABOK_ACCESS_TOKEN,
         data={'title': title, 'body': body}
     )
+    # todo check for error and raise exception
 
 
 def add_query_set_to_response(query_set: QuerySet, response_dict: dict, key_name: str, request,

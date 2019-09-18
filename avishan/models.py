@@ -464,6 +464,7 @@ class UserGroup(AvishanModel):
 
 
 class User(AvishanModel):
+
     phone = models.CharField(max_length=255, unique=True)
     first_name = models.CharField(max_length=255, blank=True)
     last_name = models.CharField(max_length=255, blank=True)
