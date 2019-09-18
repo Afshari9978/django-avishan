@@ -582,10 +582,10 @@ class ExceptionRecord(AvishanModel):
 
     @property
     def get_title(self):
-        try:
+        # try:
             if self.exception_args:
                 return self.exception_args
-            return dict(self.response)['error_message']
-        except:
-            return 'UNKNOWN'
+            return self.response
+        # except:
+        #     return 'UNKNOWN'
 # todo: create a request copy model. to keep request full data
