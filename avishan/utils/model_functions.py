@@ -118,7 +118,7 @@ def find_models(app_name: str = None) -> List[Type[AvishanModel]]:
         total = AvishanModel.__subclasses__()
         for item in total[:]:
             if len(item.__subclasses__()) > 0:
-                total += item.__subclasses__()
+                total += item.__subclasses__() # todo should be recursive
         return list(set(total))
     return [x for x in find_models() if x._meta.app_label == app_name]
 

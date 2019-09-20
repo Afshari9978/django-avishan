@@ -18,10 +18,7 @@ class AvishanModel(models.Model):
     compact_fields = []
     private_fields = []
     added_properties = []
-    private_fields = []
-    compact_fields = []
     # django admin
-
     date_hierarchy = None
     list_display = None
     list_filter = []
@@ -583,9 +580,9 @@ class ExceptionRecord(AvishanModel):
     @property
     def get_title(self):
         # try:
-            if self.exception_args:
-                return self.exception_args
-            return self.response
-        # except:
-        #     return 'UNKNOWN'
+        if self.exception_args:
+            return self.exception_args
+        return self.response
+    # except:
+    #     return 'UNKNOWN'
 # todo: create a request copy model. to keep request full data

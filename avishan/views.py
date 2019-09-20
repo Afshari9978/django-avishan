@@ -23,6 +23,8 @@ def check_user_phone(request, role, phone):
     if not current_request['user_group']:
         raise AuthException(AuthException.UNAUTHORIZED_ROLE)
 
+    # todo kevenegar takes too long
+    # todo email and username and etc...
     current_request['response']['phone'] = phone
     code = str(random.randrange(10 ** (SMS_CODE_LENGTH - 1), 10 ** SMS_CODE_LENGTH - 1))
     try:
@@ -109,7 +111,7 @@ def avishan_model_store(request, model_plural_name):
 
     model = find_model_by_plural_name(model_plural_name)
     if not model:
-        raise ErrorMessageException('AvishanError: Model not found')
+        raise ErrorMessageException(f'AvishanError: Model not found')
 
     if request.method == 'GET':
         current_request['response'][model.class_plural_snake_case_name()] = [item.to_dict() for item in model.all()]
