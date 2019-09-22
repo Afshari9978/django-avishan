@@ -1,8 +1,8 @@
 from django.http import JsonResponse
 
-from .utils.model_functions import find_model_by_plural_name
-from .decorators import AvishanDecorator
-from .exceptions import ErrorMessageException
+from ..utils.model_functions import find_model_by_plural_name
+from ..decorators import AvishanDecorator
+from ..exceptions import ErrorMessageException
 
 
 @AvishanDecorator()

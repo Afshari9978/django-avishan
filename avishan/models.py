@@ -449,6 +449,8 @@ class File(AvishanModel):
 
 class UserGroup(AvishanModel):
     title = models.CharField(max_length=255, unique=True)
+    can_signin_using_phone_otp = models.BooleanField(default=False)
+    can_signup_using_phone_otp = models.BooleanField(default=False)
 
     def __str__(self):
         return self.title
@@ -502,6 +504,18 @@ class UserUserGroup(AvishanModel):
 
     def __str__(self):
         return str(self.user) + ' - ' + str(self.user_group)
+
+
+class KavenegarPhoneTemplateOTP(AvishanModel):
+    resend_seconds = models.IntegerField(default=0)
+    template_name = models.CharField(blank=True, null=True, default=None)
+    tokens = models.TextField()
+
+
+class UserKavenegarPhoneTemplateOTP(AvishanModel):
+    phone = models.CharField()
+    code = models.CharField()
+
 
 
 class KavenegarSMS(AvishanModel):
