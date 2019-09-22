@@ -40,8 +40,8 @@ def encode_token(user_user_group: UserUserGroup) -> str:
     user_user_group.save()
     token_data = {
         'created_at': now.to_unix_timestamp(),
-        'exp': (now + user_user_group.user_group.token_valid_seconds).to_unix_timestamp(),
-        'user_user_group_id': user_user_group.id
+        'exp': '', # todo
+        'id': user_user_group.id
     }
     return jwt.encode(token_data,
                       JWT_KEY,

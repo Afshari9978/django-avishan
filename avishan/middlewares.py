@@ -41,18 +41,13 @@ class AvishanMiddleware:
                 self.decoded_token = decode_token(self.token)
                 try:
                     user_user_group = UserUserGroup.get(avishan_raise_exception=True,
-                                                        id=self.decoded_token['user_user_group_id'])
+                                                        id=self.decoded_token['id'])
                 except UserUserGroup.DoesNotExist:
                     save_traceback()
                     raise AuthException(AuthException.ACCOUNT_NOT_FOUND)
                 current_request['user'] = user_user_group.user
 
-                # prints user data to log
-                if user_user_group.user.have_profile:
-                    print(
-                        user_user_group.user.phone + " " + user_user_group.user.first_name + " " + user_user_group.user.last_name)
-                else:
-                    print(user_user_group.user.phone)
+                print(user_user_group.user)
 
                 current_request['user_group'] = user_user_group.user_group
                 verify_user()
@@ -84,9 +79,7 @@ class AvishanMiddleware:
                     print("EXEC:", current_request['execution_time'])
                     response = json.loads(response.content.decode('utf-8'))
                     response['execution_time'] = current_request['execution_time']
-                    # clear_current_request(current_request)
                     return JsonResponse(response, status=status_code)
-            # clear_current_request(current_request)
             return response
         except Exception as e:
             save_traceback()
