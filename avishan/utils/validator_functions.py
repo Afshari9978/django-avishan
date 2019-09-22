@@ -33,7 +33,7 @@ def validate_phone_number(input: str, country_code: str = '98', phone_start_numb
 
 def validate_text(input: str, blank: bool = True) -> str:
     input = input.strip()
-    input = convert_to_fa_number(input)
+    # input = convert_to_fa_number(input)
 
     if not blank and len(input) == 0:
         raise ValidatorException('متن')

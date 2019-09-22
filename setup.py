@@ -6,7 +6,7 @@ README = open(os.path.join(here, 'README.rst')).read()
 
 setup(
     name='django-avishan',
-    version='0.1.11',
+    version='0.1.12',
     packages=find_packages(),
     description='Avishan is a set of tools for building fast, comfortable and reliable django apps',
     long_description=README,

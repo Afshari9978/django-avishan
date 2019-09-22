@@ -452,9 +452,9 @@ class UserGroup(AvishanModel):
     token_valid_seconds = models.IntegerField(default=0)
     is_base_group = models.BooleanField(default=False)
 
-    list_display = ('title', 'is_base_group', 'token_valid_seconds')
+    # todo put sign in and sign up formats here. boolean
 
-    # todo only one is_base_group can have
+    list_display = ('title', 'is_base_group', 'token_valid_seconds')
 
     def __str__(self):
         return self.title
