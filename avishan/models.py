@@ -506,16 +506,13 @@ class UserUserGroup(AvishanModel):
         return str(self.user) + ' - ' + str(self.user_group)
 
 
-class KavenegarPhoneTemplateOTP(AvishanModel):
-    resend_seconds = models.IntegerField(default=0)
-    template_name = models.CharField(blank=True, null=True, default=None)
-    tokens = models.TextField()
+class UserAuthEmailPassword(AvishanModel):
+    email = models.CharField(max_length=255)  # todo unique for usergroup
+    password = models.CharField(max_length=255)
+    user_user_group = models.OneToOneField(UserUserGroup, on_delete=models.CASCADE,
+                                           related_name='user_auth_email_password')
 
-
-class UserKavenegarPhoneTemplateOTP(AvishanModel):
-    phone = models.CharField()
-    code = models.CharField()
-
+    list_display = ('user_user_group', 'email')
 
 
 class KavenegarSMS(AvishanModel):
