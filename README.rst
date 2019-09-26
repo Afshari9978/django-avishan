@@ -17,6 +17,7 @@ Quick start
 
     MIDDLEWARE = [
         ...
+        'avishan_wrapper.middlewares.AvishanThreadStorage',
         'avishan.middlewares.AvishanMiddleware',
     ]
 
