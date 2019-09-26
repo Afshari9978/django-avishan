@@ -449,12 +449,8 @@ class File(AvishanModel):
 
 class UserGroup(AvishanModel):
     title = models.CharField(max_length=255, unique=True)
-    token_valid_seconds = models.IntegerField(default=0)
-    is_base_group = models.BooleanField(default=False)
-
-    list_display = ('title', 'is_base_group', 'token_valid_seconds')
-
-    # todo only one is_base_group can have
+    can_signin_using_phone_otp = models.BooleanField(default=False)
+    can_signup_using_phone_otp = models.BooleanField(default=False)
 
     def __str__(self):
         return self.title
@@ -463,20 +459,18 @@ class UserGroup(AvishanModel):
 class User(AvishanModel):
     first_name = models.CharField(max_length=255, blank=True)
     last_name = models.CharField(max_length=255, blank=True)
-
     is_active = models.BooleanField(default=False)
-    have_profile = models.BooleanField(default=False)
 
-    date_updated = models.DateTimeField(blank=True, null=True)
-
-    compact_fields = ('first_name', 'last_name', 'phone')
-    list_display = ('phone', '__str__', 'is_active')
-    private_fields = ['id', 'have_profile', 'date_updated']
+    compact_fields = ('first_name', 'last_name')
+    list_display = ('__str__', 'is_active')
+    private_fields = ['id']
 
     def __str__(self):
-        if self.first_name or self.last_name:
-            return self.first_name + " " + self.last_name
-        return self.phone
+        try:
+            if self.first_name or self.last_name:
+                return self.first_name + " " + self.last_name
+        except:
+            return super().__str__()
 
     # todo show user id for django admin better filter
 
@@ -514,6 +508,15 @@ class UserUserGroup(AvishanModel):
         return str(self.user) + ' - ' + str(self.user_group)
 
 
+class UserAuthEmailPassword(AvishanModel):
+    email = models.CharField(max_length=255)  # todo unique for usergroup
+    password = models.CharField(max_length=255)
+    user_user_group = models.OneToOneField(UserUserGroup, on_delete=models.CASCADE,
+                                           related_name='user_auth_email_password')
+
+    list_display = ('user_user_group', 'email')
+
+
 class KavenegarSMS(AvishanModel):
     STATUS_TYPES = {
         'in_queue': 1,
@@ -547,6 +550,8 @@ class KavenegarSMS(AvishanModel):
     @classmethod
     def class_plural_snake_case_name(cls) -> str:
         return 'kavenegar_smses'
+
+    # todo add user field blank=True
 
 
 class ActivationCode(AvishanModel):

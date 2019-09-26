@@ -8,7 +8,9 @@ from django.core.paginator import Paginator
 from django.db.models import QuerySet
 
 from avishan_config import RECOMMEND_CODE_CHOICES, SMS_SIGNIN_TEMPLATE, KAVENEGAR_API_TOKEN, SMS_SIGNUP_TEMPLATE, \
-    CHABOK_ACCESS_TOKEN, RECOMMEND_CODE_FROM_USER
+    CHABOK_ACCESS_TOKEN, INTRODUCE_CODE_FROM_USER
+
+from avishan.avishan.avishan_config import INTRODUCE_CODE_LENGTH
 from ..utils.bch_datetime import BchDatetime
 from ..models import User, KavenegarSMS, ActivationCode
 
@@ -35,16 +37,16 @@ def has_numbers(input):
 
 
 def introduce_code_length() -> int:
-    return 6
+    return INTRODUCE_CODE_LENGTH
 
 
-def create_introduce_code() -> str:
+def create_introduce_code(introduce_code_from_user) -> str:
     while True:
         new_code = ''.join(
             random.choice(RECOMMEND_CODE_CHOICES) for _ in range(introduce_code_length()))
         try:
             # todo: mese adam
-            User.objects.get(**{RECOMMEND_CODE_FROM_USER: new_code})
+            User.objects.get(**{introduce_code_from_user: new_code})
             continue
         except User.DoesNotExist:
             return new_code
@@ -74,30 +76,6 @@ def convert_to_en_number(text):
         else:
             result += char
     return result
-
-
-def create_sms_transaction(user: User, amount: int):
-    # if amount == 0:
-    #     return
-    #
-    # amount = -amount
-    # from core.models import SystemTransaction
-    # last_transaction = SystemTransaction.objects.filter(is_sms=True, transaction__user=user).order_by('-date_created')
-    # if len(last_transaction) > 0:
-    #     last_transaction = last_transaction[0]
-    #     last_transaction.transaction.amount += amount
-    #     last_transaction.transaction.date_created = BchDatetime().to_datetime()
-    #     last_transaction.transaction.save()
-    # else:
-    #     from core.models import Transaction
-    #     SystemTransaction.objects.create(
-    #         transaction=Transaction.objects.create(
-    #             user=user, amount=amount, title='هزینه پیامک'
-    #         ),
-    #         is_sms=True
-    #     )
-    # todo
-    pass
 
 
 def send_template_sms(phone_number: str, template_title: str, token: str, token2: str = None,
@@ -161,12 +139,6 @@ def send_raw_sms(phone_number: str, message: str) -> KavenegarSMS:
     kavenegar_sms.cost = data['cost']
     kavenegar_sms.http_status_code = response.status_code
     kavenegar_sms.save()
-
-    try:
-        user = User.objects.get(phone=phone_number, profile__use_sms_notification=True)
-        create_sms_transaction(user, kavenegar_sms.cost // 10)
-    except User.DoesNotExist:
-        pass
 
     return kavenegar_sms
 
