@@ -2,8 +2,7 @@
 Avishan
 =======
 
-Avishan is a set of tools for building fast, comfortable and reliable django apps. For memory management reasons, you should also install `Avishan wrapper
-<https://gitlab.com/Afshari9978/avishan_wrapper.git>`_ as mentioned in itself page.
+Avishan is a set of tools for building fast, comfortable and reliable django apps.
 
 Quick start
 -----------
@@ -17,6 +16,7 @@ Quick start
 
     MIDDLEWARE = [
         ...
+        'avishan_wrapper.middlewares.AvishanThreadStorage',
         'avishan.middlewares.AvishanMiddleware',
     ]
 
@@ -30,12 +30,3 @@ Quick start
     python manage.py avishan_init
 
 4. Now follow part below for more detail about every single usage.
-
-
-What does it do for me?
--------------------------
-- Token based authentication
-- Data body parser for POST/PUT/... Http requests
-- Exception reports
-- Fully implemented third-party libraries like Kavenagar & Chabok
-- Automated django admin tools

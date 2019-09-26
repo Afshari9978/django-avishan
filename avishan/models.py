@@ -478,6 +478,8 @@ class User(AvishanModel):
             return self.first_name + " " + self.last_name
         return self.phone
 
+    # todo show user id for django admin better filter
+
     def is_in_group(self, user_group: UserGroup) -> bool:
         try:
             UserUserGroup.get(avishan_raise_exception=True, user=self, user_group=user_group)
@@ -576,6 +578,7 @@ class ExceptionRecord(AvishanModel):
     list_filter = ('class_title', 'user', 'request_url', 'checked')
     date_hierarchy = 'date_created'
 
+    # todo remove user from filter and add search
     @property
     def get_title(self):
         # try:
