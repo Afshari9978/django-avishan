@@ -11,6 +11,7 @@ from .utils.bch_datetime import BchDatetime
 
 
 # todo: check access rules in crud
+# todo: models package them
 # todo: create a helping class to move many of functions there
 class AvishanModel(models.Model):
     date_created = models.DateTimeField(auto_now_add=True)
