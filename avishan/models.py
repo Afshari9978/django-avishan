@@ -11,6 +11,7 @@ from .utils.bch_datetime import BchDatetime
 
 
 # todo: check access rules in crud
+# todo: models package them
 # todo: create a helping class to move many of functions there
 class AvishanModel(models.Model):
     date_created = models.DateTimeField(auto_now_add=True)
@@ -449,35 +450,30 @@ class File(AvishanModel):
 
 class UserGroup(AvishanModel):
     title = models.CharField(max_length=255, unique=True)
-    token_valid_seconds = models.IntegerField(default=0)
-    is_base_group = models.BooleanField(default=False)
-
-    # todo put sign in and sign up formats here. boolean
-
-    list_display = ('title', 'is_base_group', 'token_valid_seconds')
+    can_signin_using_phone_otp = models.BooleanField(default=False)
+    can_signup_using_phone_otp = models.BooleanField(default=False)
 
     def __str__(self):
         return self.title
 
 
 class User(AvishanModel):
-    phone = models.CharField(max_length=255, unique=True)
     first_name = models.CharField(max_length=255, blank=True)
     last_name = models.CharField(max_length=255, blank=True)
-
     is_active = models.BooleanField(default=False)
-    have_profile = models.BooleanField(default=False)
 
-    date_updated = models.DateTimeField(blank=True, null=True)
-
-    compact_fields = ('first_name', 'last_name', 'phone')
-    list_display = ('phone', '__str__', 'is_active')
-    private_fields = ['id', 'have_profile', 'date_updated']
+    compact_fields = ('first_name', 'last_name')
+    list_display = ('__str__', 'is_active')
+    private_fields = ['id']
 
     def __str__(self):
-        if self.first_name or self.last_name:
-            return self.first_name + " " + self.last_name
-        return self.phone
+        try:
+            if self.first_name or self.last_name:
+                return self.first_name + " " + self.last_name
+        except:
+            return super().__str__()
+
+    # todo show user id for django admin better filter
 
     def is_in_group(self, user_group: UserGroup) -> bool:
         try:
@@ -511,6 +507,15 @@ class UserUserGroup(AvishanModel):
 
     def __str__(self):
         return str(self.user) + ' - ' + str(self.user_group)
+
+
+class UserAuthEmailPassword(AvishanModel):
+    email = models.CharField(max_length=255)  # todo unique for usergroup
+    password = models.CharField(max_length=255)
+    user_user_group = models.OneToOneField(UserUserGroup, on_delete=models.CASCADE,
+                                           related_name='user_auth_email_password')
+
+    list_display = ('user_user_group', 'email')
 
 
 class KavenegarSMS(AvishanModel):
@@ -547,6 +552,8 @@ class KavenegarSMS(AvishanModel):
     def class_plural_snake_case_name(cls) -> str:
         return 'kavenegar_smses'
 
+    # todo add user field blank=True
+
 
 class ActivationCode(AvishanModel):
     code = models.CharField(max_length=255)
@@ -577,6 +584,7 @@ class ExceptionRecord(AvishanModel):
     list_filter = ('class_title', 'user', 'request_url', 'checked')
     date_hierarchy = 'date_created'
 
+    # todo remove user from filter and add search
     @property
     def get_title(self):
         # try:
