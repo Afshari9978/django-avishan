@@ -2,8 +2,7 @@
 Avishan
 =======
 
-Avishan is a set of tools for building fast, comfortable and reliable django apps. For memory management reasons, you should also install `Avishan wrapper
-<https://gitlab.com/Afshari9978/avishan_wrapper.git>`_ as mentioned in itself page.
+Avishan is a set of tools for building fast, comfortable and reliable django apps.
 
 Quick start
 -----------
