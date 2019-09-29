@@ -12,6 +12,7 @@ class Command(BaseCommand):
          static
          media
         """
+        # todo create avishan_config file on project root
         init_file = import_module('avishan.init')
         init_file.init()
         self.stdout.write(self.style.SUCCESS('init function executed successfully'))

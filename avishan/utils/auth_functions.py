@@ -1,20 +1,10 @@
 import jwt
 
+from avishan.models.users import User, UserGroup, UserUserGroup
 from .data_functions import save_traceback
 from avishan_config import JWT_KEY
 from ..exceptions import AuthException
 from .bch_datetime import BchDatetime
-from ..models import UserGroup, UserUserGroup, User
-
-
-def sign_in_user(user, user_group):
-    user_user_group = verify_user(user, user_group)
-    user_user_group.is_logged_in = True
-    user_user_group.date_last_login = BchDatetime().to_datetime()
-    user.save()
-    from avishan_wrapper import current_request
-    current_request['response']['token'] = encode_token(user_user_group)
-    current_request['response']['user'] = user.to_dict(compact=True)
 
 
 def verify_user(user_object: User = None, try_on_group: UserGroup = None) -> UserUserGroup:

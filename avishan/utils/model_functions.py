@@ -1,11 +1,9 @@
-import importlib
-import pkgutil
-from datetime import datetime, date, time
-from typing import Union, List, Optional, Type
+from typing import List, Optional, Type
 
 from django.db.models import QuerySet, Model
 
-from ..models import AvishanModel, Image
+from avishan.models.base import Image
+from ..models import AvishanModel
 
 
 def filter_added_properties(field_names, model: Model):
@@ -66,7 +64,7 @@ def find_models(app_name: str = None) -> List[Type[AvishanModel]]:
         total = AvishanModel.__subclasses__()
         for item in total[:]:
             if len(item.__subclasses__()) > 0:
-                total += item.__subclasses__() # todo should be recursive
+                total += item.__subclasses__()  # todo should be recursive
         return list(set(total))
     return [x for x in find_models() if x._meta.app_label == app_name]
 
@@ -89,6 +87,9 @@ def get_sum_on_field(query_set: QuerySet, field_name: str) -> int:
         return total
     return 0
 
+
+def annotate_on_queryset(query_set: QuerySet, name: str, calculated):
+    return query_set.annotate(**{name: calculated})
 
 
 def get_app_names() -> List[str]:

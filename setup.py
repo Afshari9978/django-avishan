@@ -6,7 +6,7 @@ README = open(os.path.join(here, 'README.rst')).read()
 
 setup(
     name='django-avishan',
-    version='0.1.12',
+    version='0.2.0',
     packages=find_packages(),
     description='Avishan is a set of tools for building fast, comfortable and reliable django apps',
     long_description=README,
@@ -15,8 +15,9 @@ setup(
     url='https://gitlab.com/afshari9978/avishan',
     license='MIT',
     install_requires=[
-        'Django>=2.2.5',
         'avishan_wrapper==0.1.0',
+        'bcrypt==3.1.6',
+        'Django>=2.2.5',
         'django-cors-headers==2.4.0',
         'gunicorn==19.9.0',
         'kavenegar==1.1.2',

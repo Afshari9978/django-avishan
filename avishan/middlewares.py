@@ -8,7 +8,7 @@ from .utils.data_functions import save_traceback
 from avishan_config import USER_RESPONSE_DICT_FIELDS, MONITORED_URLS_START, NOT_MONITORED_URLS, \
     MONITORED_ANONYMOUS_URLS
 from .exceptions import AuthException
-from .models import UserUserGroup
+from .models.users import UserUserGroup
 from .utils.auth_functions import decode_token, verify_user, generate_token
 from avishan_wrapper import current_request
 

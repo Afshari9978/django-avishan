@@ -7,18 +7,20 @@ from django.db import models
 from django.db.models import QuerySet
 from django.db.models.fields import Field, NOT_PROVIDED
 
-from .utils.bch_datetime import BchDatetime
-
-
+from avishan.models.base import File
+from ..utils.bch_datetime import BchDatetime
 # todo: check access rules in crud
 # todo: models package them
 # todo: create a helping class to move many of functions there
+
+
 class AvishanModel(models.Model):
     date_created = models.DateTimeField(auto_now_add=True)
 
     compact_fields = []
     private_fields = []
     added_properties = []
+    cascade_fields_on_delete = []
     # django admin
     date_hierarchy = None
     list_display = None
@@ -106,11 +108,11 @@ class AvishanModel(models.Model):
             return cls.__get(**kwargs)
         except cls.DoesNotExist as e:
             if avishan_raise_400:
-                from .exceptions import ErrorMessageException
+                from ..exceptions import ErrorMessageException
 
                 raise ErrorMessageException("Chosen " + cls.__name__ + " doesnt exist")  # todo: esme farsi bara model
             if avishan_raise_exception:
-                from .utils.data_functions import save_traceback
+                from ..utils.data_functions import save_traceback
                 save_traceback()
                 raise e
             return None
@@ -181,7 +183,11 @@ class AvishanModel(models.Model):
         return self
 
     def remove(self) -> dict:
+        #todo casecate on delete field
         # todo check access
+        for cascade_field_on_delete in self.cascade_fields_on_delete :
+            self.cascade_fields_on_delete.all().delete()
+
         temp = self.to_dict()
         self.delete()
         return temp
@@ -211,7 +217,7 @@ class AvishanModel(models.Model):
     def __clean_input_data_for_model(cls, input_dict: dict, previous_object_trace: str) -> Tuple[
         dict, dict]:
         from django.db.models import DateField, DateTimeField, TimeField, OneToOneField, ForeignKey, ManyToManyField
-        from .exceptions import ErrorMessageException
+        from ..exceptions import ErrorMessageException
 
         object_trace = previous_object_trace + cls.class_snake_case_name()
         create_kwargs = {}
@@ -269,9 +275,9 @@ class AvishanModel(models.Model):
     @classmethod
     def __get_object_from_dict(cls, input_dict: dict, previous_object_trace: str, reach_to_object: bool = True) -> \
             'AvishanModel':
-        from .exceptions import AuthException, ErrorMessageException
+        from ..exceptions import AuthException, ErrorMessageException
         from avishan_wrapper import current_request
-        from .utils import status
+        from ..utils import status
         object_trace = previous_object_trace + cls.class_snake_case_name()
 
         defined_action = cls.define_object_action(input_dict)
@@ -284,7 +290,7 @@ class AvishanModel(models.Model):
             except cls.DoesNotExist:
                 current_request['response']['object_trace'] = object_trace
                 current_request['response']['available_data'] = input_dict
-                from .utils.data_functions import save_traceback
+                from ..utils.data_functions import save_traceback
                 save_traceback()
                 raise ErrorMessageException('Object not found with available data.',
                                             status_code=status.HTTP_406_NOT_ACCEPTABLE)
@@ -298,7 +304,7 @@ class AvishanModel(models.Model):
             except cls.DoesNotExist:
                 current_request['response']['object_trace'] = object_trace
                 current_request['response']['available_data'] = input_dict
-                from .utils.data_functions import save_traceback
+                from ..utils.data_functions import save_traceback
                 save_traceback()
                 raise ErrorMessageException('Object not found with available data.',
                                             status_code=status.HTTP_406_NOT_ACCEPTABLE)
@@ -309,7 +315,7 @@ class AvishanModel(models.Model):
     def to_dict(self: 'AvishanModel', compact: bool = False, except_list: list = None,
                 visible_list: list = None) -> dict:
         from datetime import time
-        from .utils.model_functions import filter_added_properties, filter_private_fields, filter_compact_fields, \
+        from ..utils.model_functions import filter_added_properties, filter_private_fields, filter_compact_fields, \
             filter_except_list
         # todo objectifire kamel
         # todo __dict__ ?
@@ -419,178 +425,3 @@ class AvishanModel(models.Model):
     @classmethod
     def __create(cls, **kwargs) -> 'AvishanModel':
         return cls.objects.create(**kwargs)
-
-
-class Image(AvishanModel):
-    file = models.ImageField(blank=True)
-    private_fields = ('date_created',)
-    list_display = ('__str__', 'date_created')
-
-    def __str__(self):
-        return self.file.name
-
-    def to_dict(self, **kwargs) -> dict:
-        temp = {}
-        temp['url'] = self.file.url
-        temp['id'] = self.id
-        return temp
-    # todo: override delete() to fully remove from hard disk
-    # todo: override create to chmod
-    # todo: override create with compression util
-
-
-class File(AvishanModel):
-    file = models.FileField(blank=True)
-    private_fields = ('date_created',)
-    list_display = ('file', 'date_created')
-
-    def __str__(self):
-        return self.file.name
-
-
-class UserGroup(AvishanModel):
-    title = models.CharField(max_length=255, unique=True)
-    can_signin_using_phone_otp = models.BooleanField(default=False)
-    can_signup_using_phone_otp = models.BooleanField(default=False)
-
-    def __str__(self):
-        return self.title
-
-
-class User(AvishanModel):
-    first_name = models.CharField(max_length=255, blank=True)
-    last_name = models.CharField(max_length=255, blank=True)
-    is_active = models.BooleanField(default=False)
-
-    compact_fields = ('first_name', 'last_name')
-    list_display = ('__str__', 'is_active')
-    private_fields = ['id']
-
-    def __str__(self):
-        try:
-            if self.first_name or self.last_name:
-                return self.first_name + " " + self.last_name
-        except:
-            return super().__str__()
-
-    # todo show user id for django admin better filter
-
-    def is_in_group(self, user_group: UserGroup) -> bool:
-        try:
-            UserUserGroup.get(avishan_raise_exception=True, user=self, user_group=user_group)
-            return True
-        except UserUserGroup.DoesNotExist:
-            return False
-
-    def add_to_user_group(self, user_group: UserGroup):
-        try:
-            UserUserGroup.get(
-                avishan_raise_exception=True,
-                user=self,
-                user_group=user_group
-            )
-        except UserUserGroup.DoesNotExist:
-            UserUserGroup.create(
-                user=self,
-                user_group=user_group,
-            )
-
-
-class UserUserGroup(AvishanModel):
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='user_user_groups')
-    user_group = models.ForeignKey(UserGroup, on_delete=models.CASCADE, related_name='user_user_groups')
-    is_logged_in = models.BooleanField(default=False)
-    date_last_login = models.DateTimeField(blank=True, null=True)
-    date_last_used = models.DateTimeField(blank=True, null=True)
-
-    list_display = ('user', 'user_group', 'date_last_login', 'date_last_used')
-
-    def __str__(self):
-        return str(self.user) + ' - ' + str(self.user_group)
-
-
-class UserAuthEmailPassword(AvishanModel):
-    email = models.CharField(max_length=255)  # todo unique for usergroup
-    password = models.CharField(max_length=255)
-    user_user_group = models.OneToOneField(UserUserGroup, on_delete=models.CASCADE,
-                                           related_name='user_auth_email_password')
-
-    list_display = ('user_user_group', 'email')
-
-
-class KavenegarSMS(AvishanModel):
-    STATUS_TYPES = {
-        'in_queue': 1,
-        'scheduled': 2,
-        'sent_to_telecom': 4,
-        'sent_to_telecom2': 5,
-        'failed': 6,
-        'delivered': 10,
-        'undelivered': 11,
-        'user_canceled_sms': 13,
-        'user_blocked_sms': 14,
-        'invalid_id': 100
-    }
-    receptor = models.CharField(max_length=255)
-    message = models.TextField()
-    template_title = models.CharField(max_length=255, null=True, blank=True)
-
-    http_status_code = models.CharField(max_length=255,
-                                        blank=True)  # todo: https://kavenegar.com/rest.html#result-general
-    message_id = models.CharField(max_length=255, blank=True)
-    status = models.IntegerField(default=-1, blank=True)
-    sender = models.CharField(max_length=255, blank=True)
-    date = models.DateTimeField(blank=True, null=True)
-    cost = models.IntegerField(blank=True, default=0)
-
-    list_display = ('receptor', 'message', 'template_title', 'http_status_code', 'status', 'cost')
-
-    def __str__(self):
-        return self.receptor
-
-    @classmethod
-    def class_plural_snake_case_name(cls) -> str:
-        return 'kavenegar_smses'
-
-    # todo add user field blank=True
-
-
-class ActivationCode(AvishanModel):
-    code = models.CharField(max_length=255)
-    user_group = models.ForeignKey(UserGroup, on_delete=models.CASCADE, null=True, blank=True)
-    kavenegar_sms = models.ForeignKey(KavenegarSMS, on_delete=models.CASCADE)
-
-    list_display = ('kavenegar_sms', 'code')
-
-    def __str__(self):
-        return self.kavenegar_sms.receptor + ' - ' + self.code
-
-
-class ExceptionRecord(AvishanModel):
-    class_title = models.CharField(max_length=255)
-    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
-    user_group = models.ForeignKey(UserGroup, on_delete=models.SET_NULL, null=True, blank=True)
-    status_code = models.IntegerField()
-    request_url = models.TextField()
-    request_method = models.CharField(max_length=255)
-    request_data = models.TextField()
-    request_headers = models.TextField(null=True)
-    response = models.TextField()
-    traceback = models.TextField()
-    exception_args = models.TextField(null=True)
-    checked = models.BooleanField(default=False)
-
-    list_display = ('class_title', 'date_created', 'get_title', 'user', 'checked')
-    list_filter = ('class_title', 'user', 'request_url', 'checked')
-    date_hierarchy = 'date_created'
-
-    # todo remove user from filter and add search
-    @property
-    def get_title(self):
-        # try:
-        if self.exception_args:
-            return self.exception_args
-        return self.response
-    # except:
-    #     return 'UNKNOWN'
-# todo: create a request copy model. to keep request full data

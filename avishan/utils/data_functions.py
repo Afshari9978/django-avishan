@@ -8,11 +8,9 @@ from django.core.paginator import Paginator
 from django.db.models import QuerySet
 
 from avishan_config import RECOMMEND_CODE_CHOICES, SMS_SIGNIN_TEMPLATE, KAVENEGAR_API_TOKEN, SMS_SIGNUP_TEMPLATE, \
-    CHABOK_ACCESS_TOKEN, INTRODUCE_CODE_FROM_USER
+    CHABOK_ACCESS_TOKEN, INTRODUCE_CODE_FROM_USER, INTRODUCE_CODE_LENGTH
 
-from avishan.avishan.avishan_config import INTRODUCE_CODE_LENGTH
 from ..utils.bch_datetime import BchDatetime
-from ..models import User, KavenegarSMS, ActivationCode
 
 
 def is_number(input):
@@ -88,13 +86,13 @@ def send_template_sms(phone_number: str, template_title: str, token: str, token2
         date_created=BchDatetime().to_datetime()
     )
 
-    if template_title == SMS_SIGNIN_TEMPLATE or template_title == SMS_SIGNUP_TEMPLATE:
-        activation_code = ActivationCode.objects.create(
-            code=token,
-            user_group=current_request['user_group'],
-            kavenegar_sms=kavenegar_sms,
-            date_created=BchDatetime().to_datetime()
-        )
+    # if template_title == SMS_SIGNIN_TEMPLATE or template_title == SMS_SIGNUP_TEMPLATE:
+    #     activation_code = ActivationCode.objects.create(
+    #         code=token,
+    #         user_group=current_request['user_group'],
+    #         kavenegar_sms=kavenegar_sms,
+    #         date_created=BchDatetime().to_datetime()
+    #     ) todo
     url = "https://api.kavenegar.com/v1/" + KAVENEGAR_API_TOKEN + "/verify/lookup.json"
     querystring = {"receptor": phone_number, "token": token, "template": template_title}
     if token2:
