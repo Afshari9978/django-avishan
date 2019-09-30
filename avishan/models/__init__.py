@@ -4,11 +4,13 @@ from typing import List, Optional, Type, Tuple
 from django.db import models
 
 # todo: encrypted fields: https://django-fernet-fields.readthedocs.io/en/latest/
-from django.db.models import QuerySet
+from django.db.models import QuerySet, ManyToManyField, ForeignKey, OneToOneField
 from django.db.models.fields import Field, NOT_PROVIDED
 
 from avishan.models.base import File
 from ..utils.bch_datetime import BchDatetime
+
+
 # todo: check access rules in crud
 # todo: models package them
 # todo: create a helping class to move many of functions there
@@ -183,10 +185,14 @@ class AvishanModel(models.Model):
         return self
 
     def remove(self) -> dict:
-        #todo casecate on delete field
+        # todo casecate on delete field
         # todo check access
-        for cascade_field_on_delete in self.cascade_fields_on_delete :
-            self.cascade_fields_on_delete.all().delete()
+        for cascade_field_on_delete in self.cascade_fields_on_delete:
+            if isinstance(self.__getattribute__(cascade_field_on_delete), ManyToManyField):
+                for mast_delete in self.__getattribute__(cascade_field_on_delete).all():
+                    mast_delete.remove()
+            elif isinstance(self.__getattribute__(cascade_field_on_delete), (OneToOneField, ForeignKey)):
+                self.__getattribute__(cascade_field_on_delete).remove()
 
         temp = self.to_dict()
         self.delete()
