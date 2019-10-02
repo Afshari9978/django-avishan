@@ -4,7 +4,7 @@ from avishan.models import *
 from avishan.models.users import UserUserGroup, UserGroup
 from avishan.third_party_packages.kavenegar import KavenegarSMS
 
-
+# todo: bara sign in/up/out tabe kolli bedim, view ro nanevisim
 class UserAuthType(AvishanModel):
     is_logged_in = models.BooleanField(default=False)
     date_last_sign_in = models.DateTimeField(blank=True, null=True)

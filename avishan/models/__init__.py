@@ -189,8 +189,8 @@ class AvishanModel(models.Model):
         # todo check access
         for cascade_field_on_delete in self.cascade_fields_on_delete:
             if isinstance(self.__getattribute__(cascade_field_on_delete), ManyToManyField):
-                for mast_delete in self.__getattribute__(cascade_field_on_delete).all():
-                    mast_delete.remove()
+                for must_delete in self.__getattribute__(cascade_field_on_delete).all():
+                    must_delete.remove()  # todo if not used
             elif isinstance(self.__getattribute__(cascade_field_on_delete), (OneToOneField, ForeignKey)):
                 self.__getattribute__(cascade_field_on_delete).remove()
 
