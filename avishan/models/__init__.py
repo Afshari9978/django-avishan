@@ -17,6 +17,7 @@ from ..utils.bch_datetime import BchDatetime
 
 
 class AvishanModel(models.Model):
+    # todo use at least names on methods, available them for child classes
     date_created = models.DateTimeField(auto_now_add=True)
 
     compact_fields = []
