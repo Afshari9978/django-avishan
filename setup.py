@@ -15,14 +15,6 @@ setup(
     url='https://gitlab.com/afshari9978/avishan',
     license='MIT',
     install_requires=[
-        'avishan_wrapper==0.1.0',
-        'bcrypt==3.1.6',
-        'Django>=2.2.5',
-        'django-cors-headers==2.4.0',
-        'gunicorn==19.9.0',
-        'kavenegar==1.1.2',
-        'Khayyam==3.0.17',
-        'Pillow==6.0.0',
-        'PyJWT==1.7.0'
+        'Django==2.2.6',
     ]
 )
