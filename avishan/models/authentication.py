@@ -35,16 +35,41 @@ class UserGroup(AvishanModel):
 
 
 class UserUserGroup(AvishanModel):
+    """
+    Link between user and user group. Recommended object for addressing user and system models. It contains user group
+    and you can distinguish between multiple user accounts.
+
+    Token objects will contain address to this object, for having multiple-role login/logout without any interrupts.
+    """
+
+    """
+    Uniqueness will be guaranteed for each user and an user group programmatically. Using database UNIQUE postponed for 
+    lack of reliability on django Meta unique_together. 
+    """
+    # todo: raise appropriate exception for exceeding unique rule here.
     base_user = models.ForeignKey(BaseUser, on_delete=models.CASCADE, related_name='user_user_groups')
     user_group = models.ForeignKey(UserGroup, on_delete=models.CASCADE, related_name='user_user_groups')
+
+    """Last time user entered credentials to login using this method"""
     last_login = models.DateTimeField(null=True, blank=True, default=None)
+
+    """Date this link created between user and user group"""
     date_created = models.DateTimeField(auto_now_add=True)
-    """Only active users can use system. This field checks on every request"""
+
+    """
+    Each token have address to models.authentication.UserUserGroup object. If this fields become false, user cannot use 
+    system with this role. "is_active" field on models.authentication.BaseUser will not override on this field. 
+    """
     is_active = models.BooleanField(default=True, blank=True)
-    is_logged_in = models.BooleanField(default=True, blank=True)
+
+    """Checks for login/logout. If user never logged in throw this object, it will returns None"""
+    is_logged_in = models.BooleanField(default=None, blank=True, null=True)
 
     @property
     def last_used(self) -> Optional[datetime]:
+        """
+        Last used datetime. it will caught throw user devices. If never used, returns None
+        """
         pass  # todo
 
 
