@@ -1,4 +1,4 @@
-from . import current_request, thread_storage
+from avishan import current_request, thread_storage
 
 
 class Wrapper:
