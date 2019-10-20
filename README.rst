@@ -11,8 +11,11 @@ Quick start
 
     python manage.py avishan_config
 
-
-
-
 Features
------------
+--------
+* Request data storage (current_request dict)
+* Auto-find and checks token from session, or request header
+* Handle sort, search, filter and pagination on response
+* Configure django settings.py file
+* Handle CORS
+* Creates config.py file for each app and project
