@@ -4,6 +4,8 @@
 # todo: check for avishan_* values in data
 # todo: Handle search, sort, filter, pagination params on middleware
 # todo: save user device on every request
+# todo Check if user can use system. (is_active)
+# todo: Return current_request response as response. Should decode response and encoded it again if discard used
 
 """avishan_config file"""
 # todo: add avishan app to INSTALLED_APPS

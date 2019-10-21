@@ -8,15 +8,30 @@ class Wrapper:
         self.get_response = get_response
 
     def __call__(self, request):
+        from django.http.request import RawPostDataException
+        import json
+
         current_request['request'] = request
         current_request['response'] = {}
+        """If not checked "None", then switches between api & template"""
+        current_request['is_api'] = None
         current_request['discard_wsgi_response'] = True
         current_request['base_user'] = None
         current_request['user_group'] = None
         current_request['user_user_group'] = None
         current_request['status_code'] = 200
 
-        # todo: create request.data from request body
+        """
+        Parse request data
+        """
+        if request.method != 'GET':
+            try:
+                if len(request.body) > 0:
+                    request.data = json.loads(request.body.decode('utf-8'))
+                else:
+                    request.data = {}
+            except RawPostDataException:
+                request.data = {}
 
         """Send request object to the next layer and wait for response"""
         response = self.get_response(request)
@@ -33,7 +48,7 @@ class Authentication:
         self.get_response = get_response
 
     def __call__(self, request):
-        from avishan.utils import must_have_token, is_token_in_header, is_token_in_session, add_token_to_response, \
+        from avishan.utils import must_have_token, find_token_in_header, find_token_in_session, add_token_to_response, \
             must_monitor
 
         """Checks for avoid-touch requests"""
@@ -42,24 +57,14 @@ class Authentication:
 
         """Check if this request must contain token with it"""
         if must_have_token(request.path):
-            if is_token_in_header():
-                pass  # todo
-
-            elif is_token_in_session():
-                pass  # todo
-
-            else:
+            if not find_token_in_header() and not find_token_in_session():
                 pass  # todo Token not found; raise exception
 
+            # todo: decode token and check it
             # todo Find user and manipulate current_request object
-            # todo Check if user can use system. (is_active)
 
         """Send request object to the next layer and wait for response"""
         response = self.get_response(request)
-
-        if current_request['discard_wsgi_response']:
-            # todo: Return current_request response as response. Should decode response and encoded it again
-            pass
 
         add_token_to_response()
 
