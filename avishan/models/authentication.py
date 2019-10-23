@@ -85,8 +85,57 @@ class EmailPasswordAuthenticate(AvishanModel):
     email = models.CharField(max_length=255, unique=True)
     password = models.CharField(max_length=255, blank=True, null=True, default=None)
 
+    @staticmethod
+    def register(email: str, password: str):
+        pass  # todo
+
+    @staticmethod
+    def register_new_user(user_group: UserGroup, email: str, password: str):
+        """
+        Check for uniques. and create new user.
+        :return:
+        """
+        pass
+
+    def have_password(self):
+        return not self.password
+
 
 class PhonePasswordAuthenticate(AvishanModel):
     user_user_group = models.OneToOneField(UserUserGroup, on_delete=models.CASCADE, related_name='phone_password_auth')
     phone = models.CharField(max_length=255, unique=True)
     password = models.CharField(max_length=255, blank=True, null=True, default=None)
+
+    @staticmethod
+    def login(phone: str, password: str) -> Optional['PhonePasswordAuthenticate']:
+        try:
+            return PhonePasswordAuthenticate.objects.get(
+                phone=phone,
+                password=password
+            )
+        except PhonePasswordAuthenticate.DoesNotExist:
+            return None
+
+
+class AuthenticationKind:
+
+    @staticmethod
+    def register(user_user_group: UserUserGroup, **kwargs):
+        raise NotImplementedError()
+
+    def pending_registration(self) -> bool:
+        """
+        checks for pending registrations
+        :return: false if registered completely
+        """
+        raise NotImplementedError()
+
+    @staticmethod
+    def login(**kwargs):
+        """
+        login with entered data.
+        :param kwargs: entered credential like username, email, password and etc.
+        :return: return true if login accepted
+        """
+        raise NotImplementedError()
+        # todo: raise appropriate AuthExceptions

@@ -19,6 +19,8 @@ class Wrapper:
         current_request['base_user'] = None
         current_request['user_group'] = None
         current_request['user_user_group'] = None
+        current_request['token'] = None
+        current_request['decoded_token'] = None
         current_request['status_code'] = 200
 
         """
@@ -26,7 +28,7 @@ class Wrapper:
         """
         if request.method != 'GET':
             try:
-                if len(request.body) > 0:
+                if len(request.body) > 0 and not request.body.decode('utf-8').startswith('csrfmiddlewaretoken'):
                     request.data = json.loads(request.body.decode('utf-8'))
                 else:
                     request.data = {}
@@ -48,20 +50,16 @@ class Authentication:
         self.get_response = get_response
 
     def __call__(self, request):
-        from avishan.utils import must_have_token, find_token_in_header, find_token_in_session, add_token_to_response, \
-            must_monitor
+        from avishan.utils import find_token, add_token_to_response, must_monitor, find_and_check_user, decode_token
 
         """Checks for avoid-touch requests"""
         if not must_monitor(request.path):
             return self.get_response(request)
 
-        """Check if this request must contain token with it"""
-        if must_have_token(request.path):
-            if not find_token_in_header() and not find_token_in_session():
-                pass  # todo Token not found; raise exception
-
-            # todo: decode token and check it
-            # todo Find user and manipulate current_request object
+        """Find token and parse it"""
+        if find_token():
+            decode_token()
+            find_and_check_user()
 
         """Send request object to the next layer and wait for response"""
         response = self.get_response(request)

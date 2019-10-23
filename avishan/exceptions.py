@@ -25,10 +25,16 @@ class AuthException(AvishanException):
     GROUP_ACCOUNT_NOT_ACTIVE = 3
     TOKEN_NOT_FOUND = 4
     TOKEN_EXPIRED = 5
+    INVALID_TOKEN = 6
+    ACCESS_DENIED = 7
+    HTTP_METHOD_NOT_ALLOWED = 8
 
     def __init__(self, error_kind: int = NOT_DEFINED):
         add_data_to_response('error_kind', error_kind)
-        super().__init__(error_message=self.get_error_kind_text(error_kind), status_code=status.HTTP_403_FORBIDDEN)
+        status_code = status.HTTP_403_FORBIDDEN
+        if error_kind == AuthException.HTTP_METHOD_NOT_ALLOWED:
+            status_code = status.HTTP_405_METHOD_NOT_ALLOWED
+        super().__init__(error_message=self.get_error_kind_text(error_kind), status_code=status_code)
 
     def get_error_kind_text(self, error_kind: int):
         pass  # todo: find error kind from class variables
