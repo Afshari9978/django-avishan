@@ -113,6 +113,7 @@ class PhonePasswordAuthenticate(AvishanModel):
                 phone=phone,
                 password=password
             )
+        # todo: raise true exceptions
         except PhonePasswordAuthenticate.DoesNotExist:
             return None
 
