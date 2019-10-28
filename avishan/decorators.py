@@ -14,6 +14,10 @@ class AvishanView:
             from .exceptions import AvishanException, AuthException
             from . import current_request
 
+            def appname(request):
+                from django.urls import resolve
+                print(resolve(request.path).app_name)
+
             """If user not provided, return with error. and also if api-type but token in session"""
             if self.authenticate and not self.is_authenticated():
                 raise AuthException(AuthException.ACCESS_DENIED)

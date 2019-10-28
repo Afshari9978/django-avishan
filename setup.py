@@ -15,6 +15,9 @@ setup(
     url='https://gitlab.com/afshari9978/avishan',
     license='MIT',
     install_requires=[
+        'bcrypt==3.1.7',
         'Django==2.2.6',
+        'Khayyam==3.0.17',
+        'PyJWT==1.7.0'
     ]
 )

@@ -29,6 +29,7 @@ class AuthException(AvishanException):
     ACCESS_DENIED = 7
     HTTP_METHOD_NOT_ALLOWED = 8
     INCORRECT_PASSWORD = 9
+    DUPLICATE_AUTHENTICATION_IDENTIFIER = 10
 
     def __init__(self, error_kind: int = NOT_DEFINED):
         add_data_to_response('error_kind', error_kind)

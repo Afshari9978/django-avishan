@@ -3,6 +3,7 @@ from typing import Optional
 
 from django.db import models
 
+from avishan.misc.bch_datetime import BchDatetime
 from . import AvishanModel
 
 
@@ -102,22 +103,37 @@ class AuthenticationType(AvishanModel):
     @staticmethod
     def login(**kwargs):
         """
-        Login with entered data. Also do on-login action.
-        on-login actions:
-            -
+        Login with entered data. Can just pass data to do_password_login_actions method
         :param kwargs: entered credential like username, email, password and etc.
         :return: return true if login accepted
         """
         raise NotImplementedError()
         # todo: raise appropriate AuthExceptions 0.2.0
 
-    @staticmethod
-    def check_login(user_user_group: UserUserGroup):
+    @classmethod
+    def do_password_login(cls, key_name: str, key_value: str, value_name: str,
+                          value_value: str) -> user_user_group:
         """
-        Checks for authorizations for login and set values needed for login
-        :param user_user_group:
-        :return:
+        Doing login action in key-value aspect
+        :param key_name: identifier name: username, email
+        :param key_value: identifier value: afshari9978, afshari9978@gmail.com
+        :param value_name: checking name: password, code, passphrase
+        :param value_value: checking value (unhashed): 123465
         """
+        from avishan.exceptions import AuthException
+        try:
+            found_object = cls.objects.get(**{key_name: key_value})
+        except cls.DoesNotExist:
+            raise AuthException(AuthException.ACCOUNT_NOT_FOUND)
+        if not cls.check_password(value_value, found_object.__getattribute__(value_name)):
+            # todo 0.2.3: count incorrect enters with time, ban after some time
+            raise AuthException(AuthException.INCORRECT_PASSWORD)
+
+        found_object.last_login = BchDatetime().to_datetime()
+        found_object.is_login = True
+        found_object.save()
+
+        return found_object.user_user_group
 
     @staticmethod
     def hash_password(password: str) -> str:
@@ -159,28 +175,30 @@ class PhonePasswordAuthenticate(AuthenticationType):
     password = models.CharField(max_length=255, blank=True, null=True, default=None)
 
     @staticmethod
-    def register(user_user_group: UserUserGroup, phone: str, password: str):
+    def register(user_user_group: UserUserGroup, phone: str, password: str) -> 'PhonePasswordAuthenticate':
         """
-        Register phone-password authentication type for user.
+        Register phone-password authentication type for user. If there be errors, will raise straight.
         :param user_user_group:
         :param phone:
         :param password: un-hashed password.
-        :return:
+        :return: created
         """
-        pass  # todo 0.2.0
+        from avishan.exceptions import AuthException
+        try:
+            PhonePasswordAuthenticate.objects.create(
+                phone=phone
+            )
+
+            raise AuthException(AuthException.DUPLICATE_AUTHENTICATION_IDENTIFIER)
+        except PhonePasswordAuthenticate.DoesNotExist:
+            pass
+        created = PhonePasswordAuthenticate.objects.create(
+            user_user_group=user_user_group,
+            phone=phone,
+            password=AuthenticationType.hash_password(password)
+        )
+        return created  # todo 0.2.2: put validator on phone/password
 
     @staticmethod
     def login(phone: str, password: str) -> UserUserGroup:
-        from avishan.exceptions import AuthException
-        try:
-            phone_password_authenticate = PhonePasswordAuthenticate.objects.get(
-                phone=phone
-            )
-        except PhonePasswordAuthenticate.DoesNotExist:
-            raise AuthException(AuthException.ACCOUNT_NOT_FOUND)
-        if not AuthenticationType.check_password(password, phone_password_authenticate.password):
-            # todo 0.2.3: count incorrect enters with time, ban after some time
-            raise AuthException(AuthException.INCORRECT_PASSWORD)
-
-        AuthenticationType.check_login(phone_password_authenticate.user_user_group)
-        return phone_password_authenticate.user_user_group
+        return PhonePasswordAuthenticate.do_password_login('phone', phone, 'password', password)

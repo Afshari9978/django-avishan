@@ -1,5 +1,3 @@
-from typing import Type
-
 from avishan.exceptions import AvishanException, AuthException
 from . import current_request
 
@@ -7,10 +5,14 @@ from . import current_request
 def must_monitor(url: str) -> bool:
     """
     checks if request is in check-blacklist
-    :param url: request url
+    :param url: request url. If straightly catch from request.path, it comes like: /admin, /api/v1
     :return:
     """
+    from bpm_dev.avishan_config import avishan_configs
+    if url.startswith(avishan_configs['NOT_MONITORED_STARTS']):
+        return False
     # todo 0.2.0
+
     return True
 
 
@@ -79,8 +81,8 @@ def decode_token():
     if not token:
         raise AuthException(AuthException.TOKEN_NOT_FOUND)
     try:
-        from avishan_config import JWT_KEY
-        current_request['decoded_token'] = jwt.decode(token, JWT_KEY, algorithms=['HS256'])
+        from bpm_dev.avishan_config import avishan_configs
+        current_request['decoded_token'] = jwt.decode(token, avishan_configs('JWT_KEY'), algorithms=['HS256'])
     except jwt.exceptions.ExpiredSignatureError:
         AuthException(AuthException.TOKEN_EXPIRED)
     except:
@@ -88,11 +90,14 @@ def decode_token():
 
 
 def find_and_check_user():
+    """
+    Populate current_request object with data from token. Then check for user "active" authorization
+    :return:
+    """
     from avishan.models.authentication import UserUserGroup
     if not current_request['decoded_token']:
         AuthException(AuthException.INVALID_TOKEN)
     try:
-
         user_user_group = UserUserGroup.objects.get(id=current_request['decoded_token']['uug_id'])
     except UserUserGroup.DoesNotExist:
         raise AuthException(AuthException.ACCOUNT_NOT_FOUND)
