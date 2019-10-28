@@ -30,9 +30,26 @@ class UserGroup(AvishanModel):
     """Unique titles for groups. examples: Customer, User, Driver, Admin, Supervisor"""
     title = models.CharField(max_length=255, unique=True)
 
+    token_valid_seconds = models.BigIntegerField(default=30 * 60, blank=True)
+
     """Check if this group users can access to their specific space in this ways"""
     authenticate_with_email_password = models.BooleanField(default=False)
     authenticate_with_phone_password = models.BooleanField(default=False)
+
+    def add_user_to_user_group(self, base_user: BaseUser) -> 'UserUserGroup':
+        """
+        Create UUG or return it if available
+        """
+        try:
+            return UserUserGroup.objects.get(
+                base_user=base_user,
+                user_group=self
+            )
+        except UserUserGroup.DoesNotExist:
+            return UserUserGroup.objects.create(
+                user_group=self,
+                base_user=base_user
+            )
 
 
 class UserUserGroup(AvishanModel):
@@ -112,7 +129,7 @@ class AuthenticationType(AvishanModel):
 
     @classmethod
     def do_password_login(cls, key_name: str, key_value: str, value_name: str,
-                          value_value: str) -> user_user_group:
+                          value_value: str) -> 'AuthenticationType':
         """
         Doing login action in key-value aspect
         :param key_name: identifier name: username, email
@@ -121,6 +138,8 @@ class AuthenticationType(AvishanModel):
         :param value_value: checking value (unhashed): 123465
         """
         from avishan.exceptions import AuthException
+        from avishan.utils import populate_current_request
+
         try:
             found_object = cls.objects.get(**{key_name: key_value})
         except cls.DoesNotExist:
@@ -133,7 +152,9 @@ class AuthenticationType(AvishanModel):
         found_object.is_login = True
         found_object.save()
 
-        return found_object.user_user_group
+        populate_current_request(found_object)
+
+        return found_object
 
     @staticmethod
     def hash_password(password: str) -> str:
@@ -146,7 +167,7 @@ class AuthenticationType(AvishanModel):
         return bcrypt.hashpw(password.encode('utf8'), bcrypt.gensalt()).decode('utf8')
 
     @staticmethod
-    def check_password(password, hashed_password) -> bool:
+    def check_password(password: str, hashed_password: str) -> bool:
         """
         compares password with hashed instance.
         :param password:
@@ -154,7 +175,7 @@ class AuthenticationType(AvishanModel):
         :return: True if match
         """
         import bcrypt
-        return bcrypt.checkpw(password, hashed_password)
+        return bcrypt.checkpw(password.encode('utf8'), hashed_password.encode('utf8'))
 
 
 class EmailPasswordAuthenticate(AuthenticationType):
@@ -185,10 +206,9 @@ class PhonePasswordAuthenticate(AuthenticationType):
         """
         from avishan.exceptions import AuthException
         try:
-            PhonePasswordAuthenticate.objects.create(
+            PhonePasswordAuthenticate.objects.get(
                 phone=phone
             )
-
             raise AuthException(AuthException.DUPLICATE_AUTHENTICATION_IDENTIFIER)
         except PhonePasswordAuthenticate.DoesNotExist:
             pass
@@ -200,5 +220,5 @@ class PhonePasswordAuthenticate(AuthenticationType):
         return created  # todo 0.2.2: put validator on phone/password
 
     @staticmethod
-    def login(phone: str, password: str) -> UserUserGroup:
+    def login(phone: str, password: str) -> 'PhonePasswordAuthenticate':
         return PhonePasswordAuthenticate.do_password_login('phone', phone, 'password', password)

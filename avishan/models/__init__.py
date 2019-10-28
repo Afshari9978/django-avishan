@@ -1,4 +1,4 @@
-from typing import List, Type
+from typing import List, Type, Tuple, Optional
 
 from django.db import models
 
@@ -43,3 +43,29 @@ class AvishanModel(models.Model):
                     total += item.__subclasses__()  # todo 0.2.0: should be recursive
             return list(set(total))
         return [x for x in AvishanModel.find_models() if x._meta.app_label == app_name]
+
+    @staticmethod
+    def find_model_with_class_name(class_name: str) -> Optional[Type['AvishanModel']]:
+        for item in AvishanModel.find_models():
+            if item.class_name() == class_name:
+                return item
+        return None
+
+    @classmethod
+    def create_or_update(cls, fixed_kwargs: dict, new_additional_kwargs: dict) -> Tuple[Type['AvishanModel'], bool]:
+        """
+        Create object if doesnt exists. Else update it
+        :param fixed_kwargs: key values to find object in db
+        :param new_additional_kwargs: new changing kwargs
+        :return: found/created object and True if created, False if found
+        """
+        try:
+            found = cls.objects.get(**fixed_kwargs)
+            for key, value in new_additional_kwargs.items():
+                found.__setattr__(key, value)
+            found.save()
+            return found, False
+        except cls.DoesNotExist:
+            return cls.objects.create(
+                **{**fixed_kwargs, **new_additional_kwargs}
+            ), True
