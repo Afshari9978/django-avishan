@@ -2,12 +2,12 @@ from avishan.models import AvishanModel
 
 
 class Image(AvishanModel):
-    pass  # todo
+    pass  # todo 0.2.0
 
 
 class Video(AvishanModel):
-    pass  # todo
+    pass  # todo 0.2.3
 
 
 class File(AvishanModel):
-    pass  # todo
+    pass  # todo 0.2.1

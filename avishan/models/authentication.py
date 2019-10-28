@@ -46,12 +46,9 @@ class UserUserGroup(AvishanModel):
     Uniqueness will be guaranteed for each user and an user group programmatically. Using database UNIQUE postponed for 
     lack of reliability on django Meta unique_together. 
     """
-    # todo: raise appropriate exception for exceeding unique rule here.
+    # todo 0.2.1: raise appropriate exception for exceeding unique rule here.
     base_user = models.ForeignKey(BaseUser, on_delete=models.CASCADE, related_name='user_user_groups')
     user_group = models.ForeignKey(UserGroup, on_delete=models.CASCADE, related_name='user_user_groups')
-
-    """Last time user entered credentials to login using this method"""
-    last_login = models.DateTimeField(null=True, blank=True, default=None)
 
     """Date this link created between user and user group"""
     date_created = models.DateTimeField(auto_now_add=True)
@@ -62,15 +59,19 @@ class UserUserGroup(AvishanModel):
     """
     is_active = models.BooleanField(default=True, blank=True)
 
-    """Checks for login/logout. If user never logged in throw this object, it will returns None"""
-    is_logged_in = models.BooleanField(default=None, blank=True, null=True)
-
     @property
     def last_used(self) -> Optional[datetime]:
         """
         Last used datetime. it will caught throw user devices. If never used, returns None
         """
-        pass  # todo
+        pass  # todo 0.2.0
+
+    @property
+    def last_login(self) -> Optional[datetime]:
+        """
+        Last login comes from this user user group authorization types.
+        """
+        pass  # todo 0.2.0
 
 
 class UserDevice(AvishanModel):
@@ -80,63 +81,106 @@ class UserDevice(AvishanModel):
     used_count = models.BigIntegerField(default=0)
 
 
-class EmailPasswordAuthenticate(AvishanModel):
-    user_user_group = models.OneToOneField(UserUserGroup, on_delete=models.CASCADE, related_name='email_password_auth')
-    email = models.CharField(max_length=255, unique=True)
-    password = models.CharField(max_length=255, blank=True, null=True, default=None)
+class AuthenticationType(AvishanModel):
+    user_user_group = models.OneToOneField(UserUserGroup, on_delete=models.CASCADE)
+    last_used = models.DateTimeField(default=None, blank=True, null=True)
+    last_login = models.DateTimeField(default=None, blank=True, null=True)
+    is_login = models.BooleanField(default=None, null=True, blank=True)
 
-    @staticmethod
-    def register(email: str, password: str):
-        pass  # todo
-
-    @staticmethod
-    def register_new_user(user_group: UserGroup, email: str, password: str):
-        """
-        Check for uniques. and create new user.
-        :return:
-        """
-        pass
-
-    def have_password(self):
-        return not self.password
-
-
-class PhonePasswordAuthenticate(AvishanModel):
-    user_user_group = models.OneToOneField(UserUserGroup, on_delete=models.CASCADE, related_name='phone_password_auth')
-    phone = models.CharField(max_length=255, unique=True)
-    password = models.CharField(max_length=255, blank=True, null=True, default=None)
-
-    @staticmethod
-    def login(phone: str, password: str) -> Optional['PhonePasswordAuthenticate']:
-        try:
-            return PhonePasswordAuthenticate.objects.get(
-                phone=phone,
-                password=password
-            )
-        # todo: raise true exceptions
-        except PhonePasswordAuthenticate.DoesNotExist:
-            return None
-
-
-class AuthenticationKind:
+    class Meta:
+        abstract = True
 
     @staticmethod
     def register(user_user_group: UserUserGroup, **kwargs):
-        raise NotImplementedError()
-
-    def pending_registration(self) -> bool:
         """
-        checks for pending registrations
-        :return: false if registered completely
+        Factory method which creates object of an authorization type.
+        :param user_user_group: target user_user_group object
+        :param kwargs: email, password, phone, code, etc.
         """
         raise NotImplementedError()
 
     @staticmethod
     def login(**kwargs):
         """
-        login with entered data.
+        Login with entered data. Also do on-login action.
+        on-login actions:
+            -
         :param kwargs: entered credential like username, email, password and etc.
         :return: return true if login accepted
         """
         raise NotImplementedError()
-        # todo: raise appropriate AuthExceptions
+        # todo: raise appropriate AuthExceptions 0.2.0
+
+    @staticmethod
+    def check_login(user_user_group: UserUserGroup):
+        """
+        Checks for authorizations for login and set values needed for login
+        :param user_user_group:
+        :return:
+        """
+
+    @staticmethod
+    def hash_password(password: str) -> str:
+        """
+        Hash entered password
+        :param password:
+        :return: hashed password in string
+        """
+        import bcrypt
+        return bcrypt.hashpw(password.encode('utf8'), bcrypt.gensalt()).decode('utf8')
+
+    @staticmethod
+    def check_password(password, hashed_password) -> bool:
+        """
+        compares password with hashed instance.
+        :param password:
+        :param hashed_password:
+        :return: True if match
+        """
+        import bcrypt
+        return bcrypt.checkpw(password, hashed_password)
+
+
+class EmailPasswordAuthenticate(AuthenticationType):
+    email = models.CharField(max_length=255, unique=True)
+    password = models.CharField(max_length=255, blank=True, null=True, default=None)
+
+    @staticmethod
+    def register(user_user_group: UserUserGroup, email: str, password: str, **kwargs):
+        pass  # todo 0.2.0
+
+    @staticmethod
+    def login(**kwargs):
+        pass  # todo 0.2.0
+
+
+class PhonePasswordAuthenticate(AuthenticationType):
+    phone = models.CharField(max_length=255, unique=True)
+    password = models.CharField(max_length=255, blank=True, null=True, default=None)
+
+    @staticmethod
+    def register(user_user_group: UserUserGroup, phone: str, password: str):
+        """
+        Register phone-password authentication type for user.
+        :param user_user_group:
+        :param phone:
+        :param password: un-hashed password.
+        :return:
+        """
+        pass  # todo 0.2.0
+
+    @staticmethod
+    def login(phone: str, password: str) -> UserUserGroup:
+        from avishan.exceptions import AuthException
+        try:
+            phone_password_authenticate = PhonePasswordAuthenticate.objects.get(
+                phone=phone
+            )
+        except PhonePasswordAuthenticate.DoesNotExist:
+            raise AuthException(AuthException.ACCOUNT_NOT_FOUND)
+        if not AuthenticationType.check_password(password, phone_password_authenticate.password):
+            # todo 0.2.3: count incorrect enters with time, ban after some time
+            raise AuthException(AuthException.INCORRECT_PASSWORD)
+
+        AuthenticationType.check_login(phone_password_authenticate.user_user_group)
+        return phone_password_authenticate.user_user_group

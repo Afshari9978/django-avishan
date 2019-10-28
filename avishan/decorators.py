@@ -25,7 +25,7 @@ class AvishanView:
             try:
                 result = view_function(*args, **kwargs)
             except AvishanException as e:
-                save_traceback_and_raise_exception(e)  # todo: should return to next level middleware
+                save_traceback_and_raise_exception(e)  # todo: should return to next level middleware 0.2.0
             except Exception as e:
                 save_traceback_and_raise_exception(AvishanException(wrap_exception=e))
 
@@ -58,5 +58,5 @@ class AvishanTemplateView(AvishanView):
 
 
 class AvishanCalculate:
-    # todo: execution time
+    # todo: execution time 0.2.3
     pass

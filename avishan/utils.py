@@ -10,7 +10,7 @@ def must_monitor(url: str) -> bool:
     :param url: request url
     :return:
     """
-    # todo
+    # todo 0.2.0
     return True
 
 
@@ -64,12 +64,12 @@ def add_token_to_response():
     create new token if needed, else reuse previous
     add token to session if session-based auth, else to response header
     """
-    pass  # todo
+    pass  # todo 0.2.0
 
 
 def save_traceback_and_raise_exception(exception: AvishanException):
-    # todo: save traceback
-    # todo: save exception to current_request
+    # todo: save traceback 0.2.2
+    # todo: save exception to current_request 0.2.1
     raise exception
 
 

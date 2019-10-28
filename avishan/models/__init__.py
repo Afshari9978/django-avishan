@@ -4,6 +4,7 @@ from django.db import models
 
 
 class AvishanModel(models.Model):
+    # todo 0.2.1: use manager or simply create functions here?
     class Meta:
         abstract = True
 
@@ -39,6 +40,6 @@ class AvishanModel(models.Model):
             total = AvishanModel.__subclasses__()
             for item in total[:]:
                 if len(item.__subclasses__()) > 0:
-                    total += item.__subclasses__()  # todo should be recursive
+                    total += item.__subclasses__()  # todo 0.2.0: should be recursive
             return list(set(total))
         return [x for x in AvishanModel.find_models() if x._meta.app_label == app_name]

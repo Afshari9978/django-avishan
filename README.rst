@@ -7,6 +7,10 @@ Avishan is a set of tools for building fast, comfortable and reliable django app
 Quick start
 -----------
 
+0. On linux remember to install this packages::
+
+    sudo apt-get install build-essential libffi-dev python3-dev
+
 1. just run this command (::
 
     python manage.py avishan_config

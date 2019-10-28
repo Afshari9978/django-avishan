@@ -50,4 +50,4 @@ HTTP_504_GATEWAY_TIMEOUT = 504
 HTTP_505_HTTP_VERSION_NOT_SUPPORTED = 505
 HTTP_507_INSUFFICIENT_STORAGE = 507
 HTTP_511_NETWORK_AUTHENTICATION_REQUIRED = 511
-# todo: update with https://httpstatuses.com/
+# todo 0.2.3: update with https://httpstatuses.com/
