@@ -103,7 +103,7 @@ class AuthenticationType(AvishanModel):
     user_user_group = models.OneToOneField(UserUserGroup, on_delete=models.CASCADE)
     last_used = models.DateTimeField(default=None, blank=True, null=True)
     last_login = models.DateTimeField(default=None, blank=True, null=True)
-    is_login = models.BooleanField(default=None, null=True, blank=True)
+    last_logout = models.DateTimeField(default=None, blank=True, null=True)
 
     class Meta:
         abstract = True
@@ -127,9 +127,15 @@ class AuthenticationType(AvishanModel):
         raise NotImplementedError()
         # todo: raise appropriate AuthExceptions 0.2.0
 
+    def logout(self):
+        self.last_logout = BchDatetime().to_datetime()
+        self.save()
+        from avishan import current_request
+        current_request['authentication_object'] = None
+
     @classmethod
-    def do_password_login(cls, key_name: str, key_value: str, value_name: str,
-                          value_value: str) -> 'AuthenticationType':
+    def _do_password_login(cls, key_name: str, key_value: str, value_name: str,
+                           value_value: str) -> 'AuthenticationType':
         """
         Doing login action in key-value aspect
         :param key_name: identifier name: username, email
@@ -144,12 +150,12 @@ class AuthenticationType(AvishanModel):
             found_object = cls.objects.get(**{key_name: key_value})
         except cls.DoesNotExist:
             raise AuthException(AuthException.ACCOUNT_NOT_FOUND)
-        if not cls.check_password(value_value, found_object.__getattribute__(value_name)):
+        if not cls._check_password(value_value, found_object.__getattribute__(value_name)):
             # todo 0.2.3: count incorrect enters with time, ban after some time
             raise AuthException(AuthException.INCORRECT_PASSWORD)
 
         found_object.last_login = BchDatetime().to_datetime()
-        found_object.is_login = True
+        found_object.last_logout = None
         found_object.save()
 
         populate_current_request(found_object)
@@ -157,7 +163,7 @@ class AuthenticationType(AvishanModel):
         return found_object
 
     @staticmethod
-    def hash_password(password: str) -> str:
+    def _hash_password(password: str) -> str:
         """
         Hash entered password
         :param password:
@@ -167,7 +173,7 @@ class AuthenticationType(AvishanModel):
         return bcrypt.hashpw(password.encode('utf8'), bcrypt.gensalt()).decode('utf8')
 
     @staticmethod
-    def check_password(password: str, hashed_password: str) -> bool:
+    def _check_password(password: str, hashed_password: str) -> bool:
         """
         compares password with hashed instance.
         :param password:
@@ -215,10 +221,10 @@ class PhonePasswordAuthenticate(AuthenticationType):
         created = PhonePasswordAuthenticate.objects.create(
             user_user_group=user_user_group,
             phone=phone,
-            password=AuthenticationType.hash_password(password)
+            password=AuthenticationType._hash_password(password)
         )
         return created  # todo 0.2.2: put validator on phone/password
 
     @staticmethod
     def login(phone: str, password: str) -> 'PhonePasswordAuthenticate':
-        return PhonePasswordAuthenticate.do_password_login('phone', phone, 'password', password)
+        return PhonePasswordAuthenticate._do_password_login('phone', phone, 'password', password)

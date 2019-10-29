@@ -1,6 +1,9 @@
+from typing import Optional
+
 from django.http import HttpResponse
 
 from avishan.exceptions import AvishanException, AuthException
+from avishan.misc.bch_datetime import BchDatetime
 from avishan.models.authentication import UserUserGroup, AuthenticationType
 from . import current_request
 
@@ -41,7 +44,6 @@ def find_token_in_session() -> bool:
     try:
         current_request['token'] = current_request['request'].COOKIES['token']
         if len(current_request['token']) > 0:
-            print(current_request['token'])
             return True
     except KeyError:
         pass
@@ -70,18 +72,27 @@ def add_token_to_response(rendered_response: HttpResponse):
     create new token if needed, else reuse previous
     add token to session if session-based auth, else to response header
     """
-    token = encode_token(current_request['authentication_object'])
 
-    if current_request['is_api']:
-        current_request['response']['token'] = token
-
+    if not current_request['authentication_object']:
+        if current_request['is_api']:
+            try:
+                del current_request['response']['token']
+            except KeyError:
+                pass
+        else:
+            rendered_response.delete_cookie('token')
     else:
-        rendered_response.set_cookie('token', token)
+        token = encode_token(current_request['authentication_object'])
+
+        if current_request['is_api']:
+            current_request['response']['token'] = token
+
+        else:
+            rendered_response.set_cookie('token', token)
 
 
-def encode_token(authentication_object: AuthenticationType) -> str:
+def encode_token(authentication_object: AuthenticationType) -> Optional[str]:
     import jwt
-    from avishan.misc.bch_datetime import BchDatetime
     from datetime import timedelta
     from bpm_dev.avishan_config import AvishanConfig
 
@@ -91,7 +102,8 @@ def encode_token(authentication_object: AuthenticationType) -> str:
         'at_id': authentication_object.id,
         'exp': (now + timedelta(
             seconds=authentication_object.user_user_group.user_group.token_valid_seconds)).to_unix_timestamp(),
-        'crt': now.to_unix_timestamp()
+        'crt': now.to_unix_timestamp(),
+        'lgn': BchDatetime(authentication_object.last_login).to_unix_timestamp()
     }
     return jwt.encode(token_data,
                       AvishanConfig.JWT_KEY,
@@ -127,7 +139,8 @@ def find_and_check_user():
         current_request['decoded_token']['at_n']
     )
     try:
-        authentication_type_object = authentication_type_class.objects.get(id=current_request['decoded_token']['at_id'])
+        authentication_type_object: AuthenticationType = authentication_type_class.objects.get(
+            id=current_request['decoded_token']['at_id'])
         user_user_group = authentication_type_object.user_user_group
     except authentication_type_class.DoesNotExist:
         raise AuthException(AuthException.ACCOUNT_NOT_FOUND)
@@ -136,6 +149,10 @@ def find_and_check_user():
         raise AuthException(AuthException.GROUP_ACCOUNT_NOT_ACTIVE)
     if not user_user_group.base_user.is_active:
         raise AuthException(AuthException.ACCOUNT_NOT_ACTIVE)
+    if BchDatetime(authentication_type_object.last_login).to_unix_timestamp() != current_request['decoded_token'][
+        'lgn'] or authentication_type_object.last_logout:
+        raise AuthException(AuthException.ACCESS_DENIED)
+
     populate_current_request(authentication_type_object)
 
 

@@ -12,7 +12,7 @@ class AvishanView:
     def __call__(self, view_function):
 
         def wrapper(*args, **kwargs):
-            from .exceptions import AuthException, AvishanException
+            from .exceptions import AuthException
             from . import current_request
             from bpm_dev.avishan_config import AvishanConfig
             from django.shortcuts import redirect
@@ -31,15 +31,11 @@ class AvishanView:
             if current_request['is_api'] and current_request['request'].method not in self.methods:
                 raise AuthException(AuthException.HTTP_METHOD_NOT_ALLOWED)
 
-            try:
-                result = view_function(*args, **kwargs)
-            except AvishanException as e:
-                current_request['exception'] = e
-                result = JsonResponse({})
-                # todo: should return to next level middleware 0.2.0
-            except Exception as e:
-                current_request['exception'] = e
-                result = JsonResponse({})
+            # try:
+            result = view_function(*args, **kwargs)
+            # except Exception as e:
+            #     current_request['exception'] = e
+            #     result = JsonResponse({}) # todo 0.2.0
 
             return result
 
