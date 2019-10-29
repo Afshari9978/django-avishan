@@ -30,6 +30,10 @@ class AvishanModel(models.Model):
         s1 = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', cls.class_name())
         return re.sub('([a-z0-9])([A-Z])', r'\1_\2', s1).lower()
 
+    @classmethod
+    def app_name(cls) -> str:
+        return cls._meta.app_label
+
     @staticmethod
     def find_non_abstract_models(app_name: str = None) -> List[Type['AvishanModel']]:
         return [x for x in AvishanModel.find_models(app_name) if x._meta.abstract is False]

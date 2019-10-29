@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, List
 
 from django.http import HttpResponse
 
@@ -17,8 +17,6 @@ def must_monitor(url: str) -> bool:
     from bpm_dev.avishan_config import AvishanConfig
     if url.startswith(AvishanConfig.NOT_MONITORED_STARTS):
         return False
-    # todo 0.2.0
-
     return True
 
 
@@ -163,7 +161,37 @@ def populate_current_request(login_with: AuthenticationType):
     current_request['authentication_object'] = login_with
 
 
-def run_app_checks():
-    # todo 0.2.0
-    from core.avishan_config import check
-    check()
+def run_apps_check():
+    from importlib import import_module
+    for app_name in get_app_names():
+
+        try:
+            import_module(app_name)
+        except ModuleNotFoundError:
+            # todo 0.2.2 raise some error somewhere
+            continue
+        try:
+            init_file = import_module(app_name + ".avishan_config")
+        except ModuleNotFoundError:
+            create_avishan_config_file(app_name)
+            continue
+        try:
+            init_file.check()
+        except AttributeError as e:
+            # todo 0.2.2 raise some error somewhere
+            continue
+
+
+def get_app_names() -> List[str]:
+    from django.apps import apps
+    return [key.name for key in apps.get_app_configs() if
+            (not key.name.startswith('django.') and key.name != 'avishan')]
+
+
+def create_avishan_config_file(app_name: str):
+    f = open(app_name + "/avishan_config.py", 'w+')
+    f.writelines((
+        'def check():\n',
+        '    pass\n'
+    ))
+    f.close()

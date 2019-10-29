@@ -35,7 +35,7 @@ class AvishanView:
             result = view_function(*args, **kwargs)
             # except Exception as e:
             #     current_request['exception'] = e
-            #     result = JsonResponse({}) # todo 0.2.0
+            #     result = JsonResponse({}) # todo 0.2.0 hold
 
             return result
 

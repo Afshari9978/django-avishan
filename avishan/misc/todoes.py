@@ -3,7 +3,6 @@
 # todo 0.2.2: check for avishan_* values in data
 # todo 0.2.1: Handle search, sort, filter, pagination params on middleware
 # todo 0.2.2: save user device on every request
-# todo 0.2.0: Check if user can use system. (is_active)
 # todo 0.2.1: Return current_request response as response. Should decode response and encoded it again if discard used
 # todo 0.2.2: save traceback
 

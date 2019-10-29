@@ -82,14 +82,30 @@ class UserUserGroup(AvishanModel):
         """
         Last used datetime. it will caught throw user devices. If never used, returns None
         """
-        pass  # todo 0.2.0
+        dates = []
+        if hasattr(self, 'emailpasswordauthenticate'):
+            dates.append(self.emailpasswordauthenticate.last_used)
+        if hasattr(self, 'phonepasswordauthenticate'):
+            dates.append(self.phonepasswordauthenticate.last_used)
+
+        if len(dates) == 0:
+            return None
+        return max(dates)
 
     @property
     def last_login(self) -> Optional[datetime]:
         """
         Last login comes from this user user group authorization types.
         """
-        pass  # todo 0.2.0
+        dates = []
+        if hasattr(self, 'emailpasswordauthenticate'):
+            dates.append(self.emailpasswordauthenticate.last_login)
+        if hasattr(self, 'phonepasswordauthenticate'):
+            dates.append(self.phonepasswordauthenticate.last_login)
+
+        if len(dates) == 0:
+            return None
+        return max(dates)
 
 
 class UserDevice(AvishanModel):

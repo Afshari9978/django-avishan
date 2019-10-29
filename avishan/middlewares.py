@@ -7,13 +7,13 @@ class Wrapper:
     """this middleware creates "current_request" storage for each incoming request"""
 
     def __init__(self, get_response):
-        from avishan.utils import run_app_checks
+        from avishan.utils import run_apps_check
         self.get_response = get_response
 
         """
         Run avishan_config files, 'check' method
         """
-        run_app_checks()
+        run_apps_check()
 
     def __call__(self, request):
         from django.http.request import RawPostDataException
@@ -88,7 +88,7 @@ class Authentication:
             find_and_check_user()
         # except Exception as e:
         #     current_request['exception'] = e
-        #     return JsonResponse({}) todo 0.2.0
+        #     return JsonResponse({}) todo 0.2.0 hold
 
         """Send request object to the next layer and wait for response"""
         response = self.get_response(request)
