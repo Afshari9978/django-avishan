@@ -2,7 +2,6 @@ from typing import Optional, List
 
 from django.http import HttpResponse
 
-from avishan import current_request
 from avishan.exceptions import AuthException
 from avishan.misc.bch_datetime import BchDatetime
 from avishan.models.authentication import AuthenticationType

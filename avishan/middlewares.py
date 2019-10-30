@@ -1,7 +1,6 @@
 from django.http import JsonResponse
 
 from avishan import thread_storage
-from avishan.exceptions import AvishanException
 
 
 class Wrapper:
@@ -39,13 +38,9 @@ class Wrapper:
         """Send request object to the next layer and wait for response"""
         response = self.get_response(request)
 
-        if current_request['exception']:
-            temp = {
-                'exception': current_request['exception'].args
-            }
-            if hasattr(thread_storage, 'current_request'):
-                del thread_storage.current_request
-            return JsonResponse(temp)
+        if current_request['discard_wsgi_response']:
+            response = current_request['response']
+            return JsonResponse(current_request['response'])
 
         self.clear_current_request(current_request)
 
@@ -59,7 +54,7 @@ class Wrapper:
         """If not checked "None", then switches between api & template"""
         current_request['is_api'] = None
 
-        current_request['discard_wsgi_response'] = True
+        current_request['discard_wsgi_response'] = False
         current_request['base_user'] = None
         current_request['user_group'] = None
         current_request['user_user_group'] = None
@@ -77,6 +72,7 @@ class Authentication:
     def __call__(self, request):
         from avishan.utils import find_token, add_token_to_response, must_monitor, find_and_check_user, decode_token
         from . import current_request
+        from avishan.exceptions import AvishanException
 
         """Checks for avoid-touch requests"""
         if not must_monitor(request.path):

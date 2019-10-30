@@ -63,6 +63,17 @@ class AvishanModel(models.Model):
         return None
 
     @classmethod
+    def get_fields(cls) -> List[models.Field]:
+        return cls._meta.fields
+
+    @classmethod
+    def get_field(cls, field_name: str) -> models.Field:
+        for item in cls.get_fields():
+            if item.name == field_name:
+                return item
+        raise ValueError(f'field {field_name} not found in model {cls.class_name()}')
+
+    @classmethod
     def create_or_update(cls, fixed_kwargs: dict, new_additional_kwargs: dict) -> Tuple[Type['AvishanModel'], bool]:
         """
         Create object if doesnt exists. Else update it

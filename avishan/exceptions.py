@@ -1,6 +1,5 @@
 from typing import Optional
 from . import current_request
-from avishan.utils import add_data_to_response
 from .misc import status
 
 
@@ -11,8 +10,11 @@ class AvishanException(Exception):
             error_message: Optional[str] = None,
             status_code: int = status.HTTP_400_BAD_REQUEST
     ):
+        from avishan.utils import add_data_to_response
+
         # todo record exception 0.2.4
         add_data_to_response('error_message', error_message if error_message else 'NOT_PROVIDED')
+        current_request['exception'] = self
         current_request['status_code'] = status_code
 
 
@@ -34,6 +36,8 @@ class AuthException(AvishanException):
     DUPLICATE_AUTHENTICATION_TYPE = 11
 
     def __init__(self, error_kind: int = NOT_DEFINED):
+        from avishan.utils import add_data_to_response
+
         add_data_to_response('error_kind', error_kind)
         status_code = status.HTTP_403_FORBIDDEN
         if error_kind == AuthException.HTTP_METHOD_NOT_ALLOWED:

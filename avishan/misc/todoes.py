@@ -5,6 +5,8 @@
 # todo 0.2.2: save user device on every request
 # todo 0.2.1: Return current_request response as response. Should decode response and encoded it again if discard used
 # todo 0.2.2: save traceback
+# todo 0.2.1: doc and comment for everywhere
+# todo 0.2.1: readme edit to latest
 
 """avishan_config file"""
 # todo 0.2.2: create avishan_config.py file to each app: to always run it at startup
@@ -16,3 +18,4 @@
 # todo 0.2.1: handle cors headers
 # todo 0.2.1: add and comment database supported settings
 # todo 0.2.1: move secret_key to config file
+# todo 0.2.1: ask for project name and add it to settings.py. to put avishan_config in project folder not root
