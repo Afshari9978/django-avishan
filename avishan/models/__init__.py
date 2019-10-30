@@ -40,12 +40,19 @@ class AvishanModel(models.Model):
 
     @staticmethod
     def find_models(app_name: str = None) -> List[Type['AvishanModel']]:
+
+        def get_sub_classes(parent):
+            subs = [parent]
+            for child in parent.__subclasses__():
+                subs += get_sub_classes(child)
+            return subs
+
+        total = []
         if not app_name:
-            total = AvishanModel.__subclasses__()
-            for item in total[:]:
-                if len(item.__subclasses__()) > 0:
-                    total += item.__subclasses__()  # todo 0.2.0: should be recursive
+            for model in AvishanModel.__subclasses__():
+                total += get_sub_classes(model)
             return list(set(total))
+
         return [x for x in AvishanModel.find_models() if x._meta.app_label == app_name]
 
     @staticmethod

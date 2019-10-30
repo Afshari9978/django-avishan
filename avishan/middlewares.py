@@ -1,6 +1,7 @@
 from django.http import JsonResponse
 
 from avishan import thread_storage
+from avishan.exceptions import AvishanException
 
 
 class Wrapper:
@@ -82,13 +83,13 @@ class Authentication:
             return self.get_response(request)
 
         """Find token and parse it"""
-        # try:
-        if find_token():
-            decode_token()
-            find_and_check_user()
-        # except Exception as e:
-        #     current_request['exception'] = e
-        #     return JsonResponse({}) todo 0.2.0 hold
+        try:
+            if find_token():
+                decode_token()
+                find_and_check_user()
+        except AvishanException as e:
+            current_request['exception'] = e
+            return JsonResponse({})  # todo 0.2.4 other exceptions too
 
         """Send request object to the next layer and wait for response"""
         response = self.get_response(request)

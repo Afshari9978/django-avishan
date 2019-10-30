@@ -18,6 +18,7 @@ setup(
         'bcrypt==3.1.7',
         'Django==2.2.6',
         'Khayyam==3.0.17',
+        'Pillow==6.0.0',
         'PyJWT==1.7.0'
     ]
 )

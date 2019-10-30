@@ -1,5 +1,7 @@
 from django.http import JsonResponse
 
+from avishan.exceptions import AvishanException
+
 
 class AvishanView:
     def __init__(self, methods=None, authenticate: bool = None):
@@ -14,7 +16,7 @@ class AvishanView:
         def wrapper(*args, **kwargs):
             from .exceptions import AuthException
             from . import current_request
-            from bpm_dev.avishan_config import AvishanConfig
+            from avishan_config import AvishanConfig
             from django.shortcuts import redirect
 
             current_request['is_api'] = self.is_api if current_request['is_api'] is None else current_request['is_api']
@@ -31,11 +33,10 @@ class AvishanView:
             if current_request['is_api'] and current_request['request'].method not in self.methods:
                 raise AuthException(AuthException.HTTP_METHOD_NOT_ALLOWED)
 
-            # try:
-            result = view_function(*args, **kwargs)
-            # except Exception as e:
-            #     current_request['exception'] = e
-            #     result = JsonResponse({}) # todo 0.2.0 hold
+            try:
+                result = view_function(*args, **kwargs)
+            except AvishanException as e:
+                result = JsonResponse({})  # todo 0.2.4 capture all other exceptions too
 
             return result
 

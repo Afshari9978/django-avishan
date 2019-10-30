@@ -141,7 +141,6 @@ class AuthenticationType(AvishanModel):
         :return: return true if login accepted
         """
         raise NotImplementedError()
-        # todo: raise appropriate AuthExceptions 0.2.0
 
     def logout(self):
         self.last_logout = BchDatetime().to_datetime()
@@ -150,12 +149,12 @@ class AuthenticationType(AvishanModel):
         current_request['authentication_object'] = None
 
     @classmethod
-    def _do_password_login(cls, key_name: str, key_value: str, value_name: str,
-                           value_value: str) -> 'AuthenticationType':
+    def _do_identifier_password_login(cls, identifier_name: str, identifier_value: str, value_name: str,
+                                      value_value: str) -> 'AuthenticationType':
         """
         Doing login action in key-value aspect
-        :param key_name: identifier name: username, email
-        :param key_value: identifier value: afshari9978, afshari9978@gmail.com
+        :param identifier_name: identifier name: username, email
+        :param identifier_value: identifier value: afshari9978, afshari9978@gmail.com
         :param value_name: checking name: password, code, passphrase
         :param value_value: checking value (unhashed): 123465
         """
@@ -163,7 +162,7 @@ class AuthenticationType(AvishanModel):
         from avishan.utils import populate_current_request
 
         try:
-            found_object = cls.objects.get(**{key_name: key_value})
+            found_object = cls.objects.get(**{identifier_name: identifier_value})
         except cls.DoesNotExist:
             raise AuthException(AuthException.ACCOUNT_NOT_FOUND)
         if not cls._check_password(value_value, found_object.__getattribute__(value_name)):
@@ -177,6 +176,39 @@ class AuthenticationType(AvishanModel):
         populate_current_request(found_object)
 
         return found_object
+
+    @classmethod
+    def _do_identifier_password_register(cls, user_user_group: UserUserGroup, identifier_name: str,
+                                         identifier_value: str, password_name: str,
+                                         password_value: str) -> 'AuthenticationType':
+        """
+        Register identifier-password authentication type for user. If there be errors, will raise straight.
+        :param user_user_group:
+        :param identifier_name: examples: 'email', 'phone', 'username'
+        :param identifier_value: afshari9978@gmail.com
+        :param password_name:
+        :param password_value:
+        :return:
+        """
+        from avishan.exceptions import AuthException
+        try:
+            cls.objects.get(**{identifier_name: identifier_value})
+            raise AuthException(AuthException.DUPLICATE_AUTHENTICATION_IDENTIFIER)
+        except cls.DoesNotExist:
+            if cls.class_name() == 'EmailPasswordAuthenticate':
+                related_name = 'emailpasswordauthenticate'
+            else:
+                related_name = 'phonepasswordauthenticate'
+            # todo 0.2.3: auto reach to related
+            if hasattr(user_user_group, related_name):
+                raise AuthException(AuthException.DUPLICATE_AUTHENTICATION_TYPE)
+        created = cls.objects.create(**{
+            'user_user_group': user_user_group,
+            identifier_name: identifier_value,
+            password_name: AuthenticationType._hash_password(password_value)
+        })
+
+        return created  # todo 0.2.2: put validator on identifier/password
 
     @staticmethod
     def _hash_password(password: str) -> str:
@@ -205,12 +237,13 @@ class EmailPasswordAuthenticate(AuthenticationType):
     password = models.CharField(max_length=255, blank=True, null=True, default=None)
 
     @staticmethod
-    def register(user_user_group: UserUserGroup, email: str, password: str, **kwargs):
-        pass  # todo 0.2.0
+    def register(user_user_group: UserUserGroup, email: str, password: str, **kwargs) -> 'EmailPasswordAuthenticate':
+        return EmailPasswordAuthenticate._do_identifier_password_register(user_user_group, 'email', email, 'password',
+                                                                          password)
 
     @staticmethod
-    def login(**kwargs):
-        pass  # todo 0.2.0
+    def login(email: str, password: str) -> 'EmailPasswordAuthenticate':
+        return EmailPasswordAuthenticate._do_identifier_password_login('email', email, 'password', password)
 
 
 class PhonePasswordAuthenticate(AuthenticationType):
@@ -219,28 +252,9 @@ class PhonePasswordAuthenticate(AuthenticationType):
 
     @staticmethod
     def register(user_user_group: UserUserGroup, phone: str, password: str) -> 'PhonePasswordAuthenticate':
-        """
-        Register phone-password authentication type for user. If there be errors, will raise straight.
-        :param user_user_group:
-        :param phone:
-        :param password: un-hashed password.
-        :return: created
-        """
-        from avishan.exceptions import AuthException
-        try:
-            PhonePasswordAuthenticate.objects.get(
-                phone=phone
-            )
-            raise AuthException(AuthException.DUPLICATE_AUTHENTICATION_IDENTIFIER)
-        except PhonePasswordAuthenticate.DoesNotExist:
-            pass
-        created = PhonePasswordAuthenticate.objects.create(
-            user_user_group=user_user_group,
-            phone=phone,
-            password=AuthenticationType._hash_password(password)
-        )
-        return created  # todo 0.2.2: put validator on phone/password
+        return PhonePasswordAuthenticate._do_identifier_password_register(user_user_group, 'phone', phone, 'password',
+                                                                          password)
 
     @staticmethod
     def login(phone: str, password: str) -> 'PhonePasswordAuthenticate':
-        return PhonePasswordAuthenticate._do_password_login('phone', phone, 'password', password)
+        return PhonePasswordAuthenticate._do_identifier_password_login('phone', phone, 'password', password)

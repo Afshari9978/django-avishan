@@ -2,9 +2,10 @@ from typing import Optional, List
 
 from django.http import HttpResponse
 
-from avishan.exceptions import AvishanException, AuthException
+from avishan import current_request
+from avishan.exceptions import AuthException
 from avishan.misc.bch_datetime import BchDatetime
-from avishan.models.authentication import UserUserGroup, AuthenticationType
+from avishan.models.authentication import AuthenticationType
 from . import current_request
 
 
@@ -14,7 +15,7 @@ def must_monitor(url: str) -> bool:
     :param url: request url. If straightly catch from request.path, it comes like: /admin, /api/v1
     :return:
     """
-    from bpm_dev.avishan_config import AvishanConfig
+    from avishan_config import AvishanConfig
     if url.startswith(AvishanConfig.NOT_MONITORED_STARTS):
         return False
     return True
@@ -92,7 +93,7 @@ def add_token_to_response(rendered_response: HttpResponse):
 def encode_token(authentication_object: AuthenticationType) -> Optional[str]:
     import jwt
     from datetime import timedelta
-    from bpm_dev.avishan_config import AvishanConfig
+    from avishan_config import AvishanConfig
 
     now = BchDatetime()
     token_data = {
@@ -115,7 +116,7 @@ def decode_token():
     if not token:
         raise AuthException(AuthException.TOKEN_NOT_FOUND)
     try:
-        from bpm_dev.avishan_config import AvishanConfig
+        from avishan_config import AvishanConfig
         current_request['decoded_token'] = jwt.decode(token, AvishanConfig.JWT_KEY, algorithms=['HS256'])
     except jwt.exceptions.ExpiredSignatureError:
         AuthException(AuthException.TOKEN_EXPIRED)
@@ -195,3 +196,8 @@ def create_avishan_config_file(app_name: str):
         '    pass\n'
     ))
     f.close()
+
+
+def add_data_to_response(field: str, data):
+    current_request['response'][field] = data
+    current_request['discard_wsgi_response'] = True
