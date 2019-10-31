@@ -35,6 +35,7 @@ class Wrapper:
             except RawPostDataException:
                 request.data = {}
 
+        # todo 0.2.2 check for 'avishan_' in request bodies
         """Send request object to the next layer and wait for response"""
         response = self.get_response(request)
 

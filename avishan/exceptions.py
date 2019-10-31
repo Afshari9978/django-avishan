@@ -34,6 +34,7 @@ class AuthException(AvishanException):
     INCORRECT_PASSWORD = 9
     DUPLICATE_AUTHENTICATION_IDENTIFIER = 10
     DUPLICATE_AUTHENTICATION_TYPE = 11
+    DEPRECATED_TOKEN = 12
 
     def __init__(self, error_kind: int = NOT_DEFINED):
         from avishan.utils import add_data_to_response

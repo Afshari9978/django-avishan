@@ -149,7 +149,7 @@ def find_and_check_user():
         raise AuthException(AuthException.ACCOUNT_NOT_ACTIVE)
     if BchDatetime(authentication_type_object.last_login).to_unix_timestamp() != current_request['decoded_token'][
         'lgn'] or authentication_type_object.last_logout:
-        raise AuthException(AuthException.ACCESS_DENIED)
+        raise AuthException(AuthException.DEPRECATED_TOKEN)
 
     populate_current_request(authentication_type_object)
 

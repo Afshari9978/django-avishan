@@ -20,6 +20,9 @@ class BaseUser(AvishanModel):
     """
     date_created = models.DateTimeField(auto_now_add=True)
 
+    def add_to_user_group(self, user_group: 'UserGroup') -> 'UserUserGroup':
+        return user_group.add_user_to_user_group(self)
+
 
 class UserGroup(AvishanModel):
     """
@@ -106,13 +109,6 @@ class UserUserGroup(AvishanModel):
         if len(dates) == 0:
             return None
         return max(dates)
-
-
-class UserDevice(AvishanModel):
-    user_user_group = models.ForeignKey(UserUserGroup, on_delete=models.CASCADE, related_name='devices')
-    date_created = models.DateTimeField(auto_now_add=True)
-    last_used = models.DateTimeField(null=True, blank=True, default=None)
-    used_count = models.BigIntegerField(default=0)
 
 
 class AuthenticationType(AvishanModel):
