@@ -34,6 +34,8 @@ class Wrapper:
                     request.data = {}
             except RawPostDataException:
                 request.data = {}
+            except:  # todo 0.2.3 in html forms, it raises errors
+                pass
 
         # todo 0.2.2 check for 'avishan_' in request bodies
         """Send request object to the next layer and wait for response"""

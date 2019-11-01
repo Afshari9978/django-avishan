@@ -200,3 +200,29 @@ def create_avishan_config_file(app_name: str):
 def add_data_to_response(field: str, data):
     current_request['response'][field] = data
     current_request['discard_wsgi_response'] = True
+
+
+def fa_numbers(text):
+    text = str(text)
+    text = en_number(text)
+    array = ['۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹']
+    result = ''
+    for i in str(text):
+        if i.isdigit():
+            result = result + array[int(i)]
+        else:
+            result = result + i
+
+    return result
+
+
+def en_number(text):
+    text = str(text)
+    result = ''
+    array = ['۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹']
+    for char in text:
+        if char in array:
+            result += str(array.index(char))
+        else:
+            result += char
+    return result

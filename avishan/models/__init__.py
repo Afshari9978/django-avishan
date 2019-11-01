@@ -3,12 +3,9 @@ from typing import List, Type, Tuple, Optional, Union
 
 from django.db import models
 
-# todo 0.2.0: crud views
 from django.db.models import NOT_PROVIDED
 
-from avishan import current_request
 from avishan.exceptions import ErrorMessageException
-from avishan.misc import status
 from avishan.misc.bch_datetime import BchDatetime
 
 
@@ -261,6 +258,8 @@ class AvishanModel(models.Model):
             if item.name == field_name:
                 return item
         raise ValueError(f'field {field_name} not found in model {cls.class_name()}')
+
+
 
     @classmethod
     def is_field_identifier_for_model(cls, field: models.Field) -> bool:
