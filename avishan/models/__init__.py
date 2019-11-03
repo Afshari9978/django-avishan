@@ -322,7 +322,13 @@ class AvishanModel(models.Model):
         elif isinstance(field, models.ForeignKey):
             cast = field.related_model
 
-        # todo 0.2.0: do cast here
+        if isinstance(cast, AvishanModel):
+            output = cast.objects.get(id=int(data))
+        else:
+            output = cast(data)
+
+        return output
+        # todo 0.2.0
 
     @classmethod
     def __get_object_from_dict(cls, input_dict: dict) -> 'AvishanModel':
