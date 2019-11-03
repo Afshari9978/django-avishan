@@ -1,6 +1,8 @@
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponseRedirect
+from django.shortcuts import redirect
 
 from avishan import thread_storage
+from avishan_config import AvishanConfig
 
 
 class Wrapper:
@@ -41,9 +43,11 @@ class Wrapper:
         """Send request object to the next layer and wait for response"""
         response = self.get_response(request)
 
-        if current_request['discard_wsgi_response']:
+        if current_request['discard_wsgi_response'] and not (
+                isinstance(response, HttpResponseRedirect) and current_request['is_api'] is False):
             response = current_request['response']
-            return JsonResponse(current_request['response'])
+            self.clear_current_request(current_request)
+            return JsonResponse(response)
 
         self.clear_current_request(current_request)
 
@@ -82,18 +86,24 @@ class Authentication:
             return self.get_response(request)
 
         """Find token and parse it"""
+        delete_cookie = False
         try:
             if find_token():
                 decode_token()
                 find_and_check_user()
         except AvishanException as e:
             current_request['exception'] = e
+            if current_request['is_api'] is False:
+                response = redirect(AvishanConfig.TEMPLATE_LOGIN_PAGE)
+                from avishan.utils import delete_token_from_request
+                delete_token_from_request(response)
+                return response
             return JsonResponse({})  # todo 0.2.4 other exceptions too
 
         """Send request object to the next layer and wait for response"""
         response = self.get_response(request)
 
         if current_request['user_user_group']:
-            add_token_to_response(response)
+            add_token_to_response(response, delete_cookie)
 
         return response

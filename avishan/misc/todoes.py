@@ -7,6 +7,8 @@
 # todo 0.2.2: save traceback
 # todo 0.2.1: doc and comment for everywhere
 # todo 0.2.1: readme edit to latest
+# todo 0.2.2: app check function change to class. to use its parameters.
+# todo 0.2.2: AvishanWarning with color and text and usage
 
 """avishan_config file"""
 # todo 0.2.2: create avishan_config.py file to each app: to always run it at startup

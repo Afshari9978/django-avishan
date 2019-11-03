@@ -65,20 +65,16 @@ def find_token() -> bool:
     return True
 
 
-def add_token_to_response(rendered_response: HttpResponse):
+def add_token_to_response(rendered_response: HttpResponse, delete_token: bool = False):
     """
     create new token if needed, else reuse previous
     add token to session if session-based auth, else to response header
     """
+    if delete_token:
+        delete_token_from_request(rendered_response)
 
     if not current_request['authentication_object']:
-        if current_request['is_api']:
-            try:
-                del current_request['response']['token']
-            except KeyError:
-                pass
-        else:
-            rendered_response.delete_cookie('token')
+        delete_token_from_request(rendered_response)
     else:
         token = encode_token(current_request['authentication_object'])
 
@@ -87,6 +83,16 @@ def add_token_to_response(rendered_response: HttpResponse):
 
         else:
             rendered_response.set_cookie('token', token)
+
+
+def delete_token_from_request(rendered_response):
+    if current_request['is_api']:
+        try:
+            del current_request['response']['token']
+        except KeyError:
+            pass
+    else:
+        rendered_response.delete_cookie('token')
 
 
 def encode_token(authentication_object: AuthenticationType) -> Optional[str]:
@@ -118,9 +124,9 @@ def decode_token():
         from avishan_config import AvishanConfig
         current_request['decoded_token'] = jwt.decode(token, AvishanConfig.JWT_KEY, algorithms=['HS256'])
     except jwt.exceptions.ExpiredSignatureError:
-        AuthException(AuthException.TOKEN_EXPIRED)
+        raise AuthException(AuthException.TOKEN_EXPIRED)
     except:
-        AuthException(AuthException.INVALID_TOKEN)
+        raise AuthException(AuthException.INVALID_TOKEN)
 
 
 def find_and_check_user():

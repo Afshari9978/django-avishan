@@ -259,8 +259,6 @@ class AvishanModel(models.Model):
                 return item
         raise ValueError(f'field {field_name} not found in model {cls.class_name()}')
 
-
-
     @classmethod
     def is_field_identifier_for_model(cls, field: models.Field) -> bool:
         """
@@ -300,6 +298,31 @@ class AvishanModel(models.Model):
             return False
 
         return True
+
+    @classmethod
+    def cast_field_data(cls, data, field):
+        if isinstance(field, (models.CharField, models.TextField)):
+            cast = str
+        elif isinstance(field, (models.IntegerField, models.AutoField)):
+            cast = int
+        elif isinstance(field, models.FloatField):
+            cast = float
+        elif isinstance(field, models.TimeField):
+            cast = datetime.time
+        elif isinstance(field, models.DateTimeField):
+            cast = datetime.datetime
+        elif isinstance(field, models.DateField):
+            cast = datetime.date
+        elif isinstance(field, models.BooleanField):
+            cast = bool
+        elif isinstance(field, models.FileField):
+            cast = 'file'
+        elif isinstance(field, models.ManyToManyField):
+            cast = field.related_model
+        elif isinstance(field, models.ForeignKey):
+            cast = field.related_model
+
+        # todo 0.2.0: do cast here
 
     @classmethod
     def __get_object_from_dict(cls, input_dict: dict) -> 'AvishanModel':
