@@ -9,13 +9,13 @@ class Wrapper:
     """this middleware creates "current_request" storage for each incoming request"""
 
     def __init__(self, get_response):
-        from avishan.utils import run_apps_check
         self.get_response = get_response
 
         """
         Run avishan_config files, 'check' method
         """
-        run_apps_check()
+        from avishan.models import AvishanModel
+        AvishanModel.run_apps_check()
 
     def __call__(self, request):
         from django.http.request import RawPostDataException
@@ -80,6 +80,7 @@ class Authentication:
         from avishan.utils import find_token, add_token_to_response, must_monitor, find_and_check_user, decode_token
         from . import current_request
         from avishan.exceptions import AvishanException
+        from avishan.utils import delete_token_from_request
 
         """Checks for avoid-touch requests"""
         if not must_monitor(request.path):
@@ -94,8 +95,8 @@ class Authentication:
         except AvishanException as e:
             current_request['exception'] = e
             if current_request['is_api'] is False:
-                response = redirect(AvishanConfig.TEMPLATE_LOGIN_PAGE)
-                from avishan.utils import delete_token_from_request
+                current_request['discard_wsgi_response'] = False
+                response = redirect(AvishanConfig.TEMPLATE_LOGIN_URL, permanent=True)
                 delete_token_from_request(response)
                 return response
             return JsonResponse({})  # todo 0.2.4 other exceptions too

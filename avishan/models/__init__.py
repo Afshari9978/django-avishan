@@ -244,6 +244,35 @@ class AvishanModel(models.Model):
                 return model
         return None
 
+    @staticmethod
+    def run_apps_check():
+        from importlib import import_module
+        from avishan.utils import create_avishan_config_file
+
+        for app_name in AvishanModel.get_app_names():
+
+            try:
+                import_module(app_name)
+            except ModuleNotFoundError:
+                # todo 0.2.2 raise some error somewhere
+                continue
+            try:
+                init_file = import_module(app_name + ".avishan_config")
+            except ModuleNotFoundError:
+                create_avishan_config_file(app_name)
+                continue
+            try:
+                init_file.check()
+            except AttributeError as e:
+                # todo 0.2.2 raise some error somewhere
+                continue
+
+    @staticmethod
+    def get_app_names() -> List[str]:
+        from django.apps import apps
+        return [key.name for key in apps.get_app_configs() if
+                (not key.name.startswith('django.') and key.name != 'avishan')]
+
     @classmethod
     def get_fields(cls) -> List[models.Field]:
         return cls._meta.fields
@@ -333,3 +362,68 @@ class AvishanModel(models.Model):
     @classmethod
     def __get_object_from_dict(cls, input_dict: dict) -> 'AvishanModel':
         return cls.get(**input_dict)
+
+    """
+    Admin default values
+    """
+    admin_available = False
+    admin_name = None
+    _admin_list_display = []
+    _admin_filters = []
+
+    """
+    Admin methods
+    """
+
+    @staticmethod
+    def get_available_admin_models():
+        from avishan_config import AvishanConfig
+        if AvishanConfig.ADMIN_PANEL_ORDERED:
+            return AvishanConfig.ADMIN_PANEL_ORDERED
+        total = []
+        for app_name in AvishanModel.get_app_names():
+            total += [item for item in AvishanModel.find_models(app_name) if item.admin_available]
+        return total
+
+    @classmethod
+    def admin_list_display(cls):
+        if len(cls._admin_list_display) == 0:
+            return [cls.get_field(item.name) for item in cls.get_fields()[1:]][:5]
+        return [cls.get_field(item.name) for item in cls._admin_list_display]
+
+    @classmethod
+    def admin_filters(cls):
+        if len(cls._admin_filters) == 0:
+            return None
+        return {
+            'fields': [item for item in cls._admin_filters]
+        }
+
+    @classmethod
+    def admin_list_actions(cls):
+        output = {
+            'title': 'عملیات ها',
+            'actions': []
+        }
+        output['actions'].append({
+            'title': 'view',
+            'button_class': "btn btn-icon-circle btn-warning",
+            'style': "margin-left: 10px",
+            'contain_class': "ti-eye",
+            'tooltip': 'جزئیات'
+        })
+        output['actions'].append({
+            'title': 'edit',
+            'button_class': "btn btn-icon-circle btn-info",
+            'style': "margin-left: 10px",
+            'contain_class': "ti-marker-alt",
+            'tooltip': 'ویرایش'
+        })
+        output['actions'].append({
+            'title': 'delete',
+            'button_class': "btn btn-icon-circle btn-danger",
+            'style': "margin-left: 0",
+            'contain_class': "ti-trash",
+            'tooltip': 'حذف'
+        })
+        return output

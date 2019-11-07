@@ -27,7 +27,7 @@ class AvishanView:
             if self.authenticate and not self.is_authenticated():
                 if current_request['is_api']:
                     raise AuthException(AuthException.ACCESS_DENIED)
-                return redirect(AvishanConfig.TEMPLATE_LOGIN_PAGE)
+                return redirect(AvishanConfig.TEMPLATE_LOGIN_URL, permanent=True)
 
             """http method check and raise 405"""
             if current_request['is_api'] and current_request['request'].method not in self.methods:

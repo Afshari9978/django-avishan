@@ -1,4 +1,4 @@
-from typing import Optional, List
+from typing import Optional
 
 from django.http import HttpResponse
 
@@ -165,33 +165,6 @@ def populate_current_request(login_with: AuthenticationType):
     current_request['user_group'] = login_with.user_user_group.user_group
     current_request['user_user_group'] = login_with.user_user_group
     current_request['authentication_object'] = login_with
-
-
-def run_apps_check():
-    from importlib import import_module
-    for app_name in get_app_names():
-
-        try:
-            import_module(app_name)
-        except ModuleNotFoundError:
-            # todo 0.2.2 raise some error somewhere
-            continue
-        try:
-            init_file = import_module(app_name + ".avishan_config")
-        except ModuleNotFoundError:
-            create_avishan_config_file(app_name)
-            continue
-        try:
-            init_file.check()
-        except AttributeError as e:
-            # todo 0.2.2 raise some error somewhere
-            continue
-
-
-def get_app_names() -> List[str]:
-    from django.apps import apps
-    return [key.name for key in apps.get_app_configs() if
-            (not key.name.startswith('django.') and key.name != 'avishan')]
 
 
 def create_avishan_config_file(app_name: str):

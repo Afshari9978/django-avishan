@@ -241,6 +241,10 @@ class EmailPasswordAuthenticate(AuthenticationType):
     def login(email: str, password: str) -> 'EmailPasswordAuthenticate':
         return EmailPasswordAuthenticate._do_identifier_password_login('email', email, 'password', password)
 
+    @classmethod
+    def admin_fields(cls):
+        return [cls.get_field('email'), cls.get_field('password')]
+
 
 class PhonePasswordAuthenticate(AuthenticationType):
     phone = models.CharField(max_length=255, unique=True)
@@ -254,3 +258,11 @@ class PhonePasswordAuthenticate(AuthenticationType):
     @staticmethod
     def login(phone: str, password: str) -> 'PhonePasswordAuthenticate':
         return PhonePasswordAuthenticate._do_identifier_password_login('phone', phone, 'password', password)
+
+    @classmethod
+    def admin_fields(cls):
+        return [cls.get_field('phone'), cls.get_field('password')]
+
+    @classmethod
+    def admin_fields_verbose_name(cls):
+        return ['شماره همراه', 'رمز عبور']
