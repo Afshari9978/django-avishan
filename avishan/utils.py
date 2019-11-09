@@ -85,7 +85,7 @@ def add_token_to_response(rendered_response: HttpResponse, delete_token: bool = 
             rendered_response.set_cookie('token', token)
 
 
-def delete_token_from_request(rendered_response):
+def delete_token_from_request(rendered_response=None):
     if current_request['is_api']:
         try:
             del current_request['response']['token']
@@ -171,6 +171,8 @@ def create_avishan_config_file(app_name: str):
     f = open(app_name + "/avishan_config.py", 'w+')
     f.writelines((
         'def check():\n',
+        '    pass\n\n\n',
+        'class AvishanConfig:\n',
         '    pass\n'
     ))
     f.close()

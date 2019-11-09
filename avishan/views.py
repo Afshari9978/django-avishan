@@ -88,7 +88,7 @@ def avishan_template_login(request):
     context = {
         'fields': AvishanConfig.TEMPLATE_LOGIN_AUTHENTICATE_TYPE.admin_fields(),
         'fields_verbose_name': AvishanConfig.TEMPLATE_LOGIN_AUTHENTICATE_TYPE.admin_fields_verbose_name(),
-        'header': AvishanConfig.TEMPLATE_LOGIN_HEADER
+        'header': AvishanConfig.PANEL_LOGIN_HEADER
     }
     return render(request, 'login.html', context=context)
 

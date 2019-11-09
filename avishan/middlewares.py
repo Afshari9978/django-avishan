@@ -70,6 +70,7 @@ class Wrapper:
         current_request['status_code'] = 200
         current_request['exception'] = None
         current_request['authentication_object'] = None
+        current_request['context'] = {}
 
 
 class Authentication:
@@ -93,6 +94,9 @@ class Authentication:
                 decode_token()
                 find_and_check_user()
         except AvishanException as e:
+            """
+            Any Authentication exception should remove token and return error messages. (excluding access_denied)
+            """
             current_request['exception'] = e
             if current_request['is_api'] is False:
                 current_request['discard_wsgi_response'] = False
