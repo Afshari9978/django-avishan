@@ -227,6 +227,14 @@ class AuthenticationType(AvishanModel):
         import bcrypt
         return bcrypt.checkpw(password.encode('utf8'), hashed_password.encode('utf8'))
 
+    @classmethod
+    def identifier_field(cls):
+        raise NotImplementedError()
+
+    @classmethod
+    def password_field(cls):
+        raise NotImplementedError()
+
 
 class EmailPasswordAuthenticate(AuthenticationType):
     email = models.CharField(max_length=255, unique=True)
@@ -266,3 +274,13 @@ class PhonePasswordAuthenticate(AuthenticationType):
     @classmethod
     def admin_fields_verbose_name(cls):
         return ['شماره همراه', 'رمز عبور']
+
+    @classmethod
+    def identifier_field(cls):
+        return cls.get_field('phone')
+
+    @classmethod
+    def password_field(cls):
+        return cls.get_field('password')
+
+

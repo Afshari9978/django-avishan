@@ -1,3 +1,5 @@
+from typing import Union, Type
+
 from django.http import JsonResponse
 
 from avishan.exceptions import AvishanException
@@ -19,23 +21,28 @@ class AvishanView:
             from avishan_config import AvishanConfig
             from django.shortcuts import redirect
 
-            current_request['is_api'] = self.is_api if current_request['is_api'] is None else current_request['is_api']
-
-            """
-            If user not provided, return with error. and also if api-type request but token in session instead of header
-            """
-            if self.authenticate and not self.is_authenticated():
-                if current_request['is_api']:
+            try:
+                if current_request['is_api'] is None:
+                    current_request['is_api'] = self.is_api
+                elif current_request['is_api'] is not self.is_api:
+                    raise AuthException(AuthException.INAPPROPRIATE_PROTOCOL)
+                """
+                If user not provided, return with error. and also if api-type request but token in session instead of header
+                """
+                if self.authenticate and not self.is_authenticated():
                     raise AuthException(AuthException.ACCESS_DENIED)
-                return redirect(AvishanConfig.TEMPLATE_LOGIN_URL, permanent=True)
 
-            """http method check and raise 405"""
-            if current_request['is_api'] and current_request['request'].method not in self.methods:
-                raise AuthException(AuthException.HTTP_METHOD_NOT_ALLOWED)
+                """http method check and raise 405"""
+                if current_request['is_api'] and current_request['request'].method not in self.methods:
+                    raise AuthException(AuthException.HTTP_METHOD_NOT_ALLOWED)
+            except AuthException as e:
+                print('A5')
+                return JsonResponse({})
 
             try:
                 result = view_function(*args, **kwargs)
             except AvishanException as e:
+                print('A4')
                 result = JsonResponse({})  # todo 0.2.4 capture all other exceptions too
 
             return result
@@ -49,7 +56,7 @@ class AvishanView:
         :return: true if authenticated
         """
         from . import current_request
-        if not current_request['user_user_group']:
+        if not current_request['authentication_object']:
             return False
         return True
 
@@ -64,8 +71,3 @@ class AvishanTemplateView(AvishanView):
     def __init__(self, methods=None, authenticate: bool = True):
         super().__init__(methods=methods, authenticate=authenticate)
         self.is_api = False
-
-
-class AvishanCalculate:
-    # todo: execution time 0.2.3
-    pass

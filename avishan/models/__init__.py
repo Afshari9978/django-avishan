@@ -344,20 +344,29 @@ class AvishanModel(models.Model):
             cast = datetime.date
         elif isinstance(field, models.BooleanField):
             cast = bool
-        elif isinstance(field, models.FileField):
-            cast = 'file'
         elif isinstance(field, models.ManyToManyField):
             cast = field.related_model
         elif isinstance(field, models.ForeignKey):
             cast = field.related_model
+        else:
+            raise NotImplementedError('cast_field_data not defined cast type')
 
         if isinstance(cast, AvishanModel):
-            output = cast.objects.get(id=int(data))
+            if not isinstance(data, dict):
+                raise ValueError('ForeignKey or ManyToMany relation should contain dict with id')
+            output = cast.objects.get(id=int(data['id']))
+        elif isinstance(cast, datetime.datetime):
+            if not isinstance(data, dict):
+                raise ValueError('Datetime should contain dict')
+            output = BchDatetime(data).to_datetime()
+        elif isinstance(cast, datetime.date):
+            if not isinstance(data, dict):
+                raise ValueError('Date should contain dict')
+            output = BchDatetime(data).to_date()
         else:
             output = cast(data)
 
         return output
-        # todo 0.2.0
 
     @classmethod
     def __get_object_from_dict(cls, input_dict: dict) -> 'AvishanModel':

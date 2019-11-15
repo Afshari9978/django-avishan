@@ -90,7 +90,7 @@ def avishan_template_login(request):
         'fields_verbose_name': AvishanConfig.TEMPLATE_LOGIN_AUTHENTICATE_TYPE.admin_fields_verbose_name(),
         'header': AvishanConfig.PANEL_LOGIN_HEADER
     }
-    return render(request, 'login.html', context=context)
+    return render(request, 'pages/login.html', context=context)
 
 
 @AvishanTemplateView()

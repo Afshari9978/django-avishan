@@ -117,16 +117,17 @@ def encode_token(authentication_object: AuthenticationType) -> Optional[str]:
 
 def decode_token():
     import jwt
+    from avishan_config import AvishanConfig
     token = current_request['token']
     if not token:
         raise AuthException(AuthException.TOKEN_NOT_FOUND)
     try:
-        from avishan_config import AvishanConfig
         current_request['decoded_token'] = jwt.decode(token, AvishanConfig.JWT_KEY, algorithms=['HS256'])
+        current_request['add_token'] = True
     except jwt.exceptions.ExpiredSignatureError:
         raise AuthException(AuthException.TOKEN_EXPIRED)
     except:
-        raise AuthException(AuthException.INVALID_TOKEN)
+        raise AuthException(AuthException.ERROR_IN_TOKEN)
 
 
 def find_and_check_user():
@@ -137,7 +138,7 @@ def find_and_check_user():
     from avishan.models import AvishanModel
 
     if not current_request['decoded_token']:
-        AuthException(AuthException.INVALID_TOKEN)
+        AuthException(AuthException.ERROR_IN_TOKEN)
 
     authentication_type_class = AvishanModel.find_model_with_class_name(
         current_request['decoded_token']['at_n']
@@ -176,12 +177,6 @@ def create_avishan_config_file(app_name: str):
         '    pass\n'
     ))
     f.close()
-
-
-def add_data_to_response(field: str, data):
-    current_request['response'][field] = data
-    current_request['discard_wsgi_response'] = True
-
 
 def fa_numbers(text):
     text = str(text)
