@@ -3,7 +3,7 @@ from django.contrib.admin.sites import AlreadyRegistered
 
 from avishan.models import AvishanModel
 
-for model in AvishanModel.find_non_abstract_models():
+for model in AvishanModel.get_non_abstract_models():
     model_admin_dict = {
         'date_hierarchy': model.date_hierarchy,
         'list_filter': model.list_filter,

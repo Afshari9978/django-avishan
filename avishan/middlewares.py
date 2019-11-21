@@ -1,10 +1,12 @@
 from django.http import JsonResponse, HttpResponseRedirect
 from django.shortcuts import redirect
 
-from avishan import thread_storage
 from avishan.exceptions import AvishanException
-from avishan_config import AvishanConfig
-from avishan_admin.avishan_config import AvishanConfig as PanelAvishanConfig
+
+try:
+    from avishan_admin.avishan_config import AvishanConfig as PanelAvishanConfig
+except ImportError:
+    pass
 
 
 class Wrapper:
@@ -39,7 +41,6 @@ class Wrapper:
                 decode_token()
                 find_and_check_user()
         except AuthException as e:
-            print("A1")
             pass  # todo 0.2.0: ey khoda
 
         """
@@ -69,18 +70,19 @@ class Wrapper:
         try:
             response = self.get_response(current_request['request'])
         except AvishanException as e:
-            print("A2")
             # todo 0.2.0: what to do
             pass
         except Exception as e:
             e = AvishanException(e)
-            print("A3")
             pass
 
         if current_request['exception'] is not None:
             if isinstance(current_request['exception'], AuthException):
                 if current_request['is_api'] is False:
-                    return redirect('/' + PanelAvishanConfig.PANEL_ROOT + "/" + PanelAvishanConfig.LOGIN_URL)
+                    try:
+                        return redirect('/' + PanelAvishanConfig.PANEL_ROOT + "/" + PanelAvishanConfig.LOGIN_URL)
+                    except:
+                        raise current_request['exception']
 
         add_token_to_response(response)
         if current_request['is_api']:
@@ -95,6 +97,7 @@ class Wrapper:
 
     @staticmethod
     def initialize_request_storage(current_request):
+        current_request.clear()
         current_request['request'] = None
         current_request['response'] = {}
 

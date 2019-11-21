@@ -18,8 +18,6 @@ class AvishanView:
         def wrapper(*args, **kwargs):
             from .exceptions import AuthException
             from . import current_request
-            from avishan_config import AvishanConfig
-            from django.shortcuts import redirect
 
             try:
                 if current_request['is_api'] is None:
@@ -36,13 +34,11 @@ class AvishanView:
                 if current_request['is_api'] and current_request['request'].method not in self.methods:
                     raise AuthException(AuthException.HTTP_METHOD_NOT_ALLOWED)
             except AuthException as e:
-                print('A5')
                 return JsonResponse({})
 
             try:
                 result = view_function(*args, **kwargs)
             except AvishanException as e:
-                print('A4')
                 result = JsonResponse({})  # todo 0.2.4 capture all other exceptions too
 
             return result

@@ -140,7 +140,7 @@ def find_and_check_user():
     if not current_request['decoded_token']:
         AuthException(AuthException.ERROR_IN_TOKEN)
 
-    authentication_type_class = AvishanModel.find_model_with_class_name(
+    authentication_type_class = AvishanModel.get_model_with_class_name(
         current_request['decoded_token']['at_n']
     )
     try:
@@ -168,8 +168,11 @@ def populate_current_request(login_with: AuthenticationType):
     current_request['authentication_object'] = login_with
 
 
-def create_avishan_config_file(app_name: str):
-    f = open(app_name + "/avishan_config.py", 'w+')
+def create_avishan_config_file(app_name: str = None):
+    if app_name:
+        f = open(app_name + "/avishan_config.py", 'w+')
+    else:
+        f = open('avishan_config.py', 'w+')
     f.writelines((
         'def check():\n',
         '    pass\n\n\n',

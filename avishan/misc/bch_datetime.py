@@ -180,8 +180,29 @@ class BchDatetime(object):
     def to_time(self):
         return self.to_datetime().time()
 
-    def to_str(self):
-        return str(self.to_jalali_datetime())
+    def to_str(self, format=None):
+        if format is None:
+            return str(self.to_jalali_datetime())
+        """
+        formats: 
+        %Y: YYYY year
+        ٪y: YY short year
+        %m: MM month
+        %d: DD day
+        %A: persian weekday دوشنبه
+        %a: short persian weekday د 
+        %D: ۱۵ day
+        %B: persian month شهریور
+        %b: short persian month شه
+        %N: persian year ۱۳۶۱
+        %H: HH hour 24
+        %I: II short hour 12 
+        %M: MM minute
+        %S: SS second
+        %f: mmmmmm milliseconds
+        %p: ق.ظ ب.ظ
+        """
+        return self.to_jalali_datetime().strftime(format)
 
     @staticmethod
     def from_bch_datetime(source):
@@ -215,11 +236,11 @@ class BchDatetime(object):
     @staticmethod
     def from_date(source: date):
         return BchDatetime.from_jalali_datetime(
-            JalaliDatetime(source.year, source.month, source.day)
+            JalaliDatetime(datetime.combine(source, time(0, 0, 0, 0)))
         )
 
     @staticmethod
-    def from_datetime(source):
+    def from_datetime(source: datetime):
         return BchDatetime.from_jalali_datetime(JalaliDatetime(source))
 
     def load_time(self, time: datetime.time):
@@ -309,7 +330,7 @@ class BchDatetime(object):
         return self.to_unix_timestamp('microsecond') != other.to_unix_timestamp('microsecond')
 
     def __str__(self):
-        return self.to_datetime().strftime("%Y-%m-%d %H:%M:%S")
+        return self.to_datetime().strftime("%Y/%m/%d %H:%M:%S")
 
 
 class TimeRange(object):

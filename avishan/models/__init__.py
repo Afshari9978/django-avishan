@@ -210,11 +210,11 @@ class AvishanModel(models.Model):
         return cls._meta.app_label
 
     @staticmethod
-    def find_non_abstract_models(app_name: str = None) -> List[Type['AvishanModel']]:
-        return [x for x in AvishanModel.find_models(app_name) if x._meta.abstract is False]
+    def get_non_abstract_models(app_name: str = None) -> List[Type['AvishanModel']]:
+        return [x for x in AvishanModel.get_models(app_name) if x._meta.abstract is False]
 
     @staticmethod
-    def find_models(app_name: str = None) -> List[Type['AvishanModel']]:
+    def get_models(app_name: str = None) -> List[Type['AvishanModel']]:
 
         def get_sub_classes(parent):
             subs = [parent]
@@ -228,18 +228,18 @@ class AvishanModel(models.Model):
                 total += get_sub_classes(model)
             return list(set(total))
 
-        return [x for x in AvishanModel.find_models() if x._meta.app_label == app_name]
+        return [x for x in AvishanModel.get_models() if x._meta.app_label == app_name]
 
     @staticmethod
-    def find_model_with_class_name(class_name: str) -> Optional[Type['AvishanModel']]:
-        for item in AvishanModel.find_models():
+    def get_model_with_class_name(class_name: str) -> Optional[Type['AvishanModel']]:
+        for item in AvishanModel.get_models():
             if item.class_name() == class_name:
                 return item
         return None
 
     @staticmethod
-    def find_model_by_plural_name(name: str) -> Optional[Type['AvishanModel']]:
-        for model in AvishanModel.find_non_abstract_models():
+    def get_model_by_plural_name(name: str) -> Optional[Type['AvishanModel']]:
+        for model in AvishanModel.get_non_abstract_models():
             if model.class_plural_snake_case_name() == name:
                 return model
         return None
@@ -248,6 +248,11 @@ class AvishanModel(models.Model):
     def run_apps_check():
         from importlib import import_module
         from avishan.utils import create_avishan_config_file
+
+        try:
+            import avishan_config
+        except ImportError:
+            create_avishan_config_file()
 
         for app_name in AvishanModel.get_app_names():
 
@@ -275,11 +280,11 @@ class AvishanModel(models.Model):
 
     @classmethod
     def get_fields(cls) -> List[models.Field]:
-        return cls._meta.fields
+        return list(cls._meta.fields)
 
     @classmethod
     def get_full_fields(cls) -> List[models.Field]:
-        return cls.get_fields() + cls._meta.many_to_many
+        return list(cls._meta.fields + cls._meta.many_to_many)
 
     @classmethod
     def get_field(cls, field_name: str) -> models.Field:
@@ -371,3 +376,22 @@ class AvishanModel(models.Model):
     @classmethod
     def __get_object_from_dict(cls, input_dict: dict) -> 'AvishanModel':
         return cls.get(**input_dict)
+
+    def get_data_from_field(self, field_name: str):
+        from avishan_config import AvishanConfig
+        field = self.get_field(field_name)
+        if len(field.choices) > 0:
+            for choice in field.choices:
+                if choice[0] == self.__getattribute__(field_name):
+                    return choice[1]
+        if isinstance(field, models.DateTimeField):
+            if AvishanConfig.IS_JALALI_DATETIME:
+                return BchDatetime(self.__getattribute__(field_name)).to_str('%Y/%m/%d %H:%M:%S')
+            return self.__getattribute__(field_name).strftime("%Y/%m/%d %H:%M:%S")
+        if isinstance(field, models.DateField):
+            if AvishanConfig.IS_JALALI_DATETIME:
+                return BchDatetime(self.__getattribute__(field_name)).to_str('%Y/%m/%d')
+            return self.__getattribute__(field_name).strftime("%Y/%m/%d")
+        if isinstance(field, models.TimeField):
+            return self.__getattribute__(field_name).strftime("%H:%M:%S")
+        return self.__getattribute__(field_name)
