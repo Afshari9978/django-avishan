@@ -14,8 +14,6 @@ class AvishanException(Exception):
             status_code: int = status.HTTP_400_BAD_REQUEST
     ):
         save_traceback()
-        # todo 0.2.4: record exception
-        # todo 0.2.1: wrap exception
         if wrap_exception:
             add_error_to_response(
                 body=str(wrap_exception.args),
@@ -28,6 +26,31 @@ class AvishanException(Exception):
                                                                       FA='توضیحات خطا ارائه نشده'))
             current_request['exception'] = self
             current_request['status_code'] = status_code
+
+        from avishan.models import ExceptionRecord
+        try:
+            request_data = str(current_request['request.data'].data)
+        except:
+            request_data = ""
+        request_headers = ""
+        for key, value in current_request['request'].META.items():
+            if key.startswith('HTTP_'):
+                request_headers += f'({key[5:]}: {value}),\n'
+        current_request['exception_record'] = ExceptionRecord.objects.create(
+            class_title=current_request['exception'].__class__.__name__,
+            user_user_group=current_request['user_user_group'],
+            status_code=current_request['status_code'],
+            request_url=current_request['request'].path,
+            request_method=current_request['request'].method,
+            request_data=request_data,
+            request_headers=request_headers,
+            response=current_request['response'],
+            traceback=current_request['traceback'],
+            exception_args=current_request['exception'].args,
+            errors=str(current_request['errors']),
+            warnings=str(current_request['warnings']),
+            is_api=current_request['is_api']
+        )
 
 
 class AuthException(AvishanException):
@@ -108,6 +131,9 @@ def save_traceback():
     )
     if tbe.exc_traceback is not None:
         current_request['traceback'] = ''.join(tbe.format())
+        if current_request['exception_record']:
+            current_request['exception_record'].traceback = current_request['traceback']
+            current_request['exception_record'].save()
 
 
 def raise_exception(exception: Exception):

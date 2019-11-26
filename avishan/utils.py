@@ -4,7 +4,7 @@ from django.http import HttpResponse
 
 from avishan.exceptions import AuthException
 from avishan.misc.bch_datetime import BchDatetime
-from avishan.models.authentication import AuthenticationType
+from avishan.models import AuthenticationType
 from avishan_config import AvishanConfig
 from . import current_request
 

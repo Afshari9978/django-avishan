@@ -90,9 +90,10 @@ class Wrapper:
                     AvishanAdminConfig.ADMIN_PANEL_LOGIN_ADDRESS
                 )
             else:
-                current_request['response']['error'] = current_request['errors']
-                response = JsonResponse(current_request['response'], status=current_request['status_code'],
-                                        safe=current_request['json_safe'])
+                if not current_request['discard_json_object_check']:
+                    current_request['response']['error'] = current_request['errors']
+                    response = JsonResponse(current_request['response'], status=current_request['status_code'],
+                                            safe=not current_request['discard_json_object_check'])
 
         add_token_to_response(response, delete_token)
         status_code = current_request['status_code']
@@ -124,6 +125,7 @@ class Wrapper:
         current_request['base_user'] = None
         current_request['user_group'] = None
         current_request['authentication_object'] = None
+        current_request['exception_record'] = None
         current_request['user_user_group'] = None
         current_request['token'] = None
         current_request['decoded_token'] = None
