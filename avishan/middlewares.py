@@ -89,18 +89,24 @@ class Wrapper:
                     '/' + AvishanAdminConfig.ADMIN_PANEL_ROOT_ADDRESS + '/' +
                     AvishanAdminConfig.ADMIN_PANEL_LOGIN_ADDRESS
                 )
-            a = 1
+            else:
+                current_request['response']['error'] = current_request['errors']
+                response = JsonResponse(current_request['response'], status=current_request['status_code'],
+                                        safe=current_request['json_safe'])
 
         add_token_to_response(response, delete_token)
+        status_code = current_request['status_code']
+        is_api = current_request['is_api']
+        json_safe = not current_request['discard_json_object_check']
         if current_request['is_api']:
             response = current_request['response'].copy()
 
         self.initialize_request_storage(current_request)
 
-        if current_request['is_api']:
-            return JsonResponse(current_request['response'], status=current_request['status_code'])
-        elif response.status_code == 200 and current_request['status_code'] != 200:
-            response.status_code = current_request['status_code']
+        if is_api:
+            return JsonResponse(response, status=status_code, safe=json_safe)
+        elif response.status_code == 200 and status_code != 200:
+            response.status_code = status_code
 
         return response
 
@@ -114,6 +120,7 @@ class Wrapper:
         current_request['is_api'] = None
 
         current_request['add_token'] = False
+        current_request['discard_json_object_check'] = False
         current_request['base_user'] = None
         current_request['user_group'] = None
         current_request['authentication_object'] = None

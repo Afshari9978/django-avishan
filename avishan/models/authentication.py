@@ -270,6 +270,10 @@ class PhonePasswordAuthenticate(AuthenticationType):
 
     @staticmethod
     def login(phone: str, password: str) -> 'PhonePasswordAuthenticate':
+        if phone.startswith("09"):
+            phone = "0098" + phone[1:]
+        elif phone.startswith("9"):
+            phone = "0098" + phone
         return PhonePasswordAuthenticate._do_identifier_password_login('phone', phone, 'password', password)
 
     @classmethod

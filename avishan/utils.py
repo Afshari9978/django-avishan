@@ -80,6 +80,8 @@ def add_token_to_response(rendered_response: HttpResponse, delete_token: bool = 
     create new token if needed, else reuse previous
     add token to session if session-based auth, else to response header
     """
+    if current_request['discard_json_object_check']:
+        return
     if delete_token or not current_request['add_token']:
         delete_token_from_request(rendered_response)
 

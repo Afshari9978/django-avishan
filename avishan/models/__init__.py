@@ -65,18 +65,24 @@ class AvishanModel(models.Model):
 
     @classmethod
     def create(cls, **kwargs) -> 'AvishanModel':
-        create_kwargs, after_create_kwargs = cls._clean_model_data_kwargs(**kwargs)
+        create_kwargs, many_to_many_objects, after_creation = cls._clean_model_data_kwargs(**kwargs)
         created = cls.objects.create(**create_kwargs)
 
-        if after_create_kwargs:
-            for key, value in after_create_kwargs.items():
+        if many_to_many_objects:
+            for key, value in many_to_many_objects.items():
                 for item in value:
                     created.__getattribute__(key).add(item)
             created.save()
+        for after_create in after_creation:
+            for target_object in after_create['target_objects']:
+                after_create['target_model'].create(**{
+                    after_create['created_for_field'].name: created,
+                    **target_object
+                })
         return created
 
     def update(self, **kwargs):
-        base_kwargs, many_to_many_kwargs = self.__class__._clean_model_data_kwargs(**kwargs)
+        base_kwargs, many_to_many_kwargs, _ = self.__class__._clean_model_data_kwargs(**kwargs)
         # todo 0.2.3: check for change. if not changed, dont update
         for key, value in base_kwargs.items():
             # todo 0.2.3 check value types
@@ -164,6 +170,13 @@ class AvishanModel(models.Model):
         if not current_request['is_api']:
             kwargs = cls._clean_form_post(kwargs)
 
+        delete_list = []
+        for key, value in kwargs.items():
+            if isinstance(value, str) and len(value) == 0:
+                delete_list.append(key)
+        for key in delete_list:
+            del kwargs[key]
+
         for field in cls.get_full_fields():
             """Check exists"""
             if cls.is_field_readonly(field):
@@ -182,7 +195,10 @@ class AvishanModel(models.Model):
                 if isinstance(kwargs[field.name], models.Model):
                     base_kwargs[field.name] = kwargs[field.name]
                 else:
-                    base_kwargs[field.name] = field.related_model.__get_object_from_dict(kwargs[field.name])
+                    if kwargs[field.name] == {'id': 0}:
+                        base_kwargs[field.name] = None
+                    else:
+                        base_kwargs[field.name] = field.related_model.__get_object_from_dict(kwargs[field.name])
             elif isinstance(field, models.ManyToManyField):
                 many_to_many_kwargs[field.name] = []
                 for input_item in kwargs[field.name]:
@@ -193,12 +209,54 @@ class AvishanModel(models.Model):
                     many_to_many_kwargs[field.name].append(item_object)
             else:
                 base_kwargs[field.name] = cls.cast_field_data(kwargs[field.name], field)
-        return base_kwargs, many_to_many_kwargs
+
+        try:
+            added_related_model_names = [item.class_snake_case_name() for item in cls.admin_related_models()]
+        except:
+            added_related_model_names = []
+        after_creation = []
+        if not on_update:
+            for related_name in added_related_model_names:
+                if related_name not in kwargs.keys():
+                    continue
+                related_model = AvishanModel.get_model_by_snake_case_name(related_name)
+                for related_model_field in related_model.get_full_fields():
+                    if isinstance(related_model_field, models.ForeignKey):
+                        if related_model_field.related_model == cls:
+                            target_related_field = related_model_field
+                after_creation.append({
+                    'created_for_field': target_related_field,
+                    'target_objects': kwargs[related_name],
+                    'target_model': related_model
+                })
+        return base_kwargs, many_to_many_kwargs, after_creation
 
     @classmethod
     def _clean_form_post(cls, kwargs: dict) -> dict:
         output = {}
+        try:
+            added_related_model_names = [item.class_snake_case_name() for item in cls.admin_related_models()]
+        except:
+            added_related_model_names = []
+
+        for related_name in added_related_model_names:
+            related_name_pack = []
+            for key, value in kwargs.items():
+                if key.startswith(related_name):
+                    related_name_pack.append(key)
+            if len(related_name_pack) == 0:
+                continue
+            kwargs[related_name] = []
+            for i in range(kwargs[related_name_pack[0]].__len__()):
+                kwargs[related_name].append({})
+            for key in related_name_pack:
+                for i, final_pack in enumerate(kwargs[related_name]):
+                    final_pack[key[len(related_name):]] = kwargs[key][i]
+            for key in related_name_pack:
+                del kwargs[key]
+
         for key, value in kwargs.items():
+
             if key.endswith("_id"):
                 output[key[:-3]] = {'id': int(value)}
             elif key.endswith('_ids'):
@@ -264,6 +322,13 @@ class AvishanModel(models.Model):
     def get_model_by_plural_name(name: str) -> Optional[Type['AvishanModel']]:
         for model in AvishanModel.get_non_abstract_models():
             if model.class_plural_snake_case_name() == name:
+                return model
+        return None
+
+    @staticmethod
+    def get_model_by_snake_case_name(name: str) -> Optional[Type['AvishanModel']]:
+        for model in AvishanModel.get_non_abstract_models():
+            if model.class_snake_case_name() == name:
                 return model
         return None
 
