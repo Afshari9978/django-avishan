@@ -143,6 +143,7 @@ class AuthenticationType(AvishanModel):
         self.save()
         from avishan import current_request
         current_request['authentication_object'] = None
+        current_request['add_token'] = False
 
     @classmethod
     def _do_identifier_password_login(cls, identifier_name: str, identifier_value: str, value_name: str,
@@ -260,6 +261,10 @@ class PhonePasswordAuthenticate(AuthenticationType):
 
     @staticmethod
     def register(user_user_group: UserUserGroup, phone: str, password: str) -> 'PhonePasswordAuthenticate':
+        if phone.startswith("09"):
+            phone = "0098" + phone[1:]
+        elif phone.startswith("9"):
+            phone = "0098" + phone
         return PhonePasswordAuthenticate._do_identifier_password_register(user_user_group, 'phone', phone, 'password',
                                                                           password)
 
@@ -282,5 +287,3 @@ class PhonePasswordAuthenticate(AuthenticationType):
     @classmethod
     def password_field(cls):
         return cls.get_field('password')
-
-

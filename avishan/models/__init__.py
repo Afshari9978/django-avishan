@@ -5,7 +5,9 @@ from django.db import models
 
 from django.db.models import NOT_PROVIDED
 
+from avishan import current_request
 from avishan.exceptions import ErrorMessageException
+from avishan.misc import translatable
 from avishan.misc.bch_datetime import BchDatetime
 
 
@@ -41,7 +43,10 @@ class AvishanModel(models.Model):
             return cls.objects.get(**kwargs)
         except cls.DoesNotExist as e:
             if avishan_raise_400:
-                raise ErrorMessageException("Chosen " + cls.__name__ + " doesnt exist")
+                raise ErrorMessageException(translatable(
+                    EN="Chosen " + cls.__name__ + " doesnt exist",
+                    FA=f"{cls.__name__} انتخاب شده موجود نیست"
+                ))
             raise e
 
     @classmethod
@@ -60,29 +65,29 @@ class AvishanModel(models.Model):
 
     @classmethod
     def create(cls, **kwargs) -> 'AvishanModel':
-        create_kwargs, after_create_kwargs = cls._clean_create_kwargs(**kwargs)
+        create_kwargs, after_create_kwargs = cls._clean_model_data_kwargs(**kwargs)
         created = cls.objects.create(**create_kwargs)
 
         if after_create_kwargs:
             for key, value in after_create_kwargs.items():
                 for item in value:
                     created.__getattribute__(key).add(item)
-        created.save()
+            created.save()
         return created
 
     def update(self, **kwargs):
-        in_time_kwargs, many_to_many_kwargs = self.__class__._clean_create_kwargs(**kwargs)
-        # todo 0.2.1: remove identifier attributes to prevent update on them
+        base_kwargs, many_to_many_kwargs = self.__class__._clean_model_data_kwargs(**kwargs)
         # todo 0.2.3: check for change. if not changed, dont update
-        for key, value in in_time_kwargs.items():
+        for key, value in base_kwargs.items():
             # todo 0.2.3 check value types
             self.__setattr__(key, value)
 
-        for key, value in many_to_many_kwargs.items():
-            # todo 0.2.1 many to many efficient add/remove
-            self.__getattribute__(key).clear()
-            for item in value:
-                self.__getattribute__(key).add(item)
+        if many_to_many_kwargs:
+            for key, value in many_to_many_kwargs.items():
+                # todo 0.2.1 many to many efficient add/remove
+                self.__getattribute__(key).clear()
+                for item in value:
+                    self.__getattribute__(key).add(item)
         self.save()
         return self
 
@@ -152,44 +157,62 @@ class AvishanModel(models.Model):
         return dicted
 
     @classmethod
-    def _clean_create_kwargs(cls, **kwargs):
-        create_kwargs = {}
-        after_create_kwargs = {}
+    def _clean_model_data_kwargs(cls, on_update: bool = False, **kwargs):
+        base_kwargs = {}
+        many_to_many_kwargs = {}
+
+        if not current_request['is_api']:
+            kwargs = cls._clean_form_post(kwargs)
+
         for field in cls.get_full_fields():
-            if cls.is_field_identifier_for_model(field) or (
-                    isinstance(field, (models.DateField, models.TimeField)) and (field.auto_now or field.auto_now_add)):
+            """Check exists"""
+            if cls.is_field_readonly(field):
                 continue
-            elif cls.is_field_required(field) and field.name not in kwargs.keys():
-                raise ErrorMessageException(
-                    f'Field {field.name} not found in object {cls.class_name()}, and it\'s required.'
-                )
+
+            if cls.is_field_required(field) and not on_update and field.name not in kwargs.keys():
+                raise ErrorMessageException(translatable(
+                    EN=f'Field {field.name} not found in object {cls.class_name()}, and it\'s required.',
+                ))
+
             elif field.name not in kwargs.keys():
                 continue
-            elif isinstance(field, (models.OneToOneField, models.ForeignKey)):
+
+            """Read data part"""
+            if isinstance(field, (models.OneToOneField, models.ForeignKey)):
                 if isinstance(kwargs[field.name], models.Model):
-                    create_kwargs[field.name] = kwargs[field.name]
+                    base_kwargs[field.name] = kwargs[field.name]
                 else:
-                    create_kwargs[field.name] = field.related_model.__get_object_from_dict(kwargs[field.name])
+                    base_kwargs[field.name] = field.related_model.__get_object_from_dict(kwargs[field.name])
             elif isinstance(field, models.ManyToManyField):
-                after_create_kwargs[field.name] = []
+                many_to_many_kwargs[field.name] = []
                 for input_item in kwargs[field.name]:
                     if isinstance(input_item, models.Model):
                         item_object = input_item
                     else:
                         item_object = field.related_model.__get_object_from_dict(input_item)
-                    after_create_kwargs[field.name].append(item_object)
+                    many_to_many_kwargs[field.name].append(item_object)
             else:
-                create_kwargs[field.name] = kwargs[field.name]
-                if isinstance(kwargs[field.name], BchDatetime):
-                    if isinstance(field, models.DateTimeField):
-                        create_kwargs[field.name] = kwargs[field.name].to_datetime()
-                    elif isinstance(field, models.DateField):
-                        create_kwargs[field.name] = kwargs[field.name].to_date()
-                    elif isinstance(field, models.TimeField):
-                        create_kwargs[field.name] = kwargs[field.name].to_time()
-                    else:
-                        raise ErrorMessageException('Error in datetime system')
-        return create_kwargs, after_create_kwargs
+                base_kwargs[field.name] = cls.cast_field_data(kwargs[field.name], field)
+        return base_kwargs, many_to_many_kwargs
+
+    @classmethod
+    def _clean_form_post(cls, kwargs: dict) -> dict:
+        output = {}
+        for key, value in kwargs.items():
+            if key.endswith("_id"):
+                output[key[:-3]] = {'id': int(value)}
+            elif key.endswith('_ids'):
+                # todo 0.2.0: check it
+                output[key[:-4]] = []
+                for related_id in value:
+                    output[key[:-4]].append({'id': int(related_id)})
+            elif key.endswith('_d'):
+                date_parts = value.split('-')
+                output[key[:-2]] = BchDatetime(date_parts[2], date_parts[1], date_parts[0]).to_date()
+            else:
+                output[key] = value
+
+        return output
 
     @classmethod
     def class_name(cls) -> str:
@@ -215,7 +238,7 @@ class AvishanModel(models.Model):
 
     @staticmethod
     def get_models(app_name: str = None) -> List[Type['AvishanModel']]:
-
+        # todo 0.2.1 check for app name to be in avishan_config file
         def get_sub_classes(parent):
             subs = [parent]
             for child in parent.__subclasses__():
@@ -246,6 +269,7 @@ class AvishanModel(models.Model):
 
     @staticmethod
     def run_apps_check():
+        # todo 0.2.0 create config file and its classes. add needed fields
         from importlib import import_module
         from avishan.utils import create_avishan_config_file
 
@@ -275,8 +299,9 @@ class AvishanModel(models.Model):
     @staticmethod
     def get_app_names() -> List[str]:
         from django.apps import apps
+        from avishan_config import AvishanConfig
         return [key.name for key in apps.get_app_configs() if
-                (not key.name.startswith('django.') and key.name != 'avishan')]
+                key.name in AvishanConfig.MONITORED_APPS_NAMES]
 
     @classmethod
     def get_fields(cls) -> List[models.Field]:
@@ -291,7 +316,9 @@ class AvishanModel(models.Model):
         for item in cls.get_fields():
             if item.name == field_name:
                 return item
-        raise ValueError(f'field {field_name} not found in model {cls.class_name()}')
+        raise ValueError(translatable(
+            EN=f'field {field_name} not found in model {cls.class_name()}'
+        ))
 
     @classmethod
     def is_field_identifier_for_model(cls, field: models.Field) -> bool:
@@ -311,6 +338,8 @@ class AvishanModel(models.Model):
         """
         if (isinstance(field, models.DateField) or isinstance(field, models.DateTimeField) or
             isinstance(field, models.TimeField)) and (field.auto_now or field.auto_now_add):
+            return True
+        if field.primary_key:
             return True
         return False
 
@@ -342,11 +371,20 @@ class AvishanModel(models.Model):
         elif isinstance(field, models.FloatField):
             cast = float
         elif isinstance(field, models.TimeField):
-            cast = datetime.time
+            if not isinstance(data, datetime.time):
+                cast = datetime.time
+            else:
+                cast = None
         elif isinstance(field, models.DateTimeField):
-            cast = datetime.datetime
+            if not isinstance(data, datetime.datetime):
+                cast = datetime.datetime
+            else:
+                cast = None
         elif isinstance(field, models.DateField):
-            cast = datetime.date
+            if not isinstance(data, datetime.date):
+                cast = datetime.date
+            else:
+                cast = None
         elif isinstance(field, models.BooleanField):
             cast = bool
         elif isinstance(field, models.ManyToManyField):
@@ -354,8 +392,12 @@ class AvishanModel(models.Model):
         elif isinstance(field, models.ForeignKey):
             cast = field.related_model
         else:
-            raise NotImplementedError('cast_field_data not defined cast type')
+            raise NotImplementedError(translatable(
+                EN='cast_field_data not defined cast type',
+            ))
 
+        if cast is None:
+            return data
         if isinstance(cast, AvishanModel):
             if not isinstance(data, dict):
                 raise ValueError('ForeignKey or ManyToMany relation should contain dict with id')
