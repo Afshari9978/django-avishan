@@ -1,6 +1,4 @@
-import datetime
 from typing import List, Type, Tuple, Union
-
 
 from django.db.models import NOT_PROVIDED
 
@@ -8,9 +6,8 @@ from avishan import current_request
 from avishan.exceptions import ErrorMessageException
 from avishan.misc import translatable
 
-from datetime import datetime
+import datetime
 from typing import Optional
-
 
 from avishan.misc.bch_datetime import BchDatetime
 from django.db import models
@@ -249,14 +246,20 @@ class AvishanModel(models.Model):
             for key, value in kwargs.items():
                 if key.startswith(related_name):
                     related_name_pack.append(key)
+
             if len(related_name_pack) == 0:
                 continue
             kwargs[related_name] = []
-            for i in range(kwargs[related_name_pack[0]].__len__()):
+            if isinstance(kwargs[related_name_pack[0]], str):
                 kwargs[related_name].append({})
-            for key in related_name_pack:
-                for i, final_pack in enumerate(kwargs[related_name]):
-                    final_pack[key[len(related_name):]] = kwargs[key][i]
+                for esme in related_name_pack:
+                    kwargs[related_name][0][esme[len(related_name):]] = kwargs[esme]
+            else:
+                for i in range(kwargs[related_name_pack[0]].__len__()):
+                    kwargs[related_name].append({})
+                for key in related_name_pack:
+                    for i, final_pack in enumerate(kwargs[related_name]):
+                        final_pack[key[len(related_name):]] = kwargs[key][i]
             for key in related_name_pack:
                 del kwargs[key]
 
@@ -583,7 +586,7 @@ class UserUserGroup(AvishanModel):
     is_active = models.BooleanField(default=True, blank=True)
 
     @property
-    def last_used(self) -> Optional[datetime]:
+    def last_used(self) -> Optional[datetime.datetime]:
         """
         Last used datetime. it will caught throw user devices. If never used, returns None
         """
@@ -598,7 +601,7 @@ class UserUserGroup(AvishanModel):
         return max(dates)
 
     @property
-    def last_login(self) -> Optional[datetime]:
+    def last_login(self) -> Optional[datetime.datetime]:
         """
         Last login comes from this user user group authorization types.
         """
@@ -796,7 +799,6 @@ class PhonePasswordAuthenticate(AuthenticationType):
 
 
 class Image(AvishanModel):
-
     file = models.ImageField(blank=True, null=True)
     base_user = models.ForeignKey(BaseUser, on_delete=models.SET_NULL, null=True, blank=True)
     date_created = models.DateTimeField(auto_now_add=True)
@@ -807,7 +809,6 @@ class Video(AvishanModel):
 
 
 class File(AvishanModel):
-
     file = models.FileField(blank=True, null=True)
     base_user = models.ForeignKey(BaseUser, on_delete=models.SET_NULL, null=True, blank=True)
     date_created = models.DateTimeField(auto_now_add=True)

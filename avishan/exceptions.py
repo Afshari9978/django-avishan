@@ -29,7 +29,7 @@ class AvishanException(Exception):
 
         from avishan.models import ExceptionRecord
         try:
-            request_data = str(current_request['request.data'].data)
+            request_data = str(current_request['request'].data)
         except:
             request_data = ""
         request_headers = ""
