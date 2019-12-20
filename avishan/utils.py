@@ -58,6 +58,8 @@ def find_token() -> bool:
     check for token in both session and header
     :return: true if token
     """
+    if current_request['request'].path.startswith('/api/v1/login/generate/'):
+        return False
     if not find_token_in_header() and not find_token_in_session():
         return False
     return True
@@ -75,14 +77,14 @@ def can_be_token(text):
     return False
 
 
-def add_token_to_response(rendered_response: HttpResponse, delete_token: bool = False):
+def add_token_to_response(rendered_response: HttpResponse):
     """
     create new token if needed, else reuse previous
     add token to session if session-based auth, else to response header
     """
-    if current_request['discard_json_object_check']:
+    if current_request['json_unsafe']:
         return
-    if delete_token or not current_request['add_token']:
+    if not current_request['add_token']:
         delete_token_from_request(rendered_response)
 
     if not current_request['authentication_object']:
@@ -184,6 +186,7 @@ def populate_current_request(login_with: AuthenticationType):
 
 
 def create_avishan_config_file(app_name: str = None):
+    # todo 0.2.0 create config file and its classes. add needed fields
     if app_name:
         f = open(app_name + "/avishan_config.py", 'w+')
     else:
@@ -191,15 +194,23 @@ def create_avishan_config_file(app_name: str = None):
     f.writelines((
         'def check():\n',
         '    pass\n\n\n',
-        'class AvishanConfig:\n',
-        '    pass\n'
+        'class AvishanConfig:\n'
     ))
+    if not app_name:
+        f.writelines([
+            '    MONITORED_APPS_NAMES = []\n',
+            "    NOT_MONITORED_STARTS = ['/admin', '/static', '/favicon.ico']\n",
+            "    JWT_KEY = 'CHANGE_THIS_KEY'\n",
+            "    USE_JALALI_DATETIME = True\n",
+        ])
+    else:
+        f.write("    pass\n")
     f.close()
 
 
 def fa_numbers(text):
     text = str(text)
-    text = en_number(text)
+    text = en_numbers(text)
     array = ['۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹']
     result = ''
     for i in str(text):
@@ -211,7 +222,7 @@ def fa_numbers(text):
     return result
 
 
-def en_number(text):
+def en_numbers(text):
     text = str(text)
     result = ''
     array = ['۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹']

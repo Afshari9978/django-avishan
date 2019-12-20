@@ -18,7 +18,8 @@ class AvishanTranslatableText:
     def __str__(self):
 
         try:
-            return self.__dict__['FA']
+            return self.__dict__['EN']
+            # todo hi dear. fuck you
         except KeyError:
             if len(self.__dict__.keys()) > 0:
                 return list(self.__dict__.values())[0]

@@ -1,23 +1,27 @@
+import datetime
 import json
 
 from django.http import JsonResponse, RawPostDataException
 
-from avishan.exceptions import AvishanException, AuthException, save_traceback
+from avishan.exceptions import AvishanException, AuthException
+from avishan.misc import status
 from . import current_request
 
 
 class AvishanView:
-    def __init__(self, is_api: bool, methods=None, authenticate: bool = None):
-        if methods is None:
-            methods = ['GET']
+    def __init__(self, is_api: bool, methods=('GET',), authenticate: bool = None, track_it: bool = False):
         self.methods = methods
         self.authenticate = authenticate
         self.is_api = is_api
+        self.track_it = track_it
 
     def __call__(self, view_function):
 
         def wrapper(*args, **kwargs):
+            current_request['view_name'] = view_function.__name__
             current_request['is_api'] = self.is_api
+            if self.track_it and not current_request['is_tracked']:
+                current_request['is_tracked'] = True
             if current_request['exception']:
                 """If we have exception here, should return after "is_api" assignment to middleware"""
                 return JsonResponse({})
@@ -38,7 +42,9 @@ class AvishanView:
 
                 self.after_request()
 
+                current_request['view_start_time'] = datetime.datetime.now()
                 result = view_function(*args, **kwargs)
+                current_request['view_end_time'] = datetime.datetime.now()
 
                 self.before_response()
 
@@ -82,8 +88,8 @@ class AvishanView:
 
 class AvishanApiView(AvishanView):
 
-    def __init__(self, methods=None, authenticate: bool = True):
-        super().__init__(is_api=True, methods=methods, authenticate=authenticate)
+    def __init__(self, methods=('GET',), authenticate: bool = True, track_it: bool = False):
+        super().__init__(is_api=True, methods=methods, authenticate=authenticate, track_it=track_it)
 
     def before_request(self):
         if current_request['request'].method not in ['GET', 'DELETE']:
@@ -108,8 +114,8 @@ class AvishanApiView(AvishanView):
 
 
 class AvishanTemplateView(AvishanView):
-    def __init__(self, methods=None, authenticate: bool = True):
-        super().__init__(is_api=False, methods=methods, authenticate=authenticate)
+    def __init__(self, methods=('GET',), authenticate: bool = True, track_it: bool = False):
+        super().__init__(is_api=False, methods=methods, authenticate=authenticate, track_it=track_it)
 
     def before_request(self):
         if current_request['request'].method in ['POST', 'PUT']:

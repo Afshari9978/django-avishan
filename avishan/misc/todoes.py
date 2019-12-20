@@ -10,6 +10,7 @@
 # todo 0.2.2: app check function change to class. to use its parameters.
 # todo 0.2.2: AvishanWarning with color and text and usage
 # todo 0.2.3: execution time avishan_calculate decorator
+# todo 0.2.2: video model
 
 """avishan_config file"""
 # todo 0.2.2: create avishan_config.py file to each app: to always run it at startup

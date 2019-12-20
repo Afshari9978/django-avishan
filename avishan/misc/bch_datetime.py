@@ -35,20 +35,27 @@ class BchDatetime(object):
             try:
                 month = int(month)
             except ValueError:
-                month = {
-                    'فروردین': 1,
-                    'اردیبهشت': 2,
-                    'خرداد': 3,
-                    'تیر': 4,
-                    'مرداد': 5,
-                    'شهریور': 6,
-                    'مهر': 7,
-                    'آبان': 8,
-                    'آذر': 9,
-                    'دی': 10,
-                    'بهمن': 11,
-                    'اسفند': 12,
-                }[month]
+                try:
+                    month = {
+                        'فروردین': 1,
+                        'اردیبهشت': 2,
+                        'خرداد': 3,
+                        'تیر': 4,
+                        'مرداد': 5,
+                        'شهریور': 6,
+                        'مهر': 7,
+                        'آبان': 8,
+                        'آذر': 9,
+                        'دی': 10,
+                        'بهمن': 11,
+                        'اسفند': 12,
+                    }[month]
+                except KeyError:
+                    from avishan.exceptions import ErrorMessageException
+                    raise ErrorMessageException(translatable(
+                        EN=f'unknown month string {month}',
+                        FA=f'عبارت ناشناخته ماه {month}'
+                    ))
         self.month = month
         self.day = day
         self.hour = hour
@@ -444,7 +451,7 @@ class TimeRangeGroup(object):
                     result.time_ranges.remove(time_range)
             self.order_time_range_group()
             return result
-        raise ValueError
+        raise ValueError()
 
     def __sub__(self, other):
         if isinstance(other, TimeRangeGroup):
@@ -473,7 +480,7 @@ class TimeRangeGroup(object):
                     self.time_ranges.remove(time_range)
             self.order_time_range_group()
             return self
-        raise ValueError
+        raise ValueError()
 
     def __str__(self):
         total = "["

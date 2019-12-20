@@ -15,42 +15,17 @@ class AvishanException(Exception):
     ):
         save_traceback()
         if wrap_exception:
-            add_error_to_response(
+            add_error_message_to_response(
                 body=str(wrap_exception.args),
             )
             current_request['exception'] = wrap_exception
             current_request['status_code'] = status.HTTP_500_INTERNAL_SERVER_ERROR
         else:
-            add_error_to_response(
+            add_error_message_to_response(
                 body=error_message if error_message else translatable(EN='Error details not provided',
                                                                       FA='توضیحات خطا ارائه نشده'))
             current_request['exception'] = self
             current_request['status_code'] = status_code
-
-        from avishan.models import ExceptionRecord
-        try:
-            request_data = str(current_request['request'].data)
-        except:
-            request_data = ""
-        request_headers = ""
-        for key, value in current_request['request'].META.items():
-            if key.startswith('HTTP_'):
-                request_headers += f'({key[5:]}: {value}),\n'
-        current_request['exception_record'] = ExceptionRecord.objects.create(
-            class_title=current_request['exception'].__class__.__name__,
-            user_user_group=current_request['user_user_group'],
-            status_code=current_request['status_code'],
-            request_url=current_request['request'].path,
-            request_method=current_request['request'].method,
-            request_data=request_data,
-            request_headers=request_headers,
-            response=current_request['response'],
-            traceback=current_request['traceback'],
-            exception_args=current_request['exception'].args,
-            errors=str(current_request['errors']),
-            warnings=str(current_request['warnings']),
-            is_api=current_request['is_api']
-        )
 
 
 class AuthException(AvishanException):
@@ -59,7 +34,7 @@ class AuthException(AvishanException):
     """
     NOT_DEFINED = 0, translatable(EN='not defined', FA='مشخص نشده')
     ACCOUNT_NOT_FOUND = 1, translatable(EN='user account not found', FA='حساب کاربری پیدا نشد')
-    ACCOUNT_NOT_ACTIVE = 2, translatable(EN='user account is deactive', FA='حساب کاربری غیرفعال است')
+    ACCOUNT_NOT_ACTIVE = 2, translatable(EN='deactivated user account', FA='حساب کاربری غیرفعال است')
     GROUP_ACCOUNT_NOT_ACTIVE = 3, translatable(
         EN='user account deactivated in selected user group',
         FA='حساب کاربری در گروه‌کاربری انتخاب شده غیر فعال است'
@@ -82,13 +57,17 @@ class AuthException(AvishanException):
         EN='token deactivated, sign in again',
         FA='توکن غیرفعال شده است، دوباره وارد شوید'
     )
+    MULTIPLE_CONNECTED_ACCOUNTS = 13, translatable(
+        EN='multiple accounts found with this identifier, choose user group in url parameter',
+        FA='چند حساب با این شناسه پیدا شد، گروه کاربری را در پارامتر url مشخص کنید'
+    )
 
     def __init__(self, error_kind: tuple = NOT_DEFINED):
         status_code = status.HTTP_403_FORBIDDEN
         if error_kind[0] == AuthException.HTTP_METHOD_NOT_ALLOWED[0]:
             status_code = status.HTTP_405_METHOD_NOT_ALLOWED
         super().__init__(error_message=error_kind[1], status_code=status_code)
-        add_error_to_response(code=error_kind[0], body=error_kind[1], title=translatable(
+        add_error_message_to_response(code=error_kind[0], body=error_kind[1], title=translatable(
             EN='Authentication Exception',
             FA='خطای احراز هویت'
         ))
@@ -99,7 +78,43 @@ class ErrorMessageException(AvishanException):
         super().__init__(error_message=message, status_code=status_code)
 
 
-def add_error_to_response(body: str = None, title: str = None, code=None):
+def add_debug_message_to_response(body: str = None, title: str = None):
+    debug = {}
+    if body is not None:
+        debug['body'] = body
+    if title is not None:
+        debug['title'] = title
+    current_request['messages']['debug'].append(debug)
+
+
+def add_info_message_to_response(body: str = None, title: str = None):
+    info = {}
+    if body is not None:
+        info['body'] = body
+    if title is not None:
+        info['title'] = title
+    current_request['messages']['info'].append(info)
+
+
+def add_success_message_to_response(body: str = None, title: str = None):
+    success = {}
+    if body is not None:
+        success['body'] = body
+    if title is not None:
+        success['title'] = title
+    current_request['messages']['success'].append(success)
+
+
+def add_warning_message_to_response(body: str = None, title: str = None):
+    warning = {}
+    if body is not None:
+        warning['body'] = body
+    if title is not None:
+        warning['title'] = title
+    current_request['messages']['warning'].append(warning)
+
+
+def add_error_message_to_response(body: str = None, title: str = None, code=None):
     error = {}
     if body is not None:
         error['body'] = body
@@ -107,18 +122,7 @@ def add_error_to_response(body: str = None, title: str = None, code=None):
         error['title'] = title
     if code is not None:
         error['code'] = code
-    current_request['errors'].append(error)
-    messages.error(current_request['request'], body if body else title)
-
-
-def add_warning_to_response(body: str = None, title: str = None):
-    warning = {}
-    if body is not None:
-        warning['body'] = body
-    if title is not None:
-        warning['title'] = title
-    current_request['warnings'].append(warning)
-    messages.warning(current_request['request'], body if body else title)
+    current_request['messages']['error'].append(error)
 
 
 def save_traceback():
@@ -134,7 +138,3 @@ def save_traceback():
         if current_request['exception_record']:
             current_request['exception_record'].traceback = current_request['traceback']
             current_request['exception_record'].save()
-
-
-def raise_exception(exception: Exception):
-    pass

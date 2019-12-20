@@ -1,9 +1,9 @@
+import datetime
+
 from django.contrib import messages
 from django.http import JsonResponse
-from django.shortcuts import redirect
 
-from avishan.exceptions import AvishanException, save_traceback, AuthException
-from avishan_admin_config import AvishanAdminConfig
+from avishan.exceptions import AvishanException, save_traceback
 
 try:
     from avishan_admin.avishan_config import AvishanConfig as PanelAvishanConfig
@@ -27,12 +27,16 @@ class Wrapper:
         from avishan.utils import discard_monitor, find_token, decode_token, add_token_to_response, find_and_check_user
         from avishan import current_request
 
+        start_time = datetime.datetime.now()
+
         self.initialize_request_storage(current_request)
         current_request['request'] = request
 
         """Checks for avoid-touch requests"""
         if discard_monitor(current_request['request'].path):
             return self.get_response(current_request['request'])
+
+        current_request['start_time'] = start_time
 
         """Find token and parse it"""
         """
@@ -47,10 +51,6 @@ class Wrapper:
         except AvishanException:
             pass
         except Exception as e:
-            # import traceback
-            # summary = traceback.StackSummary.extract(
-            #     traceback.walk_stack(None)
-            # )
             save_traceback()
             AvishanException(e)
 
@@ -70,37 +70,29 @@ class Wrapper:
         except AvishanException:
             pass
         except Exception as e:
-            # import traceback
-            # summary = traceback.StackSummary.extract(
-            #     traceback.walk_stack(None)
-            # )
             save_traceback()
             AvishanException(e)
-        delete_token = False
-        if current_request['exception'] is not None:
-            if isinstance(current_request['exception'], AuthException):
-                delete_token = True
-                """
-                According to messages framework doc, iterating over messages, will clear them.
-                """
-                for item in messages.get_messages(request):
-                    pass
-                response = redirect(
-                    '/' + AvishanAdminConfig.ADMIN_PANEL_ROOT_ADDRESS + '/' +
-                    AvishanAdminConfig.ADMIN_PANEL_LOGIN_ADDRESS
-                )
-            else:
-                if not current_request['discard_json_object_check']:
-                    current_request['response']['error'] = current_request['errors']
-                    response = JsonResponse(current_request['response'], status=current_request['status_code'],
-                                            safe=not current_request['discard_json_object_check'])
 
-        add_token_to_response(response, delete_token)
+        """messages"""
+        if current_request['messages']['debug'] or current_request['messages']['info'] or \
+                current_request['messages']['success'] or current_request['messages']['warning'] or \
+                current_request['messages']['error']:
+            # todo 0.2.3: check for debug=True
+
+            if current_request['is_api']:
+                current_request['response']['messages'] = current_request['messages']
+            else:
+                self.fill_messages_framework(current_request)
+
+        add_token_to_response(response)
         status_code = current_request['status_code']
         is_api = current_request['is_api']
-        json_safe = not current_request['discard_json_object_check']
+        json_safe = not current_request['json_unsafe']
         if current_request['is_api']:
             response = current_request['response'].copy()
+
+        if current_request['is_tracked'] or current_request['exception'] is not None:
+            self.save_request_track(current_request)
 
         self.initialize_request_storage(current_request)
 
@@ -116,23 +108,103 @@ class Wrapper:
         current_request.clear()
         current_request['request'] = None
         current_request['response'] = {}
+        current_request['is_tracked'] = False
 
         """If not checked "None", then switches between api & template"""
         current_request['is_api'] = None
 
         current_request['add_token'] = False
-        current_request['discard_json_object_check'] = False
+        current_request['view_name'] = "NOT_AVAILABLE"
+        current_request['start_time'] = None
+        current_request['end_time'] = None
+        current_request['view_start_time'] = None
+        current_request['view_end_time'] = None
+        current_request['json_unsafe'] = False
         current_request['base_user'] = None
         current_request['user_group'] = None
+        current_request['user_user_group'] = None
         current_request['authentication_object'] = None
         current_request['exception_record'] = None
-        current_request['user_user_group'] = None
         current_request['token'] = None
         current_request['decoded_token'] = None
         current_request['status_code'] = 200
         current_request['exception'] = None
         current_request['traceback'] = None
         current_request['context'] = {}
-        current_request['errors'] = []
-        current_request['warnings'] = []
-        current_request['alerts'] = []
+        current_request['messages'] = {
+            'debug': [], 'info': [], 'success': [], 'warning': [], 'error': []
+        }
+        # todo ye check
+
+    @staticmethod
+    def fill_messages_framework(current_request):
+        for item in current_request['messages']['debug']:
+            messages.debug(current_request['request'], item['body'])
+        for item in current_request['messages']['info']:
+            messages.info(current_request['request'], item['body'])
+        for item in current_request['messages']['success']:
+            messages.success(current_request['request'], item['body'])
+        for item in current_request['messages']['warning']:
+            messages.warning(current_request['request'], item['body'])
+        for item in current_request['messages']['error']:
+            messages.error(current_request['request'], item['body'])
+
+    @staticmethod
+    def save_request_track(current_request):
+        from avishan.models import RequestTrack, RequestTrackMessage, RequestTrackException
+        current_request['end_time'] = datetime.datetime.now()
+
+        try:
+            request_data = str(current_request['request'].data)
+        except:
+            request_data = "NOT_AVAILABLE"
+
+        request_headers = ""
+        for key, value in current_request['request'].META.items():
+            if key.startswith('HTTP_'):
+                request_headers += f'({key[5:]}: {value}),\n'
+
+        authentication_type_class_title = "NOT_AVAILABLE"
+        authentication_type_object_id = 0
+        if current_request['authentication_object']:
+            authentication_type_class_title = current_request['authentication_object'].__class__.__name__
+            authentication_type_object_id = current_request['authentication_object'].id
+
+        created = RequestTrack.objects.create(
+            view_name=current_request['view_name'],
+            url=current_request['request'].path,
+            status_code=current_request['status_code'],
+            method=current_request['request'].method,
+            json_unsafe=current_request['json_unsafe'],
+            is_api=current_request['is_api'],
+            add_token=current_request['add_token'],
+            user_user_group=current_request['user_user_group'],
+            request_data=request_data,
+            request_headers=request_headers,
+            response_data=current_request['response'],
+            start_time=current_request['start_time'],
+            end_time=current_request['end_time'],
+            total_execution_milliseconds=int((current_request['end_time'] - current_request[
+                'start_time']).total_seconds() * 1000),
+            view_execution_milliseconds=int((current_request['view_end_time'] - current_request[
+                'view_start_time']).total_seconds() * 1000) if current_request['view_end_time'] else 0,
+            authentication_type_class_title=authentication_type_class_title,
+            authentication_type_object_id=authentication_type_object_id
+        )
+
+        for type in ['debug', 'info', 'success', 'warning', 'error']:
+            for message_item in current_request['messages'][type]:
+                RequestTrackMessage.objects.create(
+                    request_track=created,
+                    type=type,
+                    title=message_item['title'] if 'title' in message_item.keys() else "NOT_AVAILABLE",
+                    body=message_item['body'] if 'body' in message_item.keys() else "NOT_AVAILABLE",
+                    code=message_item['code'] if 'code' in message_item.keys() else "NOT_AVAILABLE"
+                )
+        if current_request['exception'] is not None:
+            RequestTrackException.objects.create(
+                request_track=created,
+                class_title=current_request['exception'].__class__.__name__,
+                args=current_request['exception'].args,
+                traceback=current_request['traceback']
+            )
