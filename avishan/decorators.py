@@ -98,10 +98,9 @@ class AvishanApiView(AvishanView):
                     current_request['request'].data = json.loads(current_request['request'].body.decode('utf-8'))
                 else:
                     current_request['request'].data = {}
-            except RawPostDataException:
-                current_request['request'].data = {}
             except:
-                pass
+                current_request['request'].data = {}
+
 
     def after_request(self):
         pass
@@ -127,10 +126,8 @@ class AvishanTemplateView(AvishanView):
                             current_request['request'].data[key] = value[0]
                 else:
                     current_request['request'].data = {}
-            except RawPostDataException:
-                current_request['request'].data = {}
             except:
-                pass
+                current_request['request'].data = {}
 
     def after_request(self):
         pass

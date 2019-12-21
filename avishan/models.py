@@ -1,9 +1,10 @@
-from typing import List, Type, Tuple, Union
+import random
+from typing import List, Type, Union
 
 from django.db.models import NOT_PROVIDED
 
 from avishan import current_request
-from avishan.exceptions import ErrorMessageException
+from avishan.exceptions import ErrorMessageException, AuthException
 from avishan.misc import translatable, status
 
 import datetime
@@ -914,6 +915,19 @@ class AuthenticationType(AvishanModel):
         current_request['authentication_object'] = None
         current_request['add_token'] = False
 
+
+class KeyValueAuthentication(AuthenticationType):
+    hashed_password = models.CharField(max_length=255, blank=True, null=True, default=None)
+
+    @classmethod
+    def key_field(cls) -> models.ForeignKey:
+        raise NotImplementedError()
+
+    # todo 0.2.2: bara verification che bokonim?
+
+    class Meta:
+        abstract = True
+
     @staticmethod
     def _hash_password(password: str) -> str:
         """
@@ -936,179 +950,138 @@ class AuthenticationType(AvishanModel):
         return bcrypt.checkpw(password.encode('utf8'), hashed_password.encode('utf8'))
 
     @classmethod
-    def identification_fields(cls) -> List[models.Field]:
+    def register(cls, user_user_group: UserUserGroup, key: str, password: str) -> \
+            Union['EmailPasswordAuthenticate', 'PhonePasswordAuthenticate']:
         """
-        list of key and value fields for identification
+        Registration process for key-value authentications
+        :param user_user_group:
+        :param key: email, phone, ...
+        :param password:
+        :param kwargs:
         :return:
         """
-        raise NotImplementedError()
+
+        try:
+            key_item = cls.key_field().related_model.get(key)
+        except cls.key_field().related_model.DoesNotExist:
+            key_item = cls.key_field().related_model.create(key)
+        try:
+            cls.objects.get(**{cls.key_field().name: key_item, 'user_user_group': user_user_group})
+            raise AuthException(AuthException.DUPLICATE_AUTHENTICATION_IDENTIFIER)
+        except cls.DoesNotExist:
+            # todo 0.2.3: auto reach to related
+            if hasattr(user_user_group, cls.key_field().name + 'passwordauthenticate'):
+                raise AuthException(AuthException.DUPLICATE_AUTHENTICATION_TYPE)
+        return cls.objects.create(**{
+            'user_user_group': user_user_group,
+            cls.key_field().name: key_item,
+            'hashed_password': cls._hash_password(password)
+        })
 
     @classmethod
-    def identifier_field(cls) -> models.Field:
-        """
-        Key field for identification on it
-        :return:
-        """
-        return cls.identification_fields()[0]
+    def login(cls, key: str, password: str, user_group: UserGroup = None) -> \
+            Union['EmailPasswordAuthenticate', 'PhonePasswordAuthenticate']:
+        from avishan.exceptions import AuthException
+        from avishan.utils import populate_current_request
+
+        key_item = cls.key_field().related_model.validate_signature(key)
+        try:
+            found_object = cls.objects.get(
+                **{cls.key_field().name: cls.key_field().related_model.get(key),
+                   "user_user_group__user_group": user_group}
+            )
+        except (cls.DoesNotExist, cls.key_field().related_model.DoesNotExist):
+            raise AuthException(AuthException.ACCOUNT_NOT_FOUND)
+        if not cls._check_password(password, found_object.hashed_password):
+            # todo 0.2.3: count incorrect enters with time, ban after some time
+            raise AuthException(AuthException.INCORRECT_PASSWORD)
+
+        found_object.last_login = BchDatetime().to_datetime()
+        found_object.last_logout = None
+        found_object.save()
+
+        populate_current_request(found_object)
+
+        return found_object
 
     @classmethod
-    def password_field(cls) -> models.Field:
-        """
-        Value field for identification on it
-        :return:
-        """
-        return cls.identification_fields()[1]
+    def find(cls, key: str, password: str = None, user_group: UserGroup = None) -> \
+            List[Union['EmailPasswordAuthenticate', 'PhonePasswordAuthenticate']]:
+        key = cls.key_field().related_model.validate_signature(key)
+        kwargs = {}
+        if user_group:
+            kwargs['user_user_group__user_group'] = user_group
+        try:
+            kwargs[cls.key_field().name] = cls.key_field().related_model.get(key)
+        except cls.key_field().related_model.DoesNotExist:
+            return []
+
+        founds = cls.objects.filter(**kwargs)
+        if password:
+            for found in founds:
+                if found._check_password(password, found.hashed_password):
+                    return founds
+            return []
+        return founds
 
 
-class EmailPasswordAuthenticate(AuthenticationType):
+class EmailPasswordAuthenticate(KeyValueAuthentication):
     email = models.ForeignKey(Email, on_delete=models.CASCADE, related_name='password_authenticates')
-    hashed_password = models.CharField(max_length=255, blank=True, null=True, default=None)
-
-    # todo 0.2.2: bara verification che bokonim?
 
     @classmethod
-    def register(cls, user_user_group: UserUserGroup, email_address: str, password: str,
-                 **kwargs) -> 'EmailPasswordAuthenticate':
-        from avishan.exceptions import AuthException
-
-        email = Email.get_or_create_email(email_address)
-        try:
-            cls.objects.get(**{'email': email, 'user_user_group': user_user_group})
-            raise AuthException(AuthException.DUPLICATE_AUTHENTICATION_IDENTIFIER)
-        except cls.DoesNotExist:
-            # todo 0.2.3: auto reach to related
-            if hasattr(user_user_group, 'emailpasswordauthenticate'):
-                raise AuthException(AuthException.DUPLICATE_AUTHENTICATION_TYPE)
-        return cls.objects.create(**{
-            'user_user_group': user_user_group,
-            'email': email,
-            'hashed_password': AuthenticationType._hash_password(password)
-        })
-
-    @classmethod
-    def login(cls, email_address: str, password: str,
-              force_on_user_group: UserGroup = None) -> 'EmailPasswordAuthenticate':
-        from avishan.exceptions import AuthException
-        from avishan.utils import populate_current_request
-
-        email_address = Email.validate_signature(email_address)
-        try:
-            found_object = cls.objects.get(
-                **{'email': Email.objects.get(address=email_address),
-                   "user_user_group__user_group": force_on_user_group}
-            )
-        except (Email.DoesNotExist, cls.DoesNotExist):
-            raise AuthException(AuthException.ACCOUNT_NOT_FOUND)
-        if not cls._check_password(password, found_object.hashed_password):
-            # todo 0.2.3: count incorrect enters with time, ban after some time
-            raise AuthException(AuthException.INCORRECT_PASSWORD)
-
-        found_object.last_login = BchDatetime().to_datetime()
-        found_object.last_logout = None
-        found_object.save()
-
-        populate_current_request(found_object)
-
-        return found_object
-
-    @classmethod
-    def identification_fields(cls) -> List[models.Field]:
-        return [cls.get_field('email'), cls.get_field('hashed_password')]
-
-    @classmethod
-    def find(cls, email_address: str, password: str = None, user_group: UserGroup = None) -> List[
-        'EmailPasswordAuthenticate']:
-        email_address = Email.validate_signature(email_address)
-        kwargs = {}
-        if user_group:
-            kwargs['user_user_group__user_group'] = user_group
-        try:
-            kwargs['email'] = Email.get(address=email_address)
-        except Email.DoesNotExist:
-            return []
-
-        founds = cls.objects.filter(**kwargs)
-        if password:
-            for found in founds:
-                if found._check_password(password, found.hashed_password):
-                    return founds
-            return []
-        return founds
+    def key_field(cls) -> Union[models.ForeignKey, models.Field]:
+        return cls.get_field('email')
 
 
-class PhonePasswordAuthenticate(AuthenticationType):
-    # todo 0.2.1 mese epa she
+class PhonePasswordAuthenticate(KeyValueAuthentication):
     phone = models.ForeignKey(Phone, on_delete=models.CASCADE, related_name='password_authenticates')
-    hashed_password = models.CharField(max_length=255, blank=True, null=True, default=None)
 
-    @classmethod
-    def register(cls, user_user_group: UserUserGroup, phone_number: str, password: str,
-                 **kwargs) -> 'PhonePasswordAuthenticate':
-        from avishan.exceptions import AuthException
+    @property
+    def key_field(self) -> Union[models.ForeignKey, models.Field]:
+        return self.get_field('phone')
 
-        phone = Phone.get_or_create_phone(phone_number)
-        try:
-            cls.objects.get(**{'phone': phone, 'user_user_group': user_user_group})
-            raise AuthException(AuthException.DUPLICATE_AUTHENTICATION_IDENTIFIER)
-        except cls.DoesNotExist:
-            # todo 0.2.3: auto reach to related
-            if hasattr(user_user_group, 'emailpasswordauthenticate'):
-                raise AuthException(AuthException.DUPLICATE_AUTHENTICATION_TYPE)
-        return cls.objects.create(**{
-            'user_user_group': user_user_group,
-            'phone': phone,
-            'hashed_password': AuthenticationType._hash_password(password)
-        })
 
-    @classmethod
-    def login(cls, phone_number: str, password: str,
-              force_on_user_group: UserGroup = None) -> 'PhonePasswordAuthenticate':
-        from avishan.exceptions import AuthException
-        from avishan.utils import populate_current_request
+class OTPAuthentication(AuthenticationType):
+    date_sent = models.DateTimeField(null=True, blank=True, default=None)
+    code = models.CharField(max_length=255, blank=True, null=True)
+    tried_codes = models.TextField(blank=True, default="")
 
-        phone_number = Phone.validate_signature(phone_number)
-        try:
-            found_object = cls.objects.get(
-                **{'phone': Phone.objects.get(number=phone_number),
-                   "user_user_group__user_group": force_on_user_group}
-            )
-        except (Phone.DoesNotExist, cls.DoesNotExist):
-            raise AuthException(AuthException.ACCOUNT_NOT_FOUND)
-        if not cls._check_password(password, found_object.hashed_password):
-            # todo 0.2.3: count incorrect enters with time, ban after some time
-            raise AuthException(AuthException.INCORRECT_PASSWORD)
+    class Meta:
+        abstract = True
 
-        found_object.last_login = BchDatetime().to_datetime()
-        found_object.last_logout = None
-        found_object.save()
+    @staticmethod
+    def create_otp_code() -> str:
+        from avishan_config import AvishanConfig
+        return str(random.randint(10 ** (AvishanConfig.OTP_CODE_LENGTH - 1)), 10 ** AvishanConfig.OTP_CODE_LENGTH - 1)
 
-        populate_current_request(found_object)
+    def is_verified(self, entered_code) -> bool:
+        from avishan_config import AvishanConfig
+        if self.code is None:
+            raise ErrorMessageException(translatable(
+                EN='code not found for this account',
+                FA='برای این حساب کدی پیدا نشد'
+            ))
+        if (BchDatetime() - BchDatetime(self.date_sent)).total_seconds() > AvishanConfig.PHONE_OTP_CODE_VALID_SECONDS:
+            self.code = None
+            self.save()
+            raise ErrorMessageException(translatable(
+                EN='code expired',
+                FA='کد منقضی شده است'
+            ))
 
-        return found_object
+        if self.code != entered_code:
+            self.tried_codes += f"{entered_code} - {BchDatetime().to_datetime()}\n"
+            self.save()
+            return False
 
-    @classmethod
-    def identification_fields(cls) -> List[models.Field]:
-        return [cls.get_field('email'), cls.get_field('hashed_password')]
+        self.code = None
+        self.tried_codes = ""
+        self.save()
+        return True
 
-    @classmethod
-    def find(cls, email_address: str, password: str = None, user_group: UserGroup = None) -> List[
-        'EmailPasswordAuthenticate']:
-        email_address = Email.validate_signature(email_address)
-        kwargs = {}
-        if user_group:
-            kwargs['user_user_group__user_group'] = user_group
-        try:
-            kwargs['email'] = Email.get(address=email_address)
-        except Email.DoesNotExist:
-            return []
 
-        founds = cls.objects.filter(**kwargs)
-        if password:
-            for found in founds:
-                if found._check_password(password, found.hashed_password):
-                    return founds
-            return []
-        return founds
+class PhoneOTPAuthenticate(OTPAuthentication):
+    phone = models.ForeignKey(Phone, on_delete=models.CASCADE, related_name='otp_authenticates')
 
 
 class Image(AvishanModel):
@@ -1137,6 +1110,24 @@ class Image(AvishanModel):
         return {
             'id': self.id,
             'url': self.file.url
+        }
+
+    @classmethod
+    def upload(cls):
+        media = current_request['request'].FILES.get('file')
+        if media == '####':
+            raise ErrorMessageException(translatable(
+                EN='file not found',
+                FA='فایل ارسال نشده است'
+            ))
+
+        created = Image.objects.create()
+
+        created.file.save("files/" + media.name, media, save=True)
+
+        created.save()
+        return {
+            'image': created.to_dict()
         }
 
 
