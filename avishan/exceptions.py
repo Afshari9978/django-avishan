@@ -15,17 +15,20 @@ class AvishanException(Exception):
     ):
         save_traceback()
         if wrap_exception:
-            add_error_message_to_response(
-                body=str(wrap_exception.args),
-            )
+            if isinstance(wrap_exception, KeyError):
+                body = f'field {wrap_exception.args[0]} not found in data and its required'
+            else:
+                body = str(wrap_exception.args[0]) if len(wrap_exception.args) == 1 else str(wrap_exception.args)
             current_request['exception'] = wrap_exception
             current_request['status_code'] = status.HTTP_418_IM_TEAPOT
         else:
-            add_error_message_to_response(
-                body=error_message if error_message else translatable(EN='Error details not provided',
-                                                                      FA='توضیحات خطا ارائه نشده'))
+            body = error_message if error_message else translatable(EN='Error details not provided',
+                                                                    FA='توضیحات خطا ارائه نشده')
             current_request['exception'] = self
             current_request['status_code'] = status_code
+        add_error_message_to_response(
+            body=body,
+        )
 
 
 class AuthException(AvishanException):

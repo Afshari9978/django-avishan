@@ -3,3 +3,4 @@ Django==2.2.6
 Khayyam==3.0.17
 Pillow==6.2.1
 PyJWT==1.7.0
+requests==2.21.0

@@ -1,5 +1,5 @@
 import random
-from typing import List, Type, Union
+from typing import List, Type, Union, Tuple
 
 import requests
 from django.db.models import NOT_PROVIDED
@@ -553,6 +553,10 @@ class BaseUser(AvishanModel):
 
     def add_to_user_group(self, user_group: 'UserGroup') -> 'UserUserGroup':
         return user_group.add_user_to_user_group(self)
+
+    @classmethod
+    def create(cls, is_active: bool = True, **kwargs):
+        return super().create(is_active=is_active)
     # todo ye rahi bezarim in betoone username mese adam bargardoone
 
 
@@ -646,6 +650,12 @@ class UserUserGroup(AvishanModel):
         if len(dates) == 0:
             return None
         return max(dates)
+
+    @classmethod
+    def create(cls, user_group: UserGroup, base_user: BaseUser = None, **kwargs):
+        if base_user is None:
+            base_user = BaseUser.create()
+        return super().create(user_group=user_group, base_user=base_user)
 
 
 class Email(AvishanModel):
@@ -1053,8 +1063,8 @@ class PhonePasswordAuthenticate(KeyValueAuthentication):
 
 
 class OTPAuthentication(AuthenticationType):
-    date_sent = models.DateTimeField(null=True, blank=True, default=None)
     code = models.CharField(max_length=255, blank=True, null=True)
+    date_sent = models.DateTimeField(null=True, blank=True, default=None)
     tried_codes = models.TextField(blank=True, default="")
 
     class Meta:
@@ -1067,9 +1077,9 @@ class OTPAuthentication(AuthenticationType):
     @staticmethod
     def create_otp_code() -> str:
         from avishan_config import AvishanConfig
-        return str(random.randint(10 ** (AvishanConfig.OTP_CODE_LENGTH - 1)), 10 ** AvishanConfig.OTP_CODE_LENGTH - 1)
+        return str(random.randint(10 ** (AvishanConfig.OTP_CODE_LENGTH - 1), 10 ** AvishanConfig.OTP_CODE_LENGTH - 1))
 
-    def is_verified(self, entered_code) -> bool:
+    def check_verification_code(self, entered_code: str) -> bool:
         from avishan_config import AvishanConfig
         if self.code is None:
             raise ErrorMessageException(translatable(
@@ -1095,16 +1105,7 @@ class OTPAuthentication(AuthenticationType):
         return True
 
     @classmethod
-    def register(cls, user_user_group: UserUserGroup, key: str) -> 'PhoneOTPAuthenticate':
-        """
-        Registration process for otp authentications
-        :param user_user_group:
-        :param key: email, phone, ...
-        :param password:
-        :param kwargs:
-        :return:
-        """
-
+    def create_new(cls, user_user_group: UserUserGroup, key: str) -> 'PhoneOTPAuthenticate':
         try:
             key_item = cls.key_field().related_model.get(key)
         except cls.key_field().related_model.DoesNotExist:
@@ -1120,33 +1121,35 @@ class OTPAuthentication(AuthenticationType):
             cls.key_field().name: key_item
         })
 
-    @classmethod
-    def login(cls, key: str, user_group: UserGroup = None) -> 'PhoneOTPAuthenticate':
-        from avishan.exceptions import AuthException
-        from avishan.utils import populate_current_request
+    def verify_account(self) -> Union['OTPAuthentication', 'PhoneOTPAuthenticate']:
+        self.send_otp_code()
 
-        key_item = cls.key_field().related_model.validate_signature(key)
+        return self
+
+    @classmethod
+    def check_authentication(cls, key: str, entered_code: str, user_group: UserGroup) -> Tuple[
+        'PhoneOTPAuthenticate', bool]:
+        from avishan.utils import populate_current_request
         try:
-            found_object = cls.objects.get(
-                **{cls.key_field().name: cls.key_field().related_model.get(key),
-                   "user_user_group__user_group": user_group}
-            )
-        except (cls.DoesNotExist, cls.key_field().related_model.DoesNotExist):
+            item = cls.find(key, user_group)[0]
+        except IndexError:
             raise AuthException(AuthException.ACCOUNT_NOT_FOUND)
 
-        found_object.send_otp_code()
+        if not item.check_verification_code(entered_code):
+            raise AuthException(AuthException.INCORRECT_PASSWORD)
 
-        return found_object
+        if item.last_login is None:
+            created = True
+        else:
+            created = False
 
-    @classmethod
-    def check_code(cls, key: str, entered_code: str, user_group: UserGroup) -> 'PhoneOTPAuthenticate':
-        found_object.last_login = BchDatetime().to_datetime()
-        found_object.last_logout = None
-        found_object.save()
+        item.last_login = BchDatetime().to_datetime()
+        item.last_logout = None
+        item.save()
 
-        populate_current_request(found_object)
+        populate_current_request(item)
 
-        return found_object
+        return item, created
 
     def send_otp_code(self):
         raise NotImplementedError()
@@ -1168,14 +1171,15 @@ class OTPAuthentication(AuthenticationType):
 class PhoneOTPAuthenticate(OTPAuthentication):
     phone = models.ForeignKey(Phone, on_delete=models.CASCADE, related_name='otp_authenticates')
 
-    @property
-    def key_field(self) -> Union[models.ForeignKey, models.Field]:
-        return self.get_field('phone')
+    @classmethod
+    def key_field(cls) -> Union[models.Field, models.ForeignKey]:
+        return cls.get_field('phone')
 
     def send_otp_code(self):
         self.code = self.create_otp_code()
         self.date_sent = BchDatetime().to_datetime()
-        self.phone.send_verification_code()
+        self.phone.send_verification_sms(self.code)
+        self.save()
 
 
 class Image(AvishanModel):

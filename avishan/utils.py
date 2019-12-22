@@ -4,7 +4,6 @@ from django.http import HttpResponse
 
 from avishan.exceptions import AuthException
 from avishan.misc.bch_datetime import BchDatetime
-from avishan.models import AuthenticationType
 from avishan_config import AvishanConfig
 from . import current_request
 
@@ -110,7 +109,7 @@ def delete_token_from_request(rendered_response=None):
         rendered_response.delete_cookie('token')
 
 
-def encode_token(authentication_object: AuthenticationType) -> Optional[str]:
+def encode_token(authentication_object: 'AuthenticationType') -> Optional[str]:
     import jwt
     from datetime import timedelta
     from avishan_config import AvishanConfig
@@ -160,7 +159,7 @@ def find_and_check_user():
         current_request['decoded_token']['at_n']
     )
     try:
-        authentication_type_object: AuthenticationType = authentication_type_class.objects.get(
+        authentication_type_object: 'AuthenticationType' = authentication_type_class.objects.get(
             id=current_request['decoded_token']['at_id'])
         user_user_group = authentication_type_object.user_user_group
     except authentication_type_class.DoesNotExist:
@@ -177,7 +176,7 @@ def find_and_check_user():
     populate_current_request(login_with=authentication_type_object)
 
 
-def populate_current_request(login_with: AuthenticationType):
+def populate_current_request(login_with: 'AuthenticationType'):
     current_request['base_user'] = login_with.user_user_group.base_user
     current_request['user_group'] = login_with.user_user_group.user_group
     current_request['user_user_group'] = login_with.user_user_group
