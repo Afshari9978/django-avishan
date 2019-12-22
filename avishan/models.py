@@ -1,6 +1,7 @@
 import random
 from typing import List, Type, Union
 
+import requests
 from django.db.models import NOT_PROVIDED
 
 from avishan import current_request
@@ -778,9 +779,19 @@ class Phone(AvishanModel):
     def send_sms(self):
         pass  # todo
 
-    def send_verification_code(self):
-        # todo calculate time
-        pass  # todo
+    def send_verification_sms(self, code):
+        from avishan_config import AvishanConfig
+        self.send_template_sms(AvishanConfig.SMS_SIGNIN_TEMPLATE, token=code)
+
+    def send_signup_verification_sms(self, code):
+        from avishan_config import AvishanConfig
+        self.send_template_sms(AvishanConfig.SMS_SIGNUP_TEMPLATE, token=code)
+
+    def send_template_sms(self, template_name, **kwargs):
+        from avishan_config import AvishanConfig
+        url = "https://api.kavenegar.com/v1/" + AvishanConfig.KAVENEGAR_API_TOKEN + "/verify/lookup.json"
+        querystring = {**{"receptor": self.number, "template": template_name}, **kwargs}
+        requests.request("GET", url, data="", headers={}, params=querystring)
 
     def verify(self, code: str):
         if PhoneVerification.check_phone(self, code):
@@ -1049,6 +1060,10 @@ class OTPAuthentication(AuthenticationType):
     class Meta:
         abstract = True
 
+    @classmethod
+    def key_field(cls) -> models.ForeignKey:
+        raise NotImplementedError()
+
     @staticmethod
     def create_otp_code() -> str:
         from avishan_config import AvishanConfig
@@ -1079,9 +1094,88 @@ class OTPAuthentication(AuthenticationType):
         self.save()
         return True
 
+    @classmethod
+    def register(cls, user_user_group: UserUserGroup, key: str) -> 'PhoneOTPAuthenticate':
+        """
+        Registration process for otp authentications
+        :param user_user_group:
+        :param key: email, phone, ...
+        :param password:
+        :param kwargs:
+        :return:
+        """
+
+        try:
+            key_item = cls.key_field().related_model.get(key)
+        except cls.key_field().related_model.DoesNotExist:
+            key_item = cls.key_field().related_model.create(key)
+        try:
+            cls.objects.get(**{cls.key_field().name: key_item, 'user_user_group': user_user_group})
+            raise AuthException(AuthException.DUPLICATE_AUTHENTICATION_IDENTIFIER)
+        except cls.DoesNotExist:
+            if hasattr(user_user_group, cls.key_field().name + 'otpauthenticate'):
+                raise AuthException(AuthException.DUPLICATE_AUTHENTICATION_TYPE)
+        return cls.objects.create(**{
+            'user_user_group': user_user_group,
+            cls.key_field().name: key_item
+        })
+
+    @classmethod
+    def login(cls, key: str, user_group: UserGroup = None) -> 'PhoneOTPAuthenticate':
+        from avishan.exceptions import AuthException
+        from avishan.utils import populate_current_request
+
+        key_item = cls.key_field().related_model.validate_signature(key)
+        try:
+            found_object = cls.objects.get(
+                **{cls.key_field().name: cls.key_field().related_model.get(key),
+                   "user_user_group__user_group": user_group}
+            )
+        except (cls.DoesNotExist, cls.key_field().related_model.DoesNotExist):
+            raise AuthException(AuthException.ACCOUNT_NOT_FOUND)
+
+        found_object.send_otp_code()
+
+        return found_object
+
+    @classmethod
+    def check_code(cls, key: str, entered_code: str, user_group: UserGroup) -> 'PhoneOTPAuthenticate':
+        found_object.last_login = BchDatetime().to_datetime()
+        found_object.last_logout = None
+        found_object.save()
+
+        populate_current_request(found_object)
+
+        return found_object
+
+    def send_otp_code(self):
+        raise NotImplementedError()
+
+    @classmethod
+    def find(cls, key: str, user_group: UserGroup = None) -> List['PhoneOTPAuthenticate']:
+        key = cls.key_field().related_model.validate_signature(key)
+        kwargs = {}
+        if user_group:
+            kwargs['user_user_group__user_group'] = user_group
+        try:
+            kwargs[cls.key_field().name] = cls.key_field().related_model.get(key)
+        except cls.key_field().related_model.DoesNotExist:
+            return []
+
+        return cls.objects.filter(**kwargs)
+
 
 class PhoneOTPAuthenticate(OTPAuthentication):
     phone = models.ForeignKey(Phone, on_delete=models.CASCADE, related_name='otp_authenticates')
+
+    @property
+    def key_field(self) -> Union[models.ForeignKey, models.Field]:
+        return self.get_field('phone')
+
+    def send_otp_code(self):
+        self.code = self.create_otp_code()
+        self.date_sent = BchDatetime().to_datetime()
+        self.phone.send_verification_code()
 
 
 class Image(AvishanModel):

@@ -19,7 +19,7 @@ class AvishanException(Exception):
                 body=str(wrap_exception.args),
             )
             current_request['exception'] = wrap_exception
-            current_request['status_code'] = status.HTTP_500_INTERNAL_SERVER_ERROR
+            current_request['status_code'] = status.HTTP_418_IM_TEAPOT
         else:
             add_error_message_to_response(
                 body=error_message if error_message else translatable(EN='Error details not provided',
