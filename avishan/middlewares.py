@@ -1,4 +1,5 @@
 import datetime
+import json
 
 from django.contrib import messages
 from django.http import JsonResponse
@@ -181,7 +182,7 @@ class Wrapper:
             user_user_group=current_request['user_user_group'],
             request_data=request_data,
             request_headers=request_headers,
-            response_data=current_request['response'],
+            response_data=json.dumps(current_request['response'], indent=2),
             start_time=current_request['start_time'],
             end_time=current_request['end_time'],
             total_execution_milliseconds=int((current_request['end_time'] - current_request[

@@ -67,7 +67,7 @@ def avishan_model_function_caller(request, model_plural_name, function_name):
     return JsonResponse(current_request['response'])
 
 
-@AvishanApiView(methods=['POST'], track_it=True)
+@AvishanApiView(methods=['POST', 'GET'], track_it=True)
 def avishan_item_function_caller(request, model_plural_name, item_id, function_name):
     model = AvishanModel.get_model_by_plural_name(model_plural_name)
     if not model:
@@ -82,8 +82,12 @@ def avishan_item_function_caller(request, model_plural_name, item_id, function_n
             EN=f'Requested method not found in record {item}'
         ))
 
-    current_request['response'] = {**target_function(**current_request['request'].data),
-                                   **current_request['response']}
+    if request.method == 'POST':
+        current_request['response'] = {**target_function(**current_request['request'].data),
+                                       **current_request['response']}
+    elif request.method == 'GET':
+        current_request['response'] = {**target_function(), **current_request['response']}
+
     return JsonResponse(current_request['response'])
 
 
