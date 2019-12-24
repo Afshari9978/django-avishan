@@ -2,6 +2,7 @@ import datetime
 import json
 
 from django.contrib import messages
+from django.core.handlers.wsgi import WSGIRequest
 from django.http import JsonResponse
 
 from avishan.exceptions import AvishanException, save_traceback
@@ -24,13 +25,12 @@ class Wrapper:
         from avishan.models import AvishanModel
         AvishanModel.run_apps_check()
 
-    def __call__(self, request):
+    def __call__(self, request: WSGIRequest):
         from avishan.utils import discard_monitor, find_token, decode_token, add_token_to_response, find_and_check_user
         from avishan import current_request
 
         start_time = datetime.datetime.now()
 
-        self.initialize_request_storage(current_request)
         current_request['request'] = request
 
         """Checks for avoid-touch requests"""
@@ -173,7 +173,7 @@ class Wrapper:
 
         created = RequestTrack.objects.create(
             view_name=current_request['view_name'],
-            url=current_request['request'].path,
+            url=current_request['request'].get_full_path(),
             status_code=current_request['status_code'],
             method=current_request['request'].method,
             json_unsafe=current_request['json_unsafe'],

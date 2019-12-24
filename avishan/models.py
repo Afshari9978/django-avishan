@@ -114,6 +114,15 @@ class AvishanModel(models.Model):
         return temp
 
     @classmethod
+    def search(cls, query_set: models.QuerySet, search_text: str = None) -> models.QuerySet:
+        if search_text is None:
+            return query_set
+        for field in cls.get_fields():
+            if isinstance(field, models.CharField):
+                query_set = query_set.filter(**{f'{field.name}__icontains': search_text})
+        return query_set
+
+    @classmethod
     def create_or_update(cls, fixed_kwargs: dict, new_additional_kwargs: dict):
         """
         Create object if doesnt exists. Else update it
@@ -557,6 +566,11 @@ class BaseUser(AvishanModel):
     @classmethod
     def create(cls, is_active: bool = True, **kwargs):
         return super().create(is_active=is_active)
+
+    def __str__(self):
+        if hasattr(self, 'user'):
+            return str(self.user)
+        return super().__str__()
     # todo ye rahi bezarim in betoone username mese adam bargardoone
 
 
@@ -656,6 +670,9 @@ class UserUserGroup(AvishanModel):
         if base_user is None:
             base_user = BaseUser.create()
         return super().create(user_group=user_group, base_user=base_user)
+
+    def __str__(self):
+        return f'{self.base_user} - {self.user_group}'
 
 
 class Email(AvishanModel):

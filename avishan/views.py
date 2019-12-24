@@ -1,3 +1,4 @@
+from django.db import models
 from django.http import JsonResponse
 
 from avishan import current_request
@@ -15,7 +16,20 @@ def avishan_model_store(request, model_plural_name):
         raise ErrorMessageException('Entered model name not found')
 
     if request.method == 'GET':
-        current_request['response'][model.class_plural_snake_case_name()] = [item.to_dict() for item in model.all()]
+        total = model.all()
+        search_text = None
+        url_params = request.GET.copy()
+        if url_params.get('s', False):
+            search_text = url_params['s']
+            del url_params['s']
+        filter_kwargs = {}
+        for filter_key, filter_value in url_params.items():
+            if isinstance(model.get_field(filter_key), (models.ForeignKey, models.OneToOneField)):
+                filter_kwargs[filter_key] = {'id': filter_value}
+            else:
+                filter_kwargs[filter_key] = filter_value
+        total = model.search(total.filter(**filter_kwargs), search_text)
+        current_request['response'][model.class_plural_snake_case_name()] = [item.to_dict() for item in total]
 
     elif request.method == 'POST':
         current_request['response'][model.class_snake_case_name()] = model.create(
