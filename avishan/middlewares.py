@@ -31,6 +31,7 @@ class Wrapper:
 
         start_time = datetime.datetime.now()
 
+        self.initialize_request_storage(current_request)
         current_request['request'] = request
 
         """Checks for avoid-touch requests"""
