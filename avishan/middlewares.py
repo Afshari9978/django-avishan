@@ -171,42 +171,45 @@ class Wrapper:
         if current_request['authentication_object']:
             authentication_type_class_title = current_request['authentication_object'].__class__.__name__
             authentication_type_object_id = current_request['authentication_object'].id
-
-        created = RequestTrack.objects.create(
-            view_name=current_request['view_name'],
-            url=current_request['request'].get_full_path(),
-            status_code=current_request['status_code'],
-            method=current_request['request'].method,
-            json_unsafe=current_request['json_unsafe'],
-            is_api=current_request['is_api'],
-            add_token=current_request['add_token'],
-            user_user_group=current_request['user_user_group'],
-            request_data=request_data,
-            request_headers=request_headers,
-            response_data=json.dumps(current_request['response'], indent=2),
-            start_time=current_request['start_time'],
-            end_time=current_request['end_time'],
-            total_execution_milliseconds=int((current_request['end_time'] - current_request[
-                'start_time']).total_seconds() * 1000),
-            view_execution_milliseconds=int((current_request['view_end_time'] - current_request[
-                'view_start_time']).total_seconds() * 1000) if current_request['view_end_time'] else 0,
-            authentication_type_class_title=authentication_type_class_title,
-            authentication_type_object_id=authentication_type_object_id
-        )
-
-        for type in ['debug', 'info', 'success', 'warning', 'error']:
-            for message_item in current_request['messages'][type]:
-                RequestTrackMessage.objects.create(
-                    request_track=created,
-                    type=type,
-                    title=message_item['title'] if 'title' in message_item.keys() else "NOT_AVAILABLE",
-                    body=message_item['body'] if 'body' in message_item.keys() else "NOT_AVAILABLE",
-                    code=message_item['code'] if 'code' in message_item.keys() else "NOT_AVAILABLE"
-                )
-        if current_request['exception'] is not None:
-            RequestTrackException.objects.create(
-                request_track=created,
-                class_title=current_request['exception'].__class__.__name__,
-                args=current_request['exception'].args,
-                traceback=current_request['traceback']
+        try:
+            created = RequestTrack.objects.create(
+                view_name=current_request['view_name'],
+                url=current_request['request'].get_full_path(),
+                status_code=current_request['status_code'],
+                method=current_request['request'].method,
+                json_unsafe=current_request['json_unsafe'],
+                is_api=current_request['is_api'],
+                add_token=current_request['add_token'],
+                user_user_group=current_request['user_user_group'],
+                request_data=request_data,
+                request_headers=request_headers,
+                response_data=json.dumps(current_request['response'], indent=2),
+                start_time=current_request['start_time'],
+                end_time=current_request['end_time'],
+                total_execution_milliseconds=int((current_request['end_time'] - current_request[
+                    'start_time']).total_seconds() * 1000),
+                view_execution_milliseconds=int((current_request['view_end_time'] - current_request[
+                    'view_start_time']).total_seconds() * 1000) if current_request['view_end_time'] else 0,
+                authentication_type_class_title=authentication_type_class_title,
+                authentication_type_object_id=authentication_type_object_id
             )
+            for type in ['debug', 'info', 'success', 'warning', 'error']:
+                for message_item in current_request['messages'][type]:
+                    RequestTrackMessage.objects.create(
+                        request_track=created,
+                        type=type,
+                        title=message_item['title'] if 'title' in message_item.keys() else "NOT_AVAILABLE",
+                        body=message_item['body'] if 'body' in message_item.keys() else "NOT_AVAILABLE",
+                        code=message_item['code'] if 'code' in message_item.keys() else "NOT_AVAILABLE"
+                    )
+            if current_request['exception'] is not None:
+                RequestTrackException.objects.create(
+                    request_track=created,
+                    class_title=current_request['exception'].__class__.__name__,
+                    args=current_request['exception'].args,
+                    traceback=current_request['traceback']
+                )
+        except Exception as e:
+            print(e)
+
+

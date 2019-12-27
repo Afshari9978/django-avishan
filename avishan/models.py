@@ -117,10 +117,11 @@ class AvishanModel(models.Model):
     def search(cls, query_set: models.QuerySet, search_text: str = None) -> models.QuerySet:
         if search_text is None:
             return query_set
+        result = cls.objects.none()
         for field in cls.get_fields():
             if isinstance(field, models.CharField):
-                query_set = query_set.filter(**{f'{field.name}__icontains': search_text})
-        return query_set
+                result = query_set.filter(**{f'{field.name}__icontains': search_text}) | result
+        return result.distinct()
 
     @classmethod
     def create_or_update(cls, fixed_kwargs: dict, new_additional_kwargs: dict):
@@ -533,6 +534,9 @@ class AvishanModel(models.Model):
                 if isinstance(field, models.TimeField):
                     return self.__getattribute__(field.name).strftime("%H:%M:%S")
             return self.__getattribute__(field.name)
+
+        if isinstance(field, models.ManyToManyField):
+            return self.__getattribute__(field.name).all()
 
         return self.__getattribute__(field.name)
 
@@ -1065,6 +1069,7 @@ class KeyValueAuthentication(AuthenticationType):
 
 class EmailPasswordAuthenticate(KeyValueAuthentication):
     email = models.ForeignKey(Email, on_delete=models.CASCADE, related_name='password_authenticates')
+    django_admin_list_display = [email, 'user_user_group', 'last_used', 'last_login', 'last_logout']
 
     @classmethod
     def key_field(cls) -> Union[models.ForeignKey, models.Field]:
@@ -1204,6 +1209,9 @@ class Image(AvishanModel):
     base_user = models.ForeignKey(BaseUser, on_delete=models.SET_NULL, null=True, blank=True)
     date_created = models.DateTimeField(auto_now_add=True)
 
+    def __str__(self):
+        return self.file.url
+
     @staticmethod
     def image_from_url(url: str) -> 'Image':
         """
@@ -1278,10 +1286,9 @@ class RequestTrack(AvishanModel):
     authentication_type_object_id = models.IntegerField(blank=True, null=True)
 
     django_admin_list_display = [view_name, method, status_code, user_user_group, start_time,
-                                 total_execution_milliseconds]
-    django_admin_list_filter = [view_name, method, status_code]
-    django_admin_list_max_show_all = 5000
-    django_admin_list_per_page = 5000
+                                 total_execution_milliseconds, url]
+    django_admin_list_max_show_all = 100
+    django_admin_list_per_page = 50
 
     def __str__(self):
         return self.view_name

@@ -16,7 +16,6 @@ def avishan_model_store(request, model_plural_name):
         raise ErrorMessageException('Entered model name not found')
 
     if request.method == 'GET':
-        total = model.all()
         search_text = None
         url_params = request.GET.copy()
         if url_params.get('s', False):
@@ -28,7 +27,7 @@ def avishan_model_store(request, model_plural_name):
                 filter_kwargs[filter_key] = {'id': filter_value}
             else:
                 filter_kwargs[filter_key] = filter_value
-        total = model.search(total.filter(**filter_kwargs), search_text)
+        total = model.search(model.filter(**filter_kwargs), search_text)
         current_request['response'][model.class_plural_snake_case_name()] = [item.to_dict() for item in total]
 
     elif request.method == 'POST':
@@ -60,7 +59,7 @@ def avishan_model_details(request, model_plural_name, item_id):
     return JsonResponse(current_request['response'])
 
 
-@AvishanApiView(methods=['POST', 'GET'], track_it=True)
+@AvishanApiView(methods=['POST', 'GET', 'PUT'], track_it=True)
 def avishan_model_function_caller(request, model_plural_name, function_name):
     # todo add parameter 'function_caller_methods' to each model and check them here
     model = AvishanModel.get_model_by_plural_name(model_plural_name)
@@ -73,7 +72,7 @@ def avishan_model_function_caller(request, model_plural_name, function_name):
         raise ErrorMessageException(translatable(
             EN=f'Requested method not found in model {model.class_name()}'
         ))
-    if request.method == 'POST':
+    if request.method == 'POST' or request.method == 'PUT':
         current_request['response'] = {**target_function(**current_request['request'].data),
                                        **current_request['response']}
     elif request.method == 'GET':
@@ -81,7 +80,7 @@ def avishan_model_function_caller(request, model_plural_name, function_name):
     return JsonResponse(current_request['response'])
 
 
-@AvishanApiView(methods=['POST', 'GET'], track_it=True)
+@AvishanApiView(methods=['POST', 'GET', 'PUT'], track_it=True)
 def avishan_item_function_caller(request, model_plural_name, item_id, function_name):
     model = AvishanModel.get_model_by_plural_name(model_plural_name)
     if not model:
@@ -96,7 +95,7 @@ def avishan_item_function_caller(request, model_plural_name, item_id, function_n
             EN=f'Requested method not found in record {item}'
         ))
 
-    if request.method == 'POST':
+    if request.method == 'POST' or request.method == 'PUT':
         current_request['response'] = {**target_function(**current_request['request'].data),
                                        **current_request['response']}
     elif request.method == 'GET':
