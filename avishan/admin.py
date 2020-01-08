@@ -24,6 +24,9 @@ for model in AvishanModel.get_non_abstract_models():
         'readonly_fields': maker(model.django_admin_readonly_fields),
         'search_fields': maker(model.django_admin_search_fields),
     }
+    for field in model.get_fields():
+        if isinstance(field, models.DateField) and (field.auto_now_add or field.auto_now):
+            model_admin_dict['readonly_fields'].append(field.name)
     if model.django_admin_date_hierarchy:
         model_admin_dict['date_hierarchy'] = model.django_admin_date_hierarchy
     # todo 0.2.2 type check for fields entered here

@@ -1,11 +1,116 @@
+import datetime
 from typing import Optional
 
 from django.http import HttpResponse
 
-from avishan.exceptions import AuthException
+from avishan.exceptions import AuthException, AvishanException
 from avishan.misc.bch_datetime import BchDatetime
 from avishan_config import AvishanConfig
 from . import current_request
+from .misc import status
+from .models import AuthenticationType
+
+
+class AvishanDataValidator:
+    class ValidatorException(AvishanException):
+
+        def __init__(self, field_name: str):
+            current_request['response']['error_in_field'] = field_name
+            current_request['response']['error_message'] = '"' + field_name + '" قابل قبول نیست'
+            current_request['status_code'] = status.HTTP_417_EXPECTATION_FAILED
+            super().__init__()
+
+    @classmethod
+    def validate_phone_number(cls, input: str, country_code: str = '98', phone_start_number: str = '09') -> str:
+        input = en_numbers(input)
+        input = input.replace(" ", "")
+        input = input.replace("-", "")
+
+        if input.startswith("00"):
+            if not input.startswith("00" + country_code):
+                raise cls.ValidatorException('شماره موبایل')
+            if input.startswith("00" + country_code + phone_start_number):
+                input = "00" + country_code + input[5:]
+        elif input.startswith("+"):
+            if not input.startswith("+" + country_code):
+                raise cls.ValidatorException('شماره موبایل')
+            input = "00" + input[1:]
+            if input.startswith("00" + country_code + phone_start_number):
+                input = "00" + country_code + input[5:]
+        elif input.startswith(phone_start_number):
+            input = "00" + country_code + input[1:]
+
+        if len(input) != 14 or not input.isdigit():
+            raise cls.ValidatorException('شماره موبایل')
+
+        return input
+
+    @classmethod
+    def validate_text(cls, input: str, blank: bool = True) -> str:
+        input = input.strip()
+        input = fa_numbers(input)
+
+        if not blank and len(input) == 0:
+            raise cls.ValidatorException('متن')
+
+        return input
+
+    @classmethod
+    def validate_recommend_code(cls, input: str) -> str:
+        input = cls.validate_text(input)
+
+        input = en_numbers(input)
+
+        input = input.upper()
+
+        return input
+
+    @classmethod
+    def validate_first_name(cls, input):
+        input = input.strip()
+
+        if has_numbers(input) or len(input) < 2:
+            raise cls.ValidatorException('نام')
+
+        return input
+
+    @classmethod
+    def validate_last_name(cls, input):
+        input = input.strip()
+
+        if has_numbers(input) or len(input) < 2:
+            raise cls.ValidatorException('نام خانوادگی')
+
+        return input
+
+    @classmethod
+    def validate_ferdowsi_student_id(cls, input):
+        input = cls.validate_text(input, blank=False)
+
+        if not input.isdigit():
+            raise cls.ValidatorException('شماره دانشجویی')
+        return input
+
+    @classmethod
+    def validate_plate(cls, plate_a, plate_b, plate_c, plate_d):
+        plate_a = cls.validate_text(fa_numbers(plate_a), blank=False)
+        plate_b = cls.validate_text(fa_numbers(plate_b), blank=False)
+        plate_c = cls.validate_text(fa_numbers(plate_c), blank=False)
+        plate_d = cls.validate_text(fa_numbers(plate_d), blank=False)
+
+        if plate_b not in ['ب', 'ج', 'د', 'س', 'ص', 'ط', 'ق', 'ل', 'م', 'ن', 'و', 'ه', 'ی', 'الف', 'پ', 'ت', 'ث', 'ز',
+                           'ژ',
+                           'ش', 'ع', 'ف', 'ک', 'گ', 'D', 'S', 'd', 's', 'ي']:
+            raise cls.ValidatorException('پلاک')
+
+        if not plate_a.isdigit() or not plate_c.isdigit() or not plate_d.isdigit():
+            raise cls.ValidatorException('پلاک')
+
+        return plate_a, plate_b, plate_c, plate_d
+
+    @classmethod
+    def validate_time(cls, input: dict, name: str) -> datetime.time:
+        return datetime.time(int(input['hour']), int(input['minute']))
 
 
 def discard_monitor(url: str) -> bool:
@@ -186,6 +291,13 @@ def populate_current_request(login_with: 'AuthenticationType'):
 
 def create_avishan_config_file(app_name: str = None):
     # todo 0.2.0 create config file and its classes. add needed fields
+    """
+    MONITORED_APPS_NAMES = []
+    NOT_MONITORED_STARTS [
+        '/admin', '/static', '/media', '/favicon.ico'
+    ]
+    JWT_KEY = "" or none if not available
+    """
     if app_name:
         f = open(app_name + "/avishan_config.py", 'w+')
     else:
@@ -231,3 +343,7 @@ def en_numbers(text):
         else:
             result += char
     return result
+
+
+def has_numbers(input):
+    return any(char.isdigit() for char in input)

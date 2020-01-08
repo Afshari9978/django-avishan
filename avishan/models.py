@@ -6,7 +6,8 @@ from django.db.models import NOT_PROVIDED
 
 from avishan import current_request
 from avishan.exceptions import ErrorMessageException, AuthException
-from avishan.misc import translatable, status
+from avishan.misc import status
+from avishan.misc.translation import translatable
 
 import datetime
 from typing import Optional
@@ -518,7 +519,7 @@ class AvishanModel(models.Model):
                 if k == self.__getattribute__(field.name):
                     return v
             raise ErrorMessageException(translatable(
-                EN=f'incorrect data entered for field {field.name} in model {self.class_name()}',
+                EN=f'Incorrect Data entered for field {field.name} in model {self.class_name()}',
                 FA=f'اطلاعات نامعتبر برای فیلد {field.name} مدل {self.class_name()}'
             ))
         if string_format_dates:
@@ -593,7 +594,7 @@ class UserGroup(AvishanModel):
     authenticate_with_email_password = models.BooleanField(default=False)
     authenticate_with_phone_password = models.BooleanField(default=False)
 
-    private_fields = [token_valid_seconds, 'id']
+    private_fields = [token_valid_seconds, 'id', authenticate_with_email_password, authenticate_with_phone_password]
 
     def add_user_to_user_group(self, base_user: BaseUser) -> 'UserUserGroup':
         """
@@ -756,7 +757,7 @@ class EmailVerification(AvishanModel):
             previous = email.verification
             if BchDatetime() - BchDatetime(previous.verification_date) < AvishanConfig.EMAIL_VERIFICATION_GAP_SECONDS:
                 raise ErrorMessageException(translatable(
-                    EN='verification code sent recently, please try again later'
+                    EN='Verification Code sent recently, Please try again later'
                 ), status_code=status.HTTP_401_UNAUTHORIZED)
             previous.remove()
         return EmailVerification.create(email=email, verification_code=EmailVerification.create_verification_code())
@@ -768,12 +769,12 @@ class EmailVerification(AvishanModel):
             item = EmailVerification.get(email=email)
         except EmailVerification.DoesNotExist:
             raise ErrorMessageException(translatable(
-                EN=f'email verification not found for email {email}'
+                EN=f'Email Verification not found for email {email}'
             ))
         if BchDatetime() - BchDatetime(item.verification_date) > AvishanConfig.EMAIL_VERIFICATION_VALID_SECONDS:
             item.remove()
             raise ErrorMessageException(translatable(
-                EN='code expired, request new one'
+                EN='Code Expired, Request new one'
             ))
         if item.verification_code == code:
             item.remove()
@@ -781,12 +782,12 @@ class EmailVerification(AvishanModel):
         if len(item.tried_codes.splitlines()) > AvishanConfig.EMAIL_VERIFICATION_TRIES_COUNT - 1:
             item.remove()
             raise ErrorMessageException(translatable(
-                EN=f'incorrect code repeated {AvishanConfig.EMAIL_VERIFICATION_TRIES_COUNT} times, request new code'
+                EN=f'Incorrect code repeated {AvishanConfig.EMAIL_VERIFICATION_TRIES_COUNT} times, request new code'
             ))
         item.tried_codes += f"{code}\n"
         item.save()
         raise ErrorMessageException(translatable(
-            EN='incorrect code'
+            EN='Incorrect code'
         ))
 
     @staticmethod
@@ -863,8 +864,6 @@ class Phone(AvishanModel):
             return Phone.get(number=phone_number)
         except Phone.DoesNotExist:
             return Phone.create(number=phone_number)
-        except Exception as e:
-            a = 1
 
     @classmethod
     def get(cls, number: str = None, avishan_to_dict: bool = False, avishan_raise_400: bool = False,
@@ -899,7 +898,7 @@ class PhoneVerification(AvishanModel):
             previous = phone.verification
             if BchDatetime() - BchDatetime(previous.verification_date) < AvishanConfig.PHONE_VERIFICATION_GAP_SECONDS:
                 raise ErrorMessageException(translatable(
-                    EN='verification code sent recently, please try again later'
+                    EN='Verification Code sent recently, Please try again later'
                 ), status_code=status.HTTP_401_UNAUTHORIZED)
             previous.remove()
         return PhoneVerification.create(phone=phone, verification_code=PhoneVerification.create_verification_code())
@@ -911,12 +910,12 @@ class PhoneVerification(AvishanModel):
             item = PhoneVerification.get(phone=phone)
         except PhoneVerification.DoesNotExist:
             raise ErrorMessageException(translatable(
-                EN=f'phone verification not found for phone {phone}'
+                EN=f'Phone Verification not found for phone {phone}'
             ))
         if BchDatetime() - BchDatetime(item.verification_date) > AvishanConfig.PHONE_VERIFICATION_VALID_SECONDS:
             item.remove()
             raise ErrorMessageException(translatable(
-                EN='code expired, request new one'
+                EN='Code Expired, Request new one'
             ))
         if item.verification_code == code:
             item.remove()
@@ -924,12 +923,12 @@ class PhoneVerification(AvishanModel):
         if len(item.tried_codes.splitlines()) > AvishanConfig.PHONE_VERIFICATION_TRIES_COUNT - 1:
             item.remove()
             raise ErrorMessageException(translatable(
-                EN=f'incorrect code repeated {AvishanConfig.PHONE_VERIFICATION_TRIES_COUNT} times, request new code'
+                EN=f'Incorrect Code repeated {AvishanConfig.PHONE_VERIFICATION_TRIES_COUNT} times, request new code'
             ))
         item.tried_codes += f"{code}\n"
         item.save()
         raise ErrorMessageException(translatable(
-            EN='incorrect code'
+            EN='Incorrect Code'
         ))
 
     @staticmethod
@@ -951,11 +950,19 @@ class AuthenticationType(AvishanModel):
     class Meta:
         abstract = True
 
-    def logout(self):
+    def _logout(self):
         self.last_logout = BchDatetime().to_datetime()
         self.save()
         current_request['authentication_object'] = None
         current_request['add_token'] = False
+
+    def _login(self):
+        from avishan.utils import populate_current_request
+
+        self.last_login = BchDatetime().to_datetime()
+        self.last_logout = None
+        self.save()
+        populate_current_request(self)
 
 
 class KeyValueAuthentication(AuthenticationType):
@@ -992,7 +999,7 @@ class KeyValueAuthentication(AuthenticationType):
         return bcrypt.checkpw(password.encode('utf8'), hashed_password.encode('utf8'))
 
     @classmethod
-    def register(cls, user_user_group: UserUserGroup, key: str, password: str) -> \
+    def register(cls, user_user_group: UserUserGroup, key: str, password: Optional[str] = None) -> \
             Union['EmailPasswordAuthenticate', 'PhonePasswordAuthenticate']:
         """
         Registration process for key-value authentications
@@ -1014,17 +1021,26 @@ class KeyValueAuthentication(AuthenticationType):
             # todo 0.2.3: auto reach to related
             if hasattr(user_user_group, cls.key_field().name + 'passwordauthenticate'):
                 raise AuthException(AuthException.DUPLICATE_AUTHENTICATION_TYPE)
-        return cls.objects.create(**{
+        data = {
             'user_user_group': user_user_group,
             cls.key_field().name: key_item,
-            'hashed_password': cls._hash_password(password)
-        })
+        }
+        if password is not None:
+            data['hashed_password'] = cls._hash_password(password)
+
+        return cls.objects.create(**data)
+
+    def add_password(self, password: str) -> bool:
+        if self.hashed_password is None:
+            self.hashed_password = self._hash_password(password)
+            self.save()
+            return True
+        return False
 
     @classmethod
     def login(cls, key: str, password: str, user_group: UserGroup = None) -> \
             Union['EmailPasswordAuthenticate', 'PhonePasswordAuthenticate']:
         from avishan.exceptions import AuthException
-        from avishan.utils import populate_current_request
 
         key_item = cls.key_field().related_model.validate_signature(key)
         try:
@@ -1038,12 +1054,7 @@ class KeyValueAuthentication(AuthenticationType):
             # todo 0.2.3: count incorrect enters with time, ban after some time
             raise AuthException(AuthException.INCORRECT_PASSWORD)
 
-        found_object.last_login = BchDatetime().to_datetime()
-        found_object.last_logout = None
-        found_object.save()
-
-        populate_current_request(found_object)
-
+        found_object._login()
         return found_object
 
     @classmethod
@@ -1062,7 +1073,7 @@ class KeyValueAuthentication(AuthenticationType):
         if password:
             for found in founds:
                 if found._check_password(password, found.hashed_password):
-                    return founds
+                    return [found]
             return []
         return founds
 
@@ -1079,7 +1090,7 @@ class EmailPasswordAuthenticate(KeyValueAuthentication):
 class PhonePasswordAuthenticate(KeyValueAuthentication):
     phone = models.ForeignKey(Phone, on_delete=models.CASCADE, related_name='password_authenticates')
 
-    @property
+    @classmethod
     def key_field(self) -> Union[models.ForeignKey, models.Field]:
         return self.get_field('phone')
 
@@ -1105,14 +1116,14 @@ class OTPAuthentication(AuthenticationType):
         from avishan_config import AvishanConfig
         if self.code is None:
             raise ErrorMessageException(translatable(
-                EN='code not found for this account',
+                EN='Code not found for this account',
                 FA='برای این حساب کدی پیدا نشد'
             ))
         if (BchDatetime() - BchDatetime(self.date_sent)).total_seconds() > AvishanConfig.PHONE_OTP_CODE_VALID_SECONDS:
             self.code = None
             self.save()
             raise ErrorMessageException(translatable(
-                EN='code expired',
+                EN='Code Expired',
                 FA='کد منقضی شده است'
             ))
 
@@ -1151,7 +1162,6 @@ class OTPAuthentication(AuthenticationType):
     @classmethod
     def check_authentication(cls, key: str, entered_code: str, user_group: UserGroup) -> Tuple[
         'PhoneOTPAuthenticate', bool]:
-        from avishan.utils import populate_current_request
         try:
             item = cls.find(key, user_group)[0]
         except IndexError:
@@ -1162,15 +1172,12 @@ class OTPAuthentication(AuthenticationType):
 
         if item.last_login is None:
             created = True
+            item.user_user_group.base_user.is_active = True
+            item.user_user_group.base_user.save()
         else:
             created = False
 
-        item.last_login = BchDatetime().to_datetime()
-        item.last_logout = None
-        item.save()
-
-        populate_current_request(item)
-
+        item._login()
         return item, created
 
     def send_otp_code(self):
@@ -1236,22 +1243,21 @@ class Image(AvishanModel):
         }
 
     @classmethod
-    def upload(cls):
-        media = current_request['request'].FILES.get('file')
-        if media == '####':
+    def image_from_multipart_form_data_request(cls, name: str = 'file') -> 'Image':
+        media = current_request['request'].FILES.get(name)
+        if media is None:
             raise ErrorMessageException(translatable(
-                EN='file not found',
+                EN='File not found',
                 FA='فایل ارسال نشده است'
             ))
 
-        created = Image.objects.create()
-
-        created.file.save("files/" + media.name, media, save=True)
-
+        created = Image.create(
+            base_user=current_request['base_user']
+        )
+        created.file.save("uploaded_images/" + media.name, media, save=True)
         created.save()
-        return {
-            'image': created.to_dict()
-        }
+
+        return created
 
 
 class File(AvishanModel):
@@ -1287,8 +1293,6 @@ class RequestTrack(AvishanModel):
 
     django_admin_list_display = [view_name, method, status_code, user_user_group, start_time,
                                  total_execution_milliseconds, url]
-    django_admin_list_max_show_all = 100
-    django_admin_list_per_page = 50
 
     def __str__(self):
         return self.view_name

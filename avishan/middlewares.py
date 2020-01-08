@@ -35,7 +35,8 @@ class Wrapper:
         current_request['request'] = request
 
         """Checks for avoid-touch requests"""
-        if discard_monitor(current_request['request'].path):
+        if discard_monitor(current_request['request'].get_full_path()):
+            print(f"NOT_MONITORED: {current_request['request'].get_full_path()}")
             return self.get_response(current_request['request'])
 
         current_request['start_time'] = start_time

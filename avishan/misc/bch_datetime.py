@@ -3,7 +3,7 @@ from datetime import timedelta, datetime, date, time
 from typing import Union, List
 
 # todo: type hints
-from avishan.misc import translatable
+from avishan.misc.translation import translatable
 
 
 class BchDatetime(object):
@@ -53,7 +53,7 @@ class BchDatetime(object):
                 except KeyError:
                     from avishan.exceptions import ErrorMessageException
                     raise ErrorMessageException(translatable(
-                        EN=f'unknown month string {month}',
+                        EN=f'Unknown Month String {month}',
                         FA=f'عبارت ناشناخته ماه {month}'
                     ))
         self.month = month

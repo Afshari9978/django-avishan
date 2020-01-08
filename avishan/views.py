@@ -4,7 +4,7 @@ from django.http import JsonResponse
 from avishan import current_request
 from avishan.decorators import AvishanApiView, AvishanTemplateView
 from avishan.exceptions import ErrorMessageException
-from avishan.misc import translatable
+from avishan.misc.translation import translatable
 from avishan.models import AvishanModel, AuthenticationType
 
 
