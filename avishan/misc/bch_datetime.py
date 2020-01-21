@@ -3,7 +3,7 @@ from datetime import timedelta, datetime, date, time
 from typing import Union, List
 
 # todo: type hints
-from avishan.misc.translation import translatable
+from avishan.misc.translation import AvishanTranslatable
 
 
 class BchDatetime(object):
@@ -52,7 +52,7 @@ class BchDatetime(object):
                     }[month]
                 except KeyError:
                     from avishan.exceptions import ErrorMessageException
-                    raise ErrorMessageException(translatable(
+                    raise ErrorMessageException(AvishanTranslatable(
                         EN=f'Unknown Month String {month}',
                         FA=f'عبارت ناشناخته ماه {month}'
                     ))
@@ -186,7 +186,7 @@ class BchDatetime(object):
         elif resolution == 'microsecond':
             return int(timestamp * 1000000)
         else:
-            raise ValueError(translatable(
+            raise ValueError(AvishanTranslatable(
                 EN='Incorrect resolution. Accepts are "second", "millisecond" and "microsecond". Default is "second".',
                 FA='مقیاس نامعتبر. مقادیر قابل قبول: "second"، "millisecond" و "microsecond". مقدار پیش‌فرض "second".'
             ))
@@ -325,7 +325,7 @@ class BchDatetime(object):
             return BchDatetime.from_jalali_datetime(self.to_jalali_datetime() + timedelta(seconds=other))
         if isinstance(other, timedelta):
             return BchDatetime.from_jalali_datetime(self.to_jalali_datetime() + other)
-        raise TypeError(translatable(
+        raise TypeError(AvishanTranslatable(
             EN='Accepted types are "int" as seconds and "timedelta"',
             FA='مقادیر قابل قبول "int" به عنوان ثانیه ها و "timedelta" هستند'
         ))

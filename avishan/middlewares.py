@@ -6,6 +6,8 @@ from django.core.handlers.wsgi import WSGIRequest
 from django.http import JsonResponse
 
 from avishan.exceptions import AvishanException, save_traceback
+from avishan.libraries.dbml import create_dbml_file
+from avishan.libraries.openapi3 import create_openapi_object
 
 try:
     from avishan_admin.avishan_config import AvishanConfig as PanelAvishanConfig
@@ -24,6 +26,8 @@ class Wrapper:
         """
         from avishan.models import AvishanModel
         AvishanModel.run_apps_check()
+
+        create_dbml_file('static/api/models.dbml')
 
     def __call__(self, request: WSGIRequest):
         from avishan.utils import discard_monitor, find_token, decode_token, add_token_to_response, find_and_check_user
@@ -133,6 +137,7 @@ class Wrapper:
         current_request['status_code'] = 200
         current_request['exception'] = None
         current_request['traceback'] = None
+        current_request['lang'] = None
         current_request['context'] = {}
         current_request['messages'] = {
             'debug': [], 'info': [], 'success': [], 'warning': [], 'error': []
@@ -212,5 +217,3 @@ class Wrapper:
                 )
         except Exception as e:
             print(e)
-
-

@@ -1,10 +1,9 @@
 import datetime
 import json
 
-from django.http import JsonResponse, RawPostDataException
+from django.http import JsonResponse
 
 from avishan.exceptions import AvishanException, AuthException
-from avishan.misc import status
 from . import current_request
 
 
@@ -100,7 +99,6 @@ class AvishanApiView(AvishanView):
                     current_request['request'].data = {}
             except:
                 current_request['request'].data = {}
-
 
     def after_request(self):
         pass

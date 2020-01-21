@@ -5,9 +5,8 @@ import requests
 from django.db.models import NOT_PROVIDED
 
 from avishan import current_request
-from avishan.exceptions import ErrorMessageException, AuthException
 from avishan.misc import status
-from avishan.misc.translation import translatable
+from avishan.misc.translation import AvishanTranslatable
 
 import datetime
 from typing import Optional
@@ -46,6 +45,7 @@ class AvishanModel(models.Model):
     @classmethod
     def get(cls, avishan_to_dict: bool = False, avishan_raise_400: bool = False,
             **kwargs):
+        from avishan.exceptions import ErrorMessageException
         # todo 0.2.1 compact, private, added properties
         if avishan_to_dict:
             return cls.get(avishan_to_dict=False, avishan_raise_400=avishan_raise_400, **kwargs).to_dict()
@@ -54,7 +54,7 @@ class AvishanModel(models.Model):
             return cls.objects.get(**kwargs)
         except cls.DoesNotExist as e:
             if avishan_raise_400:
-                raise ErrorMessageException(translatable(
+                raise ErrorMessageException(AvishanTranslatable(
                     EN="Chosen " + cls.__name__ + " doesnt exist",
                     FA=f"{cls.__name__} انتخاب شده موجود نیست"
                 ))
@@ -180,6 +180,7 @@ class AvishanModel(models.Model):
 
     @classmethod
     def _clean_model_data_kwargs(cls, on_update: bool = False, **kwargs):
+        from avishan.exceptions import ErrorMessageException
         base_kwargs = {}
         many_to_many_kwargs = {}
 
@@ -199,7 +200,7 @@ class AvishanModel(models.Model):
                 continue
 
             if cls.is_field_required(field) and not on_update and field.name not in kwargs.keys():
-                raise ErrorMessageException(translatable(
+                raise ErrorMessageException(AvishanTranslatable(
                     EN=f'Field {field.name} not found in object {cls.class_name()}, and it\'s required.',
                 ))
 
@@ -402,7 +403,7 @@ class AvishanModel(models.Model):
         for item in cls.get_fields():
             if item.name == field_name:
                 return item
-        raise ValueError(translatable(
+        raise ValueError(AvishanTranslatable(
             EN=f'field {field_name} not found in model {cls.class_name()}'
         ))
 
@@ -484,7 +485,7 @@ class AvishanModel(models.Model):
         elif isinstance(field, models.ForeignKey):
             cast_class = field.related_model
         else:
-            raise NotImplementedError(translatable(
+            raise NotImplementedError(AvishanTranslatable(
                 EN='cast_field_data not defined cast type',
             ))
 
@@ -513,12 +514,13 @@ class AvishanModel(models.Model):
 
     # todo 0.2.2: check None amount for choice added fields
     def get_data_from_field(self, field: models.Field, string_format_dates: bool = False):
+        from avishan.exceptions import ErrorMessageException
         from avishan_config import AvishanConfig
         if len(field.choices) > 0:
             for k, v in field.choices:
                 if k == self.__getattribute__(field.name):
                     return v
-            raise ErrorMessageException(translatable(
+            raise ErrorMessageException(AvishanTranslatable(
                 EN=f'Incorrect Data entered for field {field.name} in model {self.class_name()}',
                 FA=f'اطلاعات نامعتبر برای فیلد {field.name} مدل {self.class_name()}'
             ))
@@ -569,7 +571,7 @@ class BaseUser(AvishanModel):
         return user_group.add_user_to_user_group(self)
 
     @classmethod
-    def create(cls, is_active: bool = True, **kwargs):
+    def create(cls, is_active: bool = True):
         return super().create(is_active=is_active)
 
     def __str__(self):
@@ -671,7 +673,7 @@ class UserUserGroup(AvishanModel):
         return max(dates)
 
     @classmethod
-    def create(cls, user_group: UserGroup, base_user: BaseUser = None, **kwargs):
+    def create(cls, user_group: UserGroup, base_user: BaseUser = None):
         if base_user is None:
             base_user = BaseUser.create()
         return super().create(user_group=user_group, base_user=base_user)
@@ -730,8 +732,8 @@ class Email(AvishanModel):
         return super().get(avishan_to_dict, avishan_raise_400, address=cls.validate_signature(address), **kwargs)
 
     @classmethod
-    def create(cls, address: str = None, **kwargs) -> 'Email':
-        return super().create(address=cls.validate_signature(address), **kwargs)
+    def create(cls, address: str = None) -> 'Email':
+        return super().create(address=cls.validate_signature(address))
 
     def update(self, address: str = None, **kwargs) -> 'Email':
         return super().update(address=self.validate_signature(address), **kwargs)
@@ -751,12 +753,13 @@ class EmailVerification(AvishanModel):
 
     @staticmethod
     def create_verification(email: Email) -> 'EmailVerification':
+        from avishan.exceptions import ErrorMessageException
         from avishan_config import AvishanConfig
 
         if hasattr(email, 'verification'):
             previous = email.verification
             if BchDatetime() - BchDatetime(previous.verification_date) < AvishanConfig.EMAIL_VERIFICATION_GAP_SECONDS:
-                raise ErrorMessageException(translatable(
+                raise ErrorMessageException(AvishanTranslatable(
                     EN='Verification Code sent recently, Please try again later'
                 ), status_code=status.HTTP_401_UNAUTHORIZED)
             previous.remove()
@@ -764,16 +767,17 @@ class EmailVerification(AvishanModel):
 
     @staticmethod
     def check_email(email: Email, code: str) -> bool:
+        from avishan.exceptions import ErrorMessageException
         from avishan_config import AvishanConfig
         try:
             item = EmailVerification.get(email=email)
         except EmailVerification.DoesNotExist:
-            raise ErrorMessageException(translatable(
+            raise ErrorMessageException(AvishanTranslatable(
                 EN=f'Email Verification not found for email {email}'
             ))
         if BchDatetime() - BchDatetime(item.verification_date) > AvishanConfig.EMAIL_VERIFICATION_VALID_SECONDS:
             item.remove()
-            raise ErrorMessageException(translatable(
+            raise ErrorMessageException(AvishanTranslatable(
                 EN='Code Expired, Request new one'
             ))
         if item.verification_code == code:
@@ -781,12 +785,12 @@ class EmailVerification(AvishanModel):
             return True
         if len(item.tried_codes.splitlines()) > AvishanConfig.EMAIL_VERIFICATION_TRIES_COUNT - 1:
             item.remove()
-            raise ErrorMessageException(translatable(
+            raise ErrorMessageException(AvishanTranslatable(
                 EN=f'Incorrect code repeated {AvishanConfig.EMAIL_VERIFICATION_TRIES_COUNT} times, request new code'
             ))
         item.tried_codes += f"{code}\n"
         item.save()
-        raise ErrorMessageException(translatable(
+        raise ErrorMessageException(AvishanTranslatable(
             EN='Incorrect code'
         ))
 
@@ -834,6 +838,7 @@ class Phone(AvishanModel):
 
     @staticmethod
     def validate_signature(phone: str, country_code: str = "98") -> str:
+        from avishan.exceptions import ErrorMessageException
         from .utils import en_numbers
         phone = en_numbers(phone)
         phone = phone.replace(" ", "")
@@ -871,8 +876,8 @@ class Phone(AvishanModel):
         return super().get(avishan_to_dict, avishan_raise_400, number=cls.validate_signature(number), **kwargs)
 
     @classmethod
-    def create(cls, number: str = None, **kwargs) -> 'Phone':
-        return super().create(number=cls.validate_signature(number), **kwargs)
+    def create(cls, number: str = None) -> 'Phone':
+        return super().create(number=cls.validate_signature(number))
 
     def update(self, number: str = None, **kwargs) -> 'Phone':
         return super().update(number=self.validate_signature(number), **kwargs)
@@ -892,12 +897,13 @@ class PhoneVerification(AvishanModel):
 
     @staticmethod
     def create_verification(phone: Phone) -> 'PhoneVerification':
+        from avishan.exceptions import ErrorMessageException
         from avishan_config import AvishanConfig
 
         if hasattr(phone, 'verification'):
             previous = phone.verification
             if BchDatetime() - BchDatetime(previous.verification_date) < AvishanConfig.PHONE_VERIFICATION_GAP_SECONDS:
-                raise ErrorMessageException(translatable(
+                raise ErrorMessageException(AvishanTranslatable(
                     EN='Verification Code sent recently, Please try again later'
                 ), status_code=status.HTTP_401_UNAUTHORIZED)
             previous.remove()
@@ -905,16 +911,17 @@ class PhoneVerification(AvishanModel):
 
     @staticmethod
     def check_phone(phone: Phone, code: str) -> bool:
+        from avishan.exceptions import ErrorMessageException
         from avishan_config import AvishanConfig
         try:
             item = PhoneVerification.get(phone=phone)
         except PhoneVerification.DoesNotExist:
-            raise ErrorMessageException(translatable(
+            raise ErrorMessageException(AvishanTranslatable(
                 EN=f'Phone Verification not found for phone {phone}'
             ))
         if BchDatetime() - BchDatetime(item.verification_date) > AvishanConfig.PHONE_VERIFICATION_VALID_SECONDS:
             item.remove()
-            raise ErrorMessageException(translatable(
+            raise ErrorMessageException(AvishanTranslatable(
                 EN='Code Expired, Request new one'
             ))
         if item.verification_code == code:
@@ -922,12 +929,12 @@ class PhoneVerification(AvishanModel):
             return True
         if len(item.tried_codes.splitlines()) > AvishanConfig.PHONE_VERIFICATION_TRIES_COUNT - 1:
             item.remove()
-            raise ErrorMessageException(translatable(
+            raise ErrorMessageException(AvishanTranslatable(
                 EN=f'Incorrect Code repeated {AvishanConfig.PHONE_VERIFICATION_TRIES_COUNT} times, request new code'
             ))
         item.tried_codes += f"{code}\n"
         item.save()
-        raise ErrorMessageException(translatable(
+        raise ErrorMessageException(AvishanTranslatable(
             EN='Incorrect Code'
         ))
 
@@ -1009,6 +1016,7 @@ class KeyValueAuthentication(AuthenticationType):
         :param kwargs:
         :return:
         """
+        from avishan.exceptions import AuthException
 
         try:
             key_item = cls.key_field().related_model.get(key)
@@ -1042,11 +1050,12 @@ class KeyValueAuthentication(AuthenticationType):
             Union['EmailPasswordAuthenticate', 'PhonePasswordAuthenticate']:
         from avishan.exceptions import AuthException
 
-        key_item = cls.key_field().related_model.validate_signature(key)
         try:
             found_object = cls.objects.get(
-                **{cls.key_field().name: cls.key_field().related_model.get(key),
-                   "user_user_group__user_group": user_group}
+                **{
+                    cls.key_field().name: cls.key_field().related_model.get(key),
+                    "user_user_group__user_group": user_group
+                }
             )
         except (cls.DoesNotExist, cls.key_field().related_model.DoesNotExist):
             raise AuthException(AuthException.ACCOUNT_NOT_FOUND)
@@ -1090,6 +1099,8 @@ class EmailPasswordAuthenticate(KeyValueAuthentication):
 class PhonePasswordAuthenticate(KeyValueAuthentication):
     phone = models.ForeignKey(Phone, on_delete=models.CASCADE, related_name='password_authenticates')
 
+    django_admin_list_display = ['user_user_group', phone]
+
     @classmethod
     def key_field(self) -> Union[models.ForeignKey, models.Field]:
         return self.get_field('phone')
@@ -1113,16 +1124,17 @@ class OTPAuthentication(AuthenticationType):
         return str(random.randint(10 ** (AvishanConfig.OTP_CODE_LENGTH - 1), 10 ** AvishanConfig.OTP_CODE_LENGTH - 1))
 
     def check_verification_code(self, entered_code: str) -> bool:
+        from avishan.exceptions import ErrorMessageException
         from avishan_config import AvishanConfig
         if self.code is None:
-            raise ErrorMessageException(translatable(
+            raise ErrorMessageException(AvishanTranslatable(
                 EN='Code not found for this account',
                 FA='برای این حساب کدی پیدا نشد'
             ))
         if (BchDatetime() - BchDatetime(self.date_sent)).total_seconds() > AvishanConfig.PHONE_OTP_CODE_VALID_SECONDS:
             self.code = None
             self.save()
-            raise ErrorMessageException(translatable(
+            raise ErrorMessageException(AvishanTranslatable(
                 EN='Code Expired',
                 FA='کد منقضی شده است'
             ))
@@ -1139,6 +1151,7 @@ class OTPAuthentication(AuthenticationType):
 
     @classmethod
     def create_new(cls, user_user_group: UserUserGroup, key: str) -> 'PhoneOTPAuthenticate':
+        from avishan.exceptions import AuthException
         try:
             key_item = cls.key_field().related_model.get(key)
         except cls.key_field().related_model.DoesNotExist:
@@ -1162,6 +1175,7 @@ class OTPAuthentication(AuthenticationType):
     @classmethod
     def check_authentication(cls, key: str, entered_code: str, user_group: UserGroup) -> Tuple[
         'PhoneOTPAuthenticate', bool]:
+        from avishan.exceptions import AuthException
         try:
             item = cls.find(key, user_group)[0]
         except IndexError:
@@ -1244,9 +1258,10 @@ class Image(AvishanModel):
 
     @classmethod
     def image_from_multipart_form_data_request(cls, name: str = 'file') -> 'Image':
+        from avishan.exceptions import ErrorMessageException
         media = current_request['request'].FILES.get(name)
         if media is None:
-            raise ErrorMessageException(translatable(
+            raise ErrorMessageException(AvishanTranslatable(
                 EN='File not found',
                 FA='فایل ارسال نشده است'
             ))
@@ -1316,3 +1331,33 @@ class RequestTrackException(AvishanModel):
     traceback = models.TextField(null=True, blank=True)
 
     django_admin_list_display = [request_track, class_title, args]
+
+
+class TranslatableChar(AvishanModel):
+    en = models.CharField(max_length=255, blank=True, null=True, default=None)
+    fa = models.CharField(max_length=255, blank=True, null=True, default=None)
+
+    @classmethod
+    def create(cls, en: str = None, fa: str = None, auto: str = None):
+        from avishan.exceptions import ErrorMessageException
+
+        kwargs = {}
+        if auto:
+            if current_request['lang'] is None:
+                raise ErrorMessageException(AvishanTranslatable(
+                    EN='language not set',
+                    FA='زبان تنظیم نشده است'
+                ))
+            kwargs[current_request['lang']] = auto
+        if en is not None:
+            en = str(en)
+            if len(en) == 0:
+                en = None
+        if fa is not None:
+            fa = str(fa)
+            if len(fa) == 0:
+                fa = None
+        return super().create(en=en, fa=fa)
+
+    def __str__(self):
+        return AvishanTranslatable(EN=self.en, FA=self.fa)

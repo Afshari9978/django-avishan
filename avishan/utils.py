@@ -1,5 +1,5 @@
 import datetime
-from typing import Optional
+from typing import Optional, Union
 
 from django.http import HttpResponse
 
@@ -13,27 +13,38 @@ from .models import AuthenticationType
 
 class AvishanDataValidator:
     class ValidatorException(AvishanException):
+        from avishan.misc.translation import AvishanTranslatable
 
-        def __init__(self, field_name: str):
+        def __init__(self, field_name: Union[str, 'AvishanTranslatable']):
+            from avishan.misc.translation import AvishanTranslatable
             current_request['response']['error_in_field'] = field_name
-            current_request['response']['error_message'] = '"' + field_name + '" قابل قبول نیست'
+            current_request['response']['error_message'] = AvishanTranslatable(
+                EN=f'"{field_name}" not accepted',
+                FA='"' + field_name + '" قابل قبول نیست'
+            )
             current_request['status_code'] = status.HTTP_417_EXPECTATION_FAILED
             super().__init__()
 
     @classmethod
     def validate_phone_number(cls, input: str, country_code: str = '98', phone_start_number: str = '09') -> str:
+        from avishan.misc.translation import AvishanTranslatable
+
         input = en_numbers(input)
         input = input.replace(" ", "")
         input = input.replace("-", "")
 
         if input.startswith("00"):
             if not input.startswith("00" + country_code):
-                raise cls.ValidatorException('شماره موبایل')
+                raise cls.ValidatorException(AvishanTranslatable(
+                    EN='phone number', FA='شماره موبایل'
+                ))
             if input.startswith("00" + country_code + phone_start_number):
                 input = "00" + country_code + input[5:]
         elif input.startswith("+"):
             if not input.startswith("+" + country_code):
-                raise cls.ValidatorException('شماره موبایل')
+                raise cls.ValidatorException(AvishanTranslatable(
+                    EN='phone number', FA='شماره موبایل'
+                ))
             input = "00" + input[1:]
             if input.startswith("00" + country_code + phone_start_number):
                 input = "00" + country_code + input[5:]
@@ -41,7 +52,9 @@ class AvishanDataValidator:
             input = "00" + country_code + input[1:]
 
         if len(input) != 14 or not input.isdigit():
-            raise cls.ValidatorException('شماره موبایل')
+            raise cls.ValidatorException(AvishanTranslatable(
+                EN='phone number', FA='شماره موبایل'
+            ))
 
         return input
 
@@ -51,7 +64,8 @@ class AvishanDataValidator:
         input = fa_numbers(input)
 
         if not blank and len(input) == 0:
-            raise cls.ValidatorException('متن')
+            from avishan.misc.translation import AvishanTranslatable
+            raise cls.ValidatorException(AvishanTranslatable(EN='text', FA='متن'))
 
         return input
 
@@ -70,7 +84,8 @@ class AvishanDataValidator:
         input = input.strip()
 
         if has_numbers(input) or len(input) < 2:
-            raise cls.ValidatorException('نام')
+            from avishan.misc.translation import AvishanTranslatable
+            raise cls.ValidatorException(AvishanTranslatable(EN='first name', FA='نام'))
 
         return input
 
@@ -79,7 +94,8 @@ class AvishanDataValidator:
         input = input.strip()
 
         if has_numbers(input) or len(input) < 2:
-            raise cls.ValidatorException('نام خانوادگی')
+            from avishan.misc.translation import AvishanTranslatable
+            raise cls.ValidatorException(AvishanTranslatable(EN='last name', FA='نام خانوادگی'))
 
         return input
 
@@ -88,11 +104,13 @@ class AvishanDataValidator:
         input = cls.validate_text(input, blank=False)
 
         if not input.isdigit():
-            raise cls.ValidatorException('شماره دانشجویی')
+            from avishan.misc.translation import AvishanTranslatable
+            raise cls.ValidatorException(AvishanTranslatable(EN='Student ID', FA='کد دانشجویی'))
         return input
 
     @classmethod
     def validate_plate(cls, plate_a, plate_b, plate_c, plate_d):
+        from avishan.misc.translation import AvishanTranslatable
         plate_a = cls.validate_text(fa_numbers(plate_a), blank=False)
         plate_b = cls.validate_text(fa_numbers(plate_b), blank=False)
         plate_c = cls.validate_text(fa_numbers(plate_c), blank=False)
@@ -101,10 +119,10 @@ class AvishanDataValidator:
         if plate_b not in ['ب', 'ج', 'د', 'س', 'ص', 'ط', 'ق', 'ل', 'م', 'ن', 'و', 'ه', 'ی', 'الف', 'پ', 'ت', 'ث', 'ز',
                            'ژ',
                            'ش', 'ع', 'ف', 'ک', 'گ', 'D', 'S', 'd', 's', 'ي']:
-            raise cls.ValidatorException('پلاک')
+            raise cls.ValidatorException(AvishanTranslatable(EN='plate', FA='پلاک'))
 
         if not plate_a.isdigit() or not plate_c.isdigit() or not plate_d.isdigit():
-            raise cls.ValidatorException('پلاک')
+            raise cls.ValidatorException(AvishanTranslatable(EN='plate', FA='پلاک'))
 
         return plate_a, plate_b, plate_c, plate_d
 

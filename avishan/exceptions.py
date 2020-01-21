@@ -1,9 +1,8 @@
-from typing import Optional
-
-from django.contrib import messages
+from typing import Optional, Union
 
 from . import current_request
 from .misc import status
+from .misc.translation import AvishanTranslatable
 
 
 class AvishanException(Exception):
@@ -29,64 +28,65 @@ class AvishanException(Exception):
 
 
 class AuthException(AvishanException):
-    from .misc.translation import translatable
+    from .misc.translation import AvishanTranslatable
     """
     Error kinds
     """
-    NOT_DEFINED = 0, translatable(EN='Not Defined', FA='مشخص نشده')
-    ACCOUNT_NOT_FOUND = 1, translatable(EN='User Account not found', FA='حساب کاربری پیدا نشد')
-    ACCOUNT_NOT_ACTIVE = 2, translatable(EN='Deactivated User Account', FA='حساب کاربری غیرفعال است')
-    GROUP_ACCOUNT_NOT_ACTIVE = 3, translatable(
+    NOT_DEFINED = 0, AvishanTranslatable(EN='Not Defined', FA='مشخص نشده')
+    ACCOUNT_NOT_FOUND = 1, AvishanTranslatable(EN='User Account not found', FA='حساب کاربری پیدا نشد')
+    ACCOUNT_NOT_ACTIVE = 2, AvishanTranslatable(EN='Deactivated User Account', FA='حساب کاربری غیرفعال است')
+    GROUP_ACCOUNT_NOT_ACTIVE = 3, AvishanTranslatable(
         EN='User Account Deactivated in Selected User Group',
         FA='حساب کاربری در گروه‌کاربری انتخاب شده غیر فعال است'
     )
-    TOKEN_NOT_FOUND = 4, translatable(EN='Token not found', FA='توکن پیدا نشد')
-    TOKEN_EXPIRED = 5, translatable(EN='Token timed out', FA='زمان استفاده از توکن تمام شده است')
-    ERROR_IN_TOKEN = 6, translatable(EN='Error in token', FA='خطا در توکن')
-    ACCESS_DENIED = 7, translatable(EN='Access Denied', FA='دسترسی نامجاز')
-    HTTP_METHOD_NOT_ALLOWED = 8, translatable(EN='HTTP method not allowed in this url')
-    INCORRECT_PASSWORD = 9, translatable(EN='Incorrect Password', FA='رمز اشتباه است')
-    DUPLICATE_AUTHENTICATION_IDENTIFIER = 10, translatable(
+    TOKEN_NOT_FOUND = 4, AvishanTranslatable(EN='Token not found', FA='توکن پیدا نشد')
+    TOKEN_EXPIRED = 5, AvishanTranslatable(EN='Token timed out', FA='زمان استفاده از توکن تمام شده است')
+    ERROR_IN_TOKEN = 6, AvishanTranslatable(EN='Error in token', FA='خطا در توکن')
+    ACCESS_DENIED = 7, AvishanTranslatable(EN='Access Denied', FA='دسترسی نامجاز')
+    HTTP_METHOD_NOT_ALLOWED = 8, AvishanTranslatable(EN='HTTP method not allowed in this url')
+    INCORRECT_PASSWORD = 9, AvishanTranslatable(EN='Incorrect Password', FA='رمز اشتباه است')
+    DUPLICATE_AUTHENTICATION_IDENTIFIER = 10, AvishanTranslatable(
         EN='Authentication Identifier already Exists',
         FA='شناسه احراز هویت تکراری است'
     )
-    DUPLICATE_AUTHENTICATION_TYPE = 11, translatable(
+    DUPLICATE_AUTHENTICATION_TYPE = 11, AvishanTranslatable(
         EN='Duplicate Authentication Type for User Account',
         FA='روش احراز هویت برای این حساب کاربری تکراری است'
     )
-    DEACTIVATED_TOKEN = 12, translatable(
+    DEACTIVATED_TOKEN = 12, AvishanTranslatable(
         EN='Token Deactivated, Sign in again',
         FA='توکن غیرفعال شده است، دوباره وارد شوید'
     )
-    MULTIPLE_CONNECTED_ACCOUNTS = 13, translatable(
+    MULTIPLE_CONNECTED_ACCOUNTS = 13, AvishanTranslatable(
         EN='Multiple Accounts found with this identifier, Choose user group in url parameter',
         FA='چند حساب با این شناسه پیدا شد، گروه کاربری را در پارامتر url مشخص کنید'
     )
 
     def __init__(self, error_kind: tuple = NOT_DEFINED):
-        from .misc.translation import translatable
+        from .misc.translation import AvishanTranslatable
         status_code = status.HTTP_403_FORBIDDEN
         if error_kind[0] == AuthException.HTTP_METHOD_NOT_ALLOWED[0]:
             status_code = status.HTTP_405_METHOD_NOT_ALLOWED
         super().__init__(status_code=status_code)
-        add_error_message_to_response(code=error_kind[0], body=error_kind[1], title=translatable(
+        add_error_message_to_response(code=error_kind[0], body=str(error_kind[1]), title=AvishanTranslatable(
             EN='Authentication Exception',
             FA='خطای احراز هویت'
-        ))
+        ).__str__())
 
 
 class ErrorMessageException(AvishanException):
-    def __init__(self, message: str = 'Error', status_code: int = status.HTTP_400_BAD_REQUEST):
-        from .misc.translation import translatable
+    def __init__(self, message: Union[str, AvishanTranslatable] = 'Error',
+                 status_code: int = status.HTTP_400_BAD_REQUEST):
         super().__init__(status_code=status_code)
+        message = str(message)
         add_error_message_to_response(
-            body=message if message else translatable(
+            body=message if message else AvishanTranslatable(
                 EN='Error details not provided',
-                FA='توضیحات خطا ارائه نشده'),
-            title=translatable(
+                FA='توضیحات خطا ارائه نشده').__str__(),
+            title=AvishanTranslatable(
                 EN='Error',
                 FA='خطا'
-            )
+            ).__str__()
         )
 
 

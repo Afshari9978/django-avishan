@@ -1,0 +1,56 @@
+from typing import Optional, Union, List
+
+import requests
+
+from avishan.exceptions import ErrorMessageException
+from avishan.misc.translation import AvishanTranslatable
+from avishan.models import Phone
+from avishan_config import AvishanConfig
+
+
+# todo 0.2.2 full functions https://kavenegar.com/rest.html
+
+
+def send_raw_sms(phone: Union[Phone, List[Phone]], text: str,
+                 api_key: Optional[str] = AvishanConfig.KAVENEGAR_API_TOKEN):
+    receptor = ""
+    if isinstance(phone, Phone):
+        receptor = phone.number
+    else:
+        for item in phone:
+            receptor += item.number + ","
+        if len(phone) > 0:
+            receptor = receptor[:-1]
+    if len(receptor) == 0:
+        raise ErrorMessageException(message=AvishanTranslatable(
+            EN='Empty receptor numbers',
+            FA='لیست دریافت کننده‌ها خالی است'
+        ))
+
+    data = {
+        'receptor': receptor,
+        'message': text
+    }
+
+    requests.post(
+        url=f"https://api.kavenegar.com/v1/{api_key}/sms/send.json",
+        data=data
+    )
+
+
+def send_template_sms(phone: Phone, template_name: str, token: str, token2: str = None, token3: str = None,
+                      api_key: Optional[str] = AvishanConfig.KAVENEGAR_API_TOKEN):
+    data = {
+        'receptor': phone.number,
+        'template': template_name,
+        'token': token
+    }
+    if token2 is not None:
+        data['token2'] = token2
+    if token3 is not None:
+        data['token3'] = token3
+
+    requests.post(
+        url=f"https://api.kavenegar.com/v1/{api_key}/verify/lookup.json",
+        data=data
+    )

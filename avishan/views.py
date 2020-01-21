@@ -4,7 +4,7 @@ from django.http import JsonResponse
 from avishan import current_request
 from avishan.decorators import AvishanApiView, AvishanTemplateView
 from avishan.exceptions import ErrorMessageException
-from avishan.misc.translation import translatable
+from avishan.misc.translation import AvishanTranslatable
 from avishan.models import AvishanModel, AuthenticationType
 
 
@@ -69,7 +69,7 @@ def avishan_model_function_caller(request, model_plural_name, function_name):
     try:
         target_function = getattr(model, function_name)
     except AttributeError:
-        raise ErrorMessageException(translatable(
+        raise ErrorMessageException(AvishanTranslatable(
             EN=f'Requested method not found in model {model.class_name()}'
         ))
     if request.method == 'POST' or request.method == 'PUT':
@@ -91,7 +91,7 @@ def avishan_item_function_caller(request, model_plural_name, item_id, function_n
     try:
         target_function = getattr(item, function_name)
     except AttributeError:
-        raise ErrorMessageException(translatable(
+        raise ErrorMessageException(AvishanTranslatable(
             EN=f'Requested method not found in record {item}'
         ))
 
@@ -113,7 +113,7 @@ def avishan_model_page_function_caller(request, model_plural_name, function_name
     try:
         return getattr(model, function_name)()
     except AttributeError:
-        raise ErrorMessageException(translatable(
+        raise ErrorMessageException(AvishanTranslatable(
             EN=f'Requested method not found in model {model.class_name()}'
         ))
 
@@ -129,7 +129,7 @@ def avishan_item_page_function_caller(request, model_plural_name, item_id, funct
     try:
         return getattr(item, function_name)()
     except AttributeError:
-        raise ErrorMessageException(translatable(
+        raise ErrorMessageException(AvishanTranslatable(
             EN=f'Requested method not found in record {item}'
         ))
 
@@ -140,3 +140,12 @@ def avishan_hash_password(request, password: str):
         'hashed_password': AuthenticationType._hash_password(password)
     }
     return JsonResponse(current_request['response'])
+
+
+@AvishanTemplateView(authenticate=False)
+def avishan_doc(request):
+    from avishan.libraries.openapi3 import create_openapi_object
+    import json
+    data = json.dumps(create_openapi_object('Snappion API Documentation', '1.0.0'))
+    from django.shortcuts import render
+    return render(request, 'swagger.html', context={'data': data})
