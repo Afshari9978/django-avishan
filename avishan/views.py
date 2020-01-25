@@ -147,5 +147,6 @@ def avishan_doc(request):
     from avishan.libraries.openapi3 import create_openapi_object
     import json
     data = json.dumps(create_openapi_object('Snappion API Documentation', '1.0.0'))
+    print(data)
     from django.shortcuts import render
     return render(request, 'swagger.html', context={'data': data})

@@ -735,8 +735,8 @@ class Email(AvishanModel):
     def create(cls, address: str = None) -> 'Email':
         return super().create(address=cls.validate_signature(address))
 
-    def update(self, address: str = None, **kwargs) -> 'Email':
-        return super().update(address=self.validate_signature(address), **kwargs)
+    def update(self, address: str = None) -> 'Email':
+        return super().update(address=self.validate_signature(address))
 
     @classmethod
     def filter(cls, address: str = None, avishan_to_dict: bool = False, **kwargs):
@@ -879,8 +879,8 @@ class Phone(AvishanModel):
     def create(cls, number: str = None) -> 'Phone':
         return super().create(number=cls.validate_signature(number))
 
-    def update(self, number: str = None, **kwargs) -> 'Phone':
-        return super().update(number=self.validate_signature(number), **kwargs)
+    def update(self, number: str = None) -> 'Phone':
+        return super().update(number=self.validate_signature(number))
 
     @classmethod
     def filter(cls, number: str = None, avishan_to_dict: bool = False, **kwargs):

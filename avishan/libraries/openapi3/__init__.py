@@ -7,6 +7,15 @@ from avishan.models import AvishanModel
 import stringcase
 
 
+def request_common_parameters() -> List[dict]:
+    return [{
+        "name": 'lang',
+        "in": 'query',
+        "description": 'set language for this request',
+        "required": False,
+    }]
+
+
 def create_openapi_object(title: str, api_version: str) -> dict:
     data = {
         'openapi': "3.0.0",
@@ -37,21 +46,20 @@ def get_model_paths(model: Type[AvishanModel]) -> dict:
         "delete": get_item_delete_request(model),
     }
     for key, value in data.items():
-        for inner_key, inner_value in data[key]:
-            if inner_key == {}:
-                del data[key][inner_key]
+        deletes = []
+
+        for inner_key, inner_value in data[key].items():
+            if inner_value == {}:
+                deletes.append(inner_key)
+        for item in deletes:
+            del data[key][item]
     return data
 
 
 def get_model_get_request(model: Type[AvishanModel]):
     return {
         "description": f"Get list of {stringcase.titlecase(model.class_name())}",
-        "parameters": {  # todo put format, pagination, sort, search here
-            "name": 'lang',  # todo check works?
-            "in": 'query',
-            "description": 'set language for this request',
-            "required": False
-        },
+        "parameters": request_common_parameters(),
         "responses": {
             "200": {
                 "content": {
@@ -78,16 +86,15 @@ def get_model_post_request(model: Type[AvishanModel]) -> dict:
         return {}
     return {
         "description": f"Create {stringcase.titlecase(model.class_name())}",
-        "parameters": {
-            "name": 'lang',
-            "in": 'query',
-            "description": 'set language for this request',
-            "required": False
-        },
-        "content": {
-            "application/json": {
-                "schema": create_schema
-            }
+        "parameters": request_common_parameters(),
+        "requestBody": {
+            "description": "Data structure for creation",
+            "content": {
+                "application/json": {
+                    "schema": create_schema
+                }
+            },
+            "required": True
         },
         "responses": {
             "200": {
@@ -110,12 +117,7 @@ def get_model_post_request(model: Type[AvishanModel]) -> dict:
 def get_item_get_request(model: Type[AvishanModel]) -> dict:
     return {
         "description": f"Get item of {stringcase.titlecase(model.class_name())}",
-        "parameters": {  # todo put format, pagination, sort, search here
-            "name": 'lang',  # todo check works?
-            "in": 'query',
-            "description": 'set language for this request',
-            "required": False
-        },
+        "parameters": request_common_parameters(),
         "responses": {
             "200": {
                 "content": {
@@ -144,16 +146,15 @@ def get_item_put_request(model: Type[AvishanModel]) -> dict:
         return {}
     return {
         "description": f"Update {stringcase.titlecase(model.class_name())} item",
-        "parameters": {
-            "name": 'lang',
-            "in": 'query',
-            "description": 'set language for this request',
-            "required": False
-        },
-        "content": {
-            "application/json": {
-                "schema": update_schema
-            }
+        "parameters": request_common_parameters(),
+        "requestBody": {
+            "description": "Data structure for edit",
+            "content": {
+                "application/json": {
+                    "schema": update_schema
+                }
+            },
+            "required": True
         },
         "responses": {
             "200": {
@@ -180,6 +181,7 @@ def get_item_delete_request(model: Type[AvishanModel]) -> dict:
         return {}
     return {
         "description": f"Delete item_id from {stringcase.titlecase(model.class_name())}",
+        "parameters": request_common_parameters(),
         "responses": {
             "200": {
                 "content": {
@@ -211,7 +213,7 @@ def get_model_create_schema(model: Type[AvishanModel]) -> dict:
     for name, param in create_signature.parameters.items():
         if name == 'kwargs':
             return {}
-        data[name] = get_input_object(param)
+        data['properties'][name] = get_input_object(param)
     return data
 
 
@@ -224,10 +226,12 @@ def get_model_update_schema(model):
     update_function = getattr(model, 'update')
 
     update_signature = inspect.signature(update_function)
-    for name, param in update_signature.parameters.items()[1:]:
+    for name, param in update_signature.parameters.items():
+        if name == 'self':
+            continue
         if name == 'kwargs':
             return {}
-        data[name] = get_input_object(param)
+        data['properties'][name] = get_input_object(param)
     return data
 
 
@@ -249,7 +253,7 @@ def get_input_object(param: Parameter) -> dict:
         data['type'] = "string"
     elif data['type'] == bool:
         data['type'] = 'boolean'
-    elif issubclass(data['type'], AvishanModel):
+    elif inspect.isclass(data['type']) and issubclass(data['type'], AvishanModel):
         data = {
             "$ref": f"#/components/schemas/{data['type'].class_name()}"
         }
@@ -272,7 +276,7 @@ def get_model_object(model: Type[AvishanModel]) -> dict:
         "type": "object",
         "properties": get_model_properties(model),
         "required": get_model_required_fields(model)
-    }
+    }  # todo abstract classes
 
 
 def get_model_properties(model: Type[AvishanModel]) -> dict:

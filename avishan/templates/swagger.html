@@ -8,15 +8,16 @@
 
 <script>
     window.onload = function () {
-        const ui = SwaggerUIBundle({
+        window.ui = SwaggerUIBundle({
             spec: JSON.parse('{{ data | escapejs }}'),
             dom_id: "#swagger-ui",
             presets: [
                 SwaggerUIBundle.presets.apis,
                 SwaggerUIBundle.SwaggerUIStandalonePreset
-            ]
+            ],
+            deepLinking: true,
+            operationsSorter: "alpha"
         })
-        window.ui = ui
     }
 </script>
 </html>
