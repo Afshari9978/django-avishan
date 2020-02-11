@@ -1,3 +1,4 @@
+import inspect
 from inspect import Parameter, _empty
 from typing import Type, List
 

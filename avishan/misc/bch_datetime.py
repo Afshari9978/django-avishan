@@ -13,6 +13,7 @@ class BchDatetime(object):
                  second: int = None, microsecond: int = None) -> None:
         temp = None
 
+        # todo not safe
         if not year and not month and not day and not hour and not minute and not second and not microsecond:
             temp = BchDatetime.from_bch_datetime(BchDatetime.now())
         elif isinstance(year, datetime):

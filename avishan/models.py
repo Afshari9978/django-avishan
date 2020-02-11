@@ -163,7 +163,28 @@ class AvishanModel(models.Model):
                 if value is None:
                     dicted[field.name] = None
                 elif isinstance(field, models.DateField):
-                    dicted[field.name] = BchDatetime(value).to_dict(full=True)
+                    from avishan_config import AvishanConfig
+                    try:
+                        if AvishanConfig.USE_JALALI_DATETIME:
+                            dicted[field.name] = BchDatetime(value).to_dict(full=True)
+                        else:
+                            if value is None:
+                                dicted[field.name] = {}
+                            else:
+                                dicted[field.name] = {
+                                    'year': value.year,
+                                    'month': value.month,
+                                    'day': value.day
+                                }
+                                if isinstance(field, models.DateTimeField):
+                                    dicted[field.name] = {**{
+                                        'hour': value.hour,
+                                        'minute': value.minute,
+                                        'second': value.second,
+                                        'microsecond': value.microsecond
+                                    }, **dicted[field.name]}
+                    except:
+                        dicted[field.name] = {}
                 elif isinstance(field, (models.OneToOneField, models.ForeignKey)):
                     dicted[field.name] = value.to_dict()
                 elif isinstance(field, models.ManyToManyField):
@@ -1288,6 +1309,7 @@ class File(AvishanModel):
 
 
 class RequestTrack(AvishanModel):
+    # todo create it on request start, to use it in other places too
     view_name = models.CharField(max_length=255, blank=True, null=True, default="NOT_AVAILABLE")
     url = models.TextField(blank=True, null=True)
     status_code = models.IntegerField(null=True, blank=True)
@@ -1311,6 +1333,45 @@ class RequestTrack(AvishanModel):
 
     def __str__(self):
         return self.view_name
+
+    def create_exec_infos(self, data: list):
+        dates = {}
+        for part in data:
+            dates[part['title']] = part['now']
+        for part in data:
+            if part['title'] == 'begin':
+                continue
+            RequestTrackExecInfo.create(
+                request_track=self,
+                title=part['title'],
+                start_time=dates[part['from_title']],
+                end_time=part['now'],
+                milliseconds=(part['now'] - dates[part['from_title']]).total_seconds() * 1000
+            )
+
+
+class RequestTrackExecInfo(AvishanModel):
+    request_track = models.ForeignKey(RequestTrack, on_delete=models.CASCADE, related_name='exec_infos')
+    title = models.CharField(max_length=255)
+    start_time = models.DateTimeField(blank=True, null=True)
+    end_time = models.DateTimeField(blank=True, null=True)
+    milliseconds = models.FloatField(default=None, null=True, blank=True)
+
+    django_admin_list_display = (request_track, title, start_time, milliseconds)
+    django_admin_list_filter = (request_track, title)
+    django_admin_list_max_show_all = 500
+    django_admin_search_fields = (title,)
+
+    @classmethod
+    def create_dict(cls, title: str, from_title: str = 'begin'):
+        current_request['request_track_exec'].append({
+            'title': title,
+            'from_title': from_title,
+            'now': datetime.datetime.now()
+        })
+
+    def __str__(self):
+        return self.title
 
 
 class RequestTrackMessage(AvishanModel):

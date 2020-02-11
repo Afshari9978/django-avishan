@@ -5,7 +5,6 @@ from django.http import HttpResponse
 
 from avishan.exceptions import AuthException, AvishanException
 from avishan.misc.bch_datetime import BchDatetime
-from avishan_config import AvishanConfig
 from . import current_request
 from .misc import status
 from .models import AuthenticationType
@@ -254,6 +253,7 @@ def encode_token(authentication_object: 'AuthenticationType') -> Optional[str]:
 
 def decode_token():
     import jwt
+    from avishan_config import AvishanConfig
     if not current_request['token']:
         raise AuthException(AuthException.TOKEN_NOT_FOUND)
     try:

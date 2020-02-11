@@ -5,6 +5,7 @@ from django.http import JsonResponse
 
 from avishan.exceptions import AvishanException, AuthException
 from . import current_request
+from .models import RequestTrack
 
 
 class AvishanView:
@@ -18,9 +19,13 @@ class AvishanView:
 
         def wrapper(*args, **kwargs):
             current_request['view_name'] = view_function.__name__
+            current_request['request_track_exec'] = [
+                {'title': 'begin', 'now': datetime.datetime.now()}
+            ]
             current_request['is_api'] = self.is_api
             if self.track_it and not current_request['is_tracked']:
                 current_request['is_tracked'] = True
+                current_request['request_track_object'] = RequestTrack.objects.create()
             if current_request['exception']:
                 """If we have exception here, should return after "is_api" assignment to middleware"""
                 return JsonResponse({})
@@ -44,6 +49,9 @@ class AvishanView:
                 current_request['view_start_time'] = datetime.datetime.now()
                 result = view_function(*args, **kwargs)
                 current_request['view_end_time'] = datetime.datetime.now()
+
+                if self.track_it:
+                    current_request['request_track_object'].create_exec_infos(current_request['request_track_exec'])
 
                 self.before_response()
 

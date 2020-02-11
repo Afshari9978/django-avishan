@@ -7,7 +7,6 @@ from django.http import JsonResponse
 
 from avishan.exceptions import AvishanException, save_traceback
 from avishan.libraries.dbml import create_dbml_file
-from avishan.libraries.openapi3 import create_openapi_object
 
 try:
     from avishan_admin.avishan_config import AvishanConfig as PanelAvishanConfig
@@ -138,6 +137,7 @@ class Wrapper:
         current_request['exception'] = None
         current_request['traceback'] = None
         current_request['lang'] = None
+        current_request['request_track_object'] = None
         current_request['context'] = {}
         current_request['messages'] = {
             'debug': [], 'info': [], 'success': [], 'warning': [], 'error': []
@@ -159,7 +159,7 @@ class Wrapper:
 
     @staticmethod
     def save_request_track(current_request):
-        from avishan.models import RequestTrack, RequestTrackMessage, RequestTrackException
+        from avishan.models import RequestTrackMessage, RequestTrackException
         current_request['end_time'] = datetime.datetime.now()
 
         try:
@@ -178,7 +178,7 @@ class Wrapper:
             authentication_type_class_title = current_request['authentication_object'].__class__.__name__
             authentication_type_object_id = current_request['authentication_object'].id
         try:
-            created = RequestTrack.objects.create(
+            created = current_request['request_track_object'].update(
                 view_name=current_request['view_name'],
                 url=current_request['request'].get_full_path(),
                 status_code=current_request['status_code'],

@@ -104,38 +104,9 @@ def avishan_item_function_caller(request, model_plural_name, item_id, function_n
     return JsonResponse(current_request['response'])
 
 
-@AvishanTemplateView(track_it=True)
-def avishan_model_page_function_caller(request, model_plural_name, function_name):
-    model = AvishanModel.get_model_by_plural_name(model_plural_name)
-    if not model:
-        raise ErrorMessageException('Entered model name not found')
-
-    try:
-        return getattr(model, function_name)()
-    except AttributeError:
-        raise ErrorMessageException(AvishanTranslatable(
-            EN=f'Requested method not found in model {model.class_name()}'
-        ))
-
-
-@AvishanTemplateView(track_it=True)
-def avishan_item_page_function_caller(request, model_plural_name, item_id, function_name):
-    model = AvishanModel.get_model_by_plural_name(model_plural_name)
-    if not model:
-        raise ErrorMessageException('Entered model name not found')
-
-    item = model.get(avishan_raise_400=True, id=item_id)
-
-    try:
-        return getattr(item, function_name)()
-    except AttributeError:
-        raise ErrorMessageException(AvishanTranslatable(
-            EN=f'Requested method not found in record {item}'
-        ))
-
-
 @AvishanApiView(authenticate=False, track_it=True)
 def avishan_hash_password(request, password: str):
+    # todo change it to accept get / post request
     current_request['response'] = {
         'hashed_password': AuthenticationType._hash_password(password)
     }
@@ -147,6 +118,5 @@ def avishan_doc(request):
     from avishan.libraries.openapi3 import create_openapi_object
     import json
     data = json.dumps(create_openapi_object('Snappion API Documentation', '1.0.0'))
-    print(data)
     from django.shortcuts import render
     return render(request, 'swagger.html', context={'data': data})
