@@ -1,5 +1,5 @@
 import datetime
-from typing import Optional, Union
+from typing import Optional, Union, List
 
 from django.http import HttpResponse
 
@@ -365,3 +365,13 @@ def en_numbers(text):
 
 def has_numbers(input):
     return any(char.isdigit() for char in input)
+
+
+def find_file(name: str, parent_directory_path: str) -> List[str]:
+    import os
+
+    result = []
+    for root, dirs, files in os.walk(parent_directory_path):
+        if name in files:
+            result.append(os.path.join(root, name))
+    return result

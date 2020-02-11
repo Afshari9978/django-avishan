@@ -73,7 +73,7 @@ class AvishanModel(models.Model):
 
     @classmethod
     def all(cls, avishan_to_dict: bool = False):
-        return cls.filter(avishan_to_dict)
+        return cls.filter(avishan_to_dict=avishan_to_dict)
 
     @classmethod
     def create(cls, **kwargs):
@@ -377,34 +377,6 @@ class AvishanModel(models.Model):
         return None
 
     @staticmethod
-    def run_apps_check():
-        from importlib import import_module
-        from avishan.utils import create_avishan_config_file
-
-        try:
-            import avishan_config
-        except ImportError:
-            create_avishan_config_file()
-
-        for app_name in AvishanModel.get_app_names():
-
-            try:
-                import_module(app_name)
-            except ModuleNotFoundError:
-                # todo 0.2.2 raise some error somewhere
-                continue
-            try:
-                init_file = import_module(app_name + ".avishan_config")
-            except ModuleNotFoundError:
-                create_avishan_config_file(app_name)
-                continue
-            try:
-                init_file.check()
-            except AttributeError as e:
-                # todo 0.2.2 raise some error somewhere
-                continue
-
-    @staticmethod
     def get_app_names() -> List[str]:
         from django.apps import apps
         from avishan_config import AvishanConfig
@@ -537,7 +509,7 @@ class AvishanModel(models.Model):
     def get_data_from_field(self, field: models.Field, string_format_dates: bool = False):
         from avishan.exceptions import ErrorMessageException
         from avishan_config import AvishanConfig
-        if len(field.choices) > 0:
+        if field.choices is not None:
             for k, v in field.choices:
                 if k == self.__getattribute__(field.name):
                     return v
@@ -760,8 +732,13 @@ class Email(AvishanModel):
         return super().update(address=self.validate_signature(address))
 
     @classmethod
-    def filter(cls, address: str = None, avishan_to_dict: bool = False, **kwargs):
-        return super().filter(avishan_to_dict, address=cls.validate_signature(address), **kwargs)
+    def filter(cls, avishan_to_dict: bool = False, **kwargs):
+        data = {
+            'avishan_to_dict': avishan_to_dict, **kwargs
+        }
+        if 'address' in data.keys():
+            data['address'] = cls.validate_signature(kwargs['address'])
+        return super().filter(**data)
 
 
 class EmailVerification(AvishanModel):
@@ -904,8 +881,13 @@ class Phone(AvishanModel):
         return super().update(number=self.validate_signature(number))
 
     @classmethod
-    def filter(cls, number: str = None, avishan_to_dict: bool = False, **kwargs):
-        return super().filter(avishan_to_dict, number=cls.validate_signature(number), **kwargs)
+    def filter(cls, avishan_to_dict: bool = False, **kwargs):
+        data = {
+            'avishan_to_dict': avishan_to_dict, **kwargs
+        }
+        if 'number' in data.keys():
+            data['number'] = cls.validate_signature(kwargs['number'])
+        return super().filter(**data)
 
 
 class PhoneVerification(AvishanModel):

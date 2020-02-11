@@ -20,14 +20,6 @@ class Wrapper:
     def __init__(self, get_response):
         self.get_response = get_response
 
-        """
-        Run avishan_config files, 'check' method. And also creates config file if not found
-        """
-        from avishan.models import AvishanModel
-        AvishanModel.run_apps_check()
-
-        create_dbml_file('static/api/models.dbml')
-
     def __call__(self, request: WSGIRequest):
         from avishan.utils import discard_monitor, find_token, decode_token, add_token_to_response, find_and_check_user
         from avishan import current_request
