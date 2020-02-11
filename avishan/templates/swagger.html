@@ -1,0 +1,24 @@
+<html>
+<head>
+    <title></title>
+    <link rel="stylesheet" type="text/css" href="https://unpkg.com/swagger-ui-dist@3/swagger-ui.css">
+    <script src="https://unpkg.com/swagger-ui-dist@3/swagger-ui-bundle.js"></script>
+</head>
+<div id="swagger-ui"></div>
+
+<script>
+    window.onload = function () {
+        window.ui = SwaggerUIBundle({
+            spec: JSON.parse('{{ data | escapejs }}'),
+            dom_id: "#swagger-ui",
+            presets: [
+                SwaggerUIBundle.presets.apis,
+                SwaggerUIBundle.SwaggerUIStandalonePreset
+            ],
+            deepLinking: true,
+            operationsSorter: "alpha"
+        })
+    }
+</script>
+</html>
+

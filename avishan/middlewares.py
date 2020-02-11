@@ -1,133 +1,219 @@
+import datetime
 import json
 
+from django.contrib import messages
 from django.core.handlers.wsgi import WSGIRequest
-from django.http import JsonResponse, QueryDict
+from django.http import JsonResponse
 
-# todo: try for import config
-from .utils.data_functions import save_traceback
-from avishan_config import USER_RESPONSE_DICT_FIELDS, MONITORED_URLS_START, NOT_MONITORED_URLS, \
-    MONITORED_ANONYMOUS_URLS
-from .exceptions import AuthException
-from .models.users import UserUserGroup
-from .utils.auth_functions import decode_token, verify_user, generate_token
-from avishan_wrapper import current_request
+from avishan.exceptions import AvishanException, save_traceback
+from avishan.libraries.dbml import create_dbml_file
+
+try:
+    from avishan_admin.avishan_config import AvishanConfig as PanelAvishanConfig
+except ImportError:
+    pass
 
 
-# todo: disable unused middlewares and installed apps
-# todo: bayad ye chizi dashte bashim k startup command bashe. role haro doros kone o yeseri kar bara re run
-# todo readme ro doros konam
-# todo: age ba ye esm, 2ta model dashtim che konim?
-# todo: csrf chie? az middleware hazf she ya doros she?
-# todo: 299 for message to user
-# todo add username/password enter mode
-# todo add email/otp enter mode
-# todo have instant turn off exception record button
+class Wrapper:
+    """this middleware creates "current_request" storage for each incoming request"""
 
-class AvishanMiddleware:
     def __init__(self, get_response):
-
         self.get_response = get_response
-        from .utils.documentation_functions import create_raml_documentation
-        # create_raml_documentation(PROJECT_NAME) todo: aya harbar bayad ejra she?
+
+        """
+        Run avishan_config files, 'check' method. And also creates config file if not found
+        """
+        from avishan.models import AvishanModel
+        AvishanModel.run_apps_check()
+
+        create_dbml_file('static/api/models.dbml')
 
     def __call__(self, request: WSGIRequest):
+        from avishan.utils import discard_monitor, find_token, decode_token, add_token_to_response, find_and_check_user
+        from avishan import current_request
+
+        start_time = datetime.datetime.now()
+
+        self.initialize_request_storage(current_request)
+        current_request['request'] = request
+
+        """Checks for avoid-touch requests"""
+        if discard_monitor(current_request['request'].get_full_path()):
+            print(f"NOT_MONITORED: {current_request['request'].get_full_path()}")
+            return self.get_response(current_request['request'])
+
+        current_request['start_time'] = start_time
+
+        """Find token and parse it"""
+        """
+        Bara inke yadam nare. tooye sathe middleware vaghti error midim, chon nemidoonim api e ya template, error ro 
+        zakhire mikonim mirim decorator, baad oonja k set shod in meghdar, check mikonim chon error hast, barmigarde 
+        inja 
+        """
         try:
-            if must_have_token(request.path):
-                try:
-                    self.token = request.META['HTTP_TOKEN']
-                except KeyError as e:
-                    save_traceback()
-                    raise AuthException(AuthException.TOKEN_ERROR)
-                self.decoded_token = decode_token(self.token)
-                try:
-                    user_user_group = UserUserGroup.get(avishan_raise_exception=True,
-                                                        id=self.decoded_token['id'])
-                except UserUserGroup.DoesNotExist:
-                    save_traceback()
-                    raise AuthException(AuthException.ACCOUNT_NOT_FOUND)
-                current_request['user'] = user_user_group.user
-
-                print(user_user_group.user)
-
-                current_request['user_group'] = user_user_group.user_group
-                verify_user()
-
-            self.data_fields_on_request(request)
-
-            response = self.get_response(request)
-            if response.status_code == 567:
-                return JsonResponse({}, status=567)
-            # todo inja k miad "status_code" 500 age bood male khodemoon nis dige
-            # todo check response to to_dict models
-
-            if isinstance(response, JsonResponse):
-                # todo: merge response dict + current_request.response
-                status_code = response.status_code
-                if must_have_token(request.path):
-                    current_request['response']['token'] = generate_token(self.decoded_token, self.token,
-                                                                          current_request['user'],
-                                                                          current_request['user_group'])
-                    current_request['response']['user'] = current_request['user'].to_dict(
-                        visible_list=USER_RESPONSE_DICT_FIELDS)
-                    if current_request['execution_time'] > 0:
-                        print("EXEC:", current_request['execution_time'])
-                        current_request['response']['execution_time'] = current_request['execution_time']
-
-                    return JsonResponse(current_request['response'], status=status_code)
-
-                elif current_request['execution_time'] > 0:
-                    print("EXEC:", current_request['execution_time'])
-                    response = json.loads(response.content.decode('utf-8'))
-                    response['execution_time'] = current_request['execution_time']
-                    return JsonResponse(response, status=status_code)
-            return response
+            if find_token():
+                decode_token()
+                find_and_check_user()
+        except AvishanException:
+            pass
         except Exception as e:
             save_traceback()
-            current_request['exception'] = e
-            return JsonResponse({}, status=567)
+            AvishanException(e)
+
+        try:
+            """
+            If avishan_admin installed and check method found, run it.
+            """
+            from avishan_admin.avishan_config import check_request
+            check_request()
+        except ImportError:
+            pass
+
+        # todo 0.2.2 check for 'avishan_' in request bodies
+        """Send request object to the next layer and wait for response"""
+        try:
+            response = self.get_response(current_request['request'])
+        except AvishanException:
+            pass
+        except Exception as e:
+            save_traceback()
+            AvishanException(e)
+
+        """messages"""
+        if current_request['messages']['debug'] or current_request['messages']['info'] or \
+                current_request['messages']['success'] or current_request['messages']['warning'] or \
+                current_request['messages']['error']:
+            # todo 0.2.3: check for debug=True
+
+            if current_request['is_api']:
+                current_request['response']['messages'] = current_request['messages']
+            else:
+                self.fill_messages_framework(current_request)
+
+        add_token_to_response(response)
+        status_code = current_request['status_code']
+        is_api = current_request['is_api']
+        json_safe = not current_request['json_unsafe']
+        if current_request['is_api']:
+            response = current_request['response'].copy()
+
+        if current_request['is_tracked'] or current_request['exception'] is not None:
+            self.save_request_track(current_request)
+
+        self.initialize_request_storage(current_request)
+
+        if is_api:
+            return JsonResponse(response, status=status_code, safe=json_safe)
+        elif response.status_code == 200 and status_code != 200:
+            response.status_code = status_code
+
+        return response
 
     @staticmethod
-    def data_fields_on_request(request: WSGIRequest):
-        if request.method == 'GET':
-            params = request.GET
-        elif request.method == 'POST':
-            params = request.POST
-        elif request.method == 'PUT' or request.method == 'DELETE':
-            params = QueryDict(request.body)
+    def initialize_request_storage(current_request):
+        current_request.clear()
+        current_request['request'] = None
+        current_request['response'] = {}
+        current_request['is_tracked'] = False
 
-        request.search = params.get('search')
-        request.page = params.get('page')
-        request.page_size = params.get('page_size')
-        request.filter = params.get('filter')
-        request.sort = params.get('sort')
+        """If not checked "None", then switches between api & template"""
+        current_request['is_api'] = None
 
-        if not request.search:
-            request.search = ''
-        if not request.page:
-            request.page = 0
-        if not request.page_size:
-            request.page_size = 20
-        if not request.filter:
-            request.filter = []
-        if not request.sort:
-            request.sort = []
+        current_request['add_token'] = False
+        current_request['view_name'] = "NOT_AVAILABLE"
+        current_request['start_time'] = None
+        current_request['end_time'] = None
+        current_request['view_start_time'] = None
+        current_request['view_end_time'] = None
+        current_request['json_unsafe'] = False
+        current_request['base_user'] = None
+        current_request['user_group'] = None
+        current_request['user_user_group'] = None
+        current_request['authentication_object'] = None
+        current_request['exception_record'] = None
+        current_request['token'] = None
+        current_request['decoded_token'] = None
+        current_request['status_code'] = 200
+        current_request['exception'] = None
+        current_request['traceback'] = None
+        current_request['lang'] = None
+        current_request['request_track_object'] = None
+        current_request['context'] = {}
+        current_request['messages'] = {
+            'debug': [], 'info': [], 'success': [], 'warning': [], 'error': []
+        }
+        # todo ye check
 
+    @staticmethod
+    def fill_messages_framework(current_request):
+        for item in current_request['messages']['debug']:
+            messages.debug(current_request['request'], item['body'])
+        for item in current_request['messages']['info']:
+            messages.info(current_request['request'], item['body'])
+        for item in current_request['messages']['success']:
+            messages.success(current_request['request'], item['body'])
+        for item in current_request['messages']['warning']:
+            messages.warning(current_request['request'], item['body'])
+        for item in current_request['messages']['error']:
+            messages.error(current_request['request'], item['body'])
 
-def must_monitor(url: str) -> bool:
-    for start in MONITORED_URLS_START:
-        if url.startswith(start):
-            for not_monitored_start in NOT_MONITORED_URLS:
-                if url.startswith(not_monitored_start):
-                    return False
-            return True
-    return False
+    @staticmethod
+    def save_request_track(current_request):
+        from avishan.models import RequestTrackMessage, RequestTrackException
+        current_request['end_time'] = datetime.datetime.now()
 
+        try:
+            request_data = str(current_request['request'].data)
+        except:
+            request_data = "NOT_AVAILABLE"
 
-def must_have_token(url: str) -> bool:
-    if must_monitor(url):
-        for start in MONITORED_ANONYMOUS_URLS:
-            if url.startswith(start):
-                return False
-    else:
-        return False
-    return True
+        request_headers = ""
+        for key, value in current_request['request'].META.items():
+            if key.startswith('HTTP_'):
+                request_headers += f'({key[5:]}: {value}),\n'
+
+        authentication_type_class_title = "NOT_AVAILABLE"
+        authentication_type_object_id = 0
+        if current_request['authentication_object']:
+            authentication_type_class_title = current_request['authentication_object'].__class__.__name__
+            authentication_type_object_id = current_request['authentication_object'].id
+        try:
+            created = current_request['request_track_object'].update(
+                view_name=current_request['view_name'],
+                url=current_request['request'].get_full_path(),
+                status_code=current_request['status_code'],
+                method=current_request['request'].method,
+                json_unsafe=current_request['json_unsafe'],
+                is_api=current_request['is_api'],
+                add_token=current_request['add_token'],
+                user_user_group=current_request['user_user_group'],
+                request_data=request_data,
+                request_headers=request_headers,
+                response_data=json.dumps(current_request['response'], indent=2),
+                start_time=current_request['start_time'],
+                end_time=current_request['end_time'],
+                total_execution_milliseconds=int((current_request['end_time'] - current_request[
+                    'start_time']).total_seconds() * 1000),
+                view_execution_milliseconds=int((current_request['view_end_time'] - current_request[
+                    'view_start_time']).total_seconds() * 1000) if current_request['view_end_time'] else 0,
+                authentication_type_class_title=authentication_type_class_title,
+                authentication_type_object_id=authentication_type_object_id
+            )
+            for type in ['debug', 'info', 'success', 'warning', 'error']:
+                for message_item in current_request['messages'][type]:
+                    RequestTrackMessage.objects.create(
+                        request_track=created,
+                        type=type,
+                        title=message_item['title'] if 'title' in message_item.keys() else "NOT_AVAILABLE",
+                        body=message_item['body'] if 'body' in message_item.keys() else "NOT_AVAILABLE",
+                        code=message_item['code'] if 'code' in message_item.keys() else "NOT_AVAILABLE"
+                    )
+            if current_request['exception'] is not None:
+                RequestTrackException.objects.create(
+                    request_track=created,
+                    class_title=current_request['exception'].__class__.__name__,
+                    args=current_request['exception'].args,
+                    traceback=current_request['traceback']
+                )
+        except Exception as e:
+            print(e)

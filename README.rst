@@ -7,26 +7,19 @@ Avishan is a set of tools for building fast, comfortable and reliable django app
 Quick start
 -----------
 
-1. Add "avishan" to end of your INSTALLED_APPS setting like this, and "AvishanMiddleware" to **end** of MIDDLEWARE too::
+0. On linux remember to install this packages::
 
-    INSTALLED_APPS = [
-        ...
-        'avishan',
-    ]
+    sudo apt-get install build-essential libffi-dev python3-dev
 
-    MIDDLEWARE = [
-        ...
-        'avishan_wrapper.middlewares.AvishanThreadStorage',
-        'avishan.middlewares.AvishanMiddleware',
-    ]
+1. just run this command (::
 
-2. Include the avishan URLconf in your project urls.py like this::
+    python manage.py avishan_config
 
-    path('', include('avishan.urls')),
-
-3. Run this commands to create the avishan models::
-
-    python manage.py migrate
-    python manage.py avishan_init
-
-4. Now follow part below for more detail about every single usage.
+Features
+--------
+* Request data storage (current_request dict)
+* Auto-find and checks token from session, or request header
+* Handle sort, search, filter and pagination on response
+* Configure django settings.py file
+* Handle CORS
+* Creates config.py file for each app and project

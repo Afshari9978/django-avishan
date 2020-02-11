@@ -1,10 +1,9 @@
-import math
 from khayyam import JalaliDate, JalaliDatetime
 from datetime import timedelta, datetime, date, time
-from typing import Union, TypeVar, Type, List
-
+from typing import Union, List
 
 # todo: type hints
+from avishan.misc.translation import AvishanTranslatable
 
 
 class BchDatetime(object):
@@ -14,6 +13,7 @@ class BchDatetime(object):
                  second: int = None, microsecond: int = None) -> None:
         temp = None
 
+        # todo not safe
         if not year and not month and not day and not hour and not minute and not second and not microsecond:
             temp = BchDatetime.from_bch_datetime(BchDatetime.now())
         elif isinstance(year, datetime):
@@ -32,6 +32,31 @@ class BchDatetime(object):
                 temp.year, temp.month, temp.day, temp.hour, temp.minute, temp.second, temp.microsecond
             return
         self.year = year
+        if isinstance(month, str):
+            try:
+                month = int(month)
+            except ValueError:
+                try:
+                    month = {
+                        'فروردین': 1,
+                        'اردیبهشت': 2,
+                        'خرداد': 3,
+                        'تیر': 4,
+                        'مرداد': 5,
+                        'شهریور': 6,
+                        'مهر': 7,
+                        'آبان': 8,
+                        'آذر': 9,
+                        'دی': 10,
+                        'بهمن': 11,
+                        'اسفند': 12,
+                    }[month]
+                except KeyError:
+                    from avishan.exceptions import ErrorMessageException
+                    raise ErrorMessageException(AvishanTranslatable(
+                        EN=f'Unknown Month String {month}',
+                        FA=f'عبارت ناشناخته ماه {month}'
+                    ))
         self.month = month
         self.day = day
         self.hour = hour
@@ -162,8 +187,10 @@ class BchDatetime(object):
         elif resolution == 'microsecond':
             return int(timestamp * 1000000)
         else:
-            raise ValueError(
-                'Incorrect resolution. Accepts are "second", "millisecond" and "microsecond". Default is "second".')
+            raise ValueError(AvishanTranslatable(
+                EN='Incorrect resolution. Accepts are "second", "millisecond" and "microsecond". Default is "second".',
+                FA='مقیاس نامعتبر. مقادیر قابل قبول: "second"، "millisecond" و "microsecond". مقدار پیش‌فرض "second".'
+            ))
 
     def to_jalali_date(self):
         return JalaliDate(self.year, self.month, self.day)
@@ -180,8 +207,29 @@ class BchDatetime(object):
     def to_time(self):
         return self.to_datetime().time()
 
-    def to_str(self):
-        return str(self.to_jalali_datetime())
+    def to_str(self, format=None):
+        if format is None:
+            return str(self.to_jalali_datetime())
+        """
+        formats: 
+        %Y: YYYY year
+        ٪y: YY short year
+        %m: MM month
+        %d: DD day
+        %A: persian weekday دوشنبه
+        %a: short persian weekday د 
+        %D: ۱۵ day
+        %B: persian month شهریور
+        %b: short persian month شه
+        %N: persian year ۱۳۶۱
+        %H: HH hour 24
+        %I: II short hour 12 
+        %M: MM minute
+        %S: SS second
+        %f: mmmmmm milliseconds
+        %p: ق.ظ ب.ظ
+        """
+        return self.to_jalali_datetime().strftime(format)
 
     @staticmethod
     def from_bch_datetime(source):
@@ -199,7 +247,7 @@ class BchDatetime(object):
     @staticmethod
     def from_unix_timestamp(source):
         source = str(source)
-        if len(source) > 10: # todo is it true?
+        if len(source) > 10:  # todo is it true?
             other = source[10:]
             source = source[:10]
             temp = BchDatetime.from_datetime(datetime.fromtimestamp(int(source)))
@@ -215,11 +263,11 @@ class BchDatetime(object):
     @staticmethod
     def from_date(source: date):
         return BchDatetime.from_jalali_datetime(
-            JalaliDatetime(source.year, source.month, source.day)
+            JalaliDatetime(datetime.combine(source, time(0, 0, 0, 0)))
         )
 
     @staticmethod
-    def from_datetime(source):
+    def from_datetime(source: datetime):
         return BchDatetime.from_jalali_datetime(JalaliDatetime(source))
 
     def load_time(self, time: datetime.time):
@@ -240,7 +288,8 @@ class BchDatetime(object):
         now = BchDatetime()
         return now.year == self.year and now.month == self.month and now.day == self.day
 
-    def cleaned_datetime(self, to_forward: bool, force_to_forward:bool=False, years: int = None, months: int = None, days: int = None,
+    def cleaned_datetime(self, to_forward: bool, force_to_forward: bool = False, years: int = None, months: int = None,
+                         days: int = None,
                          hours: int = None, minutes: int = None, seconds: int = None,
                          microseconds: int = None, ) -> 'BchDatetime':
         # todo: complete it
@@ -248,7 +297,7 @@ class BchDatetime(object):
         new = BchDatetime(self)
 
         if force_to_forward and new.cleaned_datetime(
-            to_forward, False, years, months, days, hours, minutes, seconds, microseconds
+                to_forward, False, years, months, days, hours, minutes, seconds, microseconds
         ) == new:
             new += 1
 
@@ -277,7 +326,10 @@ class BchDatetime(object):
             return BchDatetime.from_jalali_datetime(self.to_jalali_datetime() + timedelta(seconds=other))
         if isinstance(other, timedelta):
             return BchDatetime.from_jalali_datetime(self.to_jalali_datetime() + other)
-        raise TypeError('Accepted types are "int" as seconds and "timedelta"')
+        raise TypeError(AvishanTranslatable(
+            EN='Accepted types are "int" as seconds and "timedelta"',
+            FA='مقادیر قابل قبول "int" به عنوان ثانیه ها و "timedelta" هستند'
+        ))
 
     def __sub__(self, other) -> Union[timedelta, 'BchDatetime']:
         if isinstance(other, BchDatetime):
@@ -309,7 +361,7 @@ class BchDatetime(object):
         return self.to_unix_timestamp('microsecond') != other.to_unix_timestamp('microsecond')
 
     def __str__(self):
-        return self.to_datetime().strftime("%Y-%m-%d %H:%M:%S")
+        return self.to_datetime().strftime("%Y/%m/%d %H:%M:%S")
 
 
 class TimeRange(object):
@@ -328,7 +380,7 @@ class TimeRange(object):
 
 
 class TimeRangeGroup(object):
-    # todo can optimize time ranges to fit together?
+    # todo 0.2.5: can optimize time ranges to fit together?
     def __init__(self, time_range_group: 'TimeRangeGroup' = None):
         self.time_ranges: List[TimeRange] = []
         if time_range_group:
@@ -400,7 +452,7 @@ class TimeRangeGroup(object):
                     result.time_ranges.remove(time_range)
             self.order_time_range_group()
             return result
-        raise ValueError
+        raise ValueError()
 
     def __sub__(self, other):
         if isinstance(other, TimeRangeGroup):
@@ -429,7 +481,7 @@ class TimeRangeGroup(object):
                     self.time_ranges.remove(time_range)
             self.order_time_range_group()
             return self
-        raise ValueError
+        raise ValueError()
 
     def __str__(self):
         total = "["

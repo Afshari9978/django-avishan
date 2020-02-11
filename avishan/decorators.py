@@ -1,101 +1,145 @@
+import datetime
 import json
-import pprint
 
 from django.http import JsonResponse
 
-from .utils.data_functions import save_traceback
-from .exceptions import AvishanException
-from avishan_wrapper import current_request
+from avishan.exceptions import AvishanException, AuthException
+from . import current_request
+from .models import RequestTrack
 
 
-class AvishanDecorator(object):
-    def __init__(self):
-
-        pass
+class AvishanView:
+    def __init__(self, is_api: bool, methods=('GET',), authenticate: bool = None, track_it: bool = False):
+        self.methods = methods
+        self.authenticate = authenticate
+        self.is_api = is_api
+        self.track_it = track_it
 
     def __call__(self, view_function):
-        # todo we should have method checker
-        def wrapper(*args, **kwargs):
-            request = current_request['request']
 
-            if request.method != 'GET':
-                from django.http.request import RawPostDataException
-                try:
-                    if len(request.body) > 0:
-                        request.data = json.loads(request.body.decode('utf-8'))
-                        # todo: hich kodoom az key ha nabayad ba "avishan*_" shoroo beshe
-                    else:
-                        request.data = {}
-                except RawPostDataException:
-                    request.data = {}
+        def wrapper(*args, **kwargs):
+            current_request['view_name'] = view_function.__name__
+            current_request['request_track_exec'] = [
+                {'title': 'begin', 'now': datetime.datetime.now()}
+            ]
+            current_request['is_api'] = self.is_api
+            if self.track_it and not current_request['is_tracked']:
+                current_request['is_tracked'] = True
+                current_request['request_track_object'] = RequestTrack.objects.create()
+            if current_request['exception']:
+                """If we have exception here, should return after "is_api" assignment to middleware"""
+                return JsonResponse({})
 
             try:
-                return view_function(*args, **kwargs)
-            except Exception as e:
-                save_traceback()
-                current_request['exception'] = e
-                return JsonResponse({}, status=567)
+                """
+                If user not provided, return with error.
+                """
+                # todo 0.2.4: if api-type request but token in session instead of header
+                self.before_request()
 
-        return wrapper
+                if self.authenticate and not self.is_authenticated():
+                    raise AuthException(AuthException.ACCESS_DENIED)
 
+                """http method check and raise 405"""
+                if current_request['is_api'] and current_request['request'].method not in self.methods:
+                    raise AuthException(AuthException.HTTP_METHOD_NOT_ALLOWED)
 
-class AvishanCalculateTime(object):
-    def __init__(self):
-        pass
+                self.after_request()
 
-    def __call__(self, view_function):
-        from .utils.bch_datetime import BchDatetime
-
-        def wrapper(*args, **kwargs):
-            start_time = BchDatetime()
-
-            result = view_function(*args, **kwargs)
-
-            end_time = BchDatetime()
-            current_request['execution_time'] = end_time.to_unix_timestamp('microsecond') - start_time.to_unix_timestamp(
-                'microsecond')
-
-            return result
-
-        return wrapper
-
-
-class AvishanPrintRequestBody(object):
-    def __init__(self):
-        pass
-
-    def __call__(self, view_function):
-
-        def wrapper(*args, **kwargs):
-            print("++++++++++++++++++++ " + view_function.__name__ + " ++++++++++++++++++++")
-            print("***** REQUEST *****")
-            request = current_request['request']
-            if request.method != 'GET':
-                try:
-                    pprint.pprint(request.data)
-                except AttributeError:
-                    if len(request.body) > 0:
-                        request.data = json.loads(request.body.decode('utf-8'))
-                    else:
-                        request.data = {}
-                    pprint.pprint(request.data)
-
-            try:
+                current_request['view_start_time'] = datetime.datetime.now()
                 result = view_function(*args, **kwargs)
-            except AvishanException as e:
-                print("***** RESPONSE *****")
-                print("-------------------- " + view_function.__name__ + " --------------------")
-                save_traceback()
-                raise e
+                current_request['view_end_time'] = datetime.datetime.now()
 
-            print("***** RESPONSE *****")
-            if isinstance(result, JsonResponse):
-                response = json.loads(result.content.decode('utf-8'))
-                pprint.pprint(response)
-            print("-------------------- " + view_function.__name__ + " --------------------")
+                if self.track_it:
+                    current_request['request_track_object'].create_exec_infos(current_request['request_track_exec'])
+
+                self.before_response()
+
+                self.after_response()
+
+            except AvishanException:
+                return JsonResponse({})
+            except Exception as e:
+                AvishanException(wrap_exception=e)
+                return JsonResponse({})
+            if current_request['exception']:
+                return JsonResponse({})
 
             return result
 
         return wrapper
 
-# todo: part by part execution time calculator decorator
+    def before_request(self):
+        raise NotImplementedError()
+
+    def after_request(self):
+        raise NotImplementedError()
+
+    def before_response(self):
+        raise NotImplementedError()
+
+    def after_response(self):
+        raise NotImplementedError()
+
+    @staticmethod
+    def is_authenticated() -> bool:
+        """
+        Checks for user available in current_request storage
+        :return: true if authenticated
+        """
+        from . import current_request
+        if not current_request['authentication_object']:
+            return False
+        return True
+
+
+class AvishanApiView(AvishanView):
+
+    def __init__(self, methods=('GET',), authenticate: bool = True, track_it: bool = False):
+        super().__init__(is_api=True, methods=methods, authenticate=authenticate, track_it=track_it)
+
+    def before_request(self):
+        if current_request['request'].method not in ['GET', 'DELETE']:
+            try:
+                if len(current_request['request'].body) > 0:
+                    current_request['request'].data = json.loads(current_request['request'].body.decode('utf-8'))
+                else:
+                    current_request['request'].data = {}
+            except:
+                current_request['request'].data = {}
+
+    def after_request(self):
+        pass
+
+    def before_response(self):
+        pass
+
+    def after_response(self):
+        pass
+
+
+class AvishanTemplateView(AvishanView):
+    def __init__(self, methods=('GET',), authenticate: bool = True, track_it: bool = False):
+        super().__init__(is_api=False, methods=methods, authenticate=authenticate, track_it=track_it)
+
+    def before_request(self):
+        if current_request['request'].method in ['POST', 'PUT']:
+            try:
+                if len(current_request['request'].body) > 0:
+                    current_request['request'].data = dict(current_request['request'].POST)
+                    for key, value in current_request['request'].data.items():
+                        if len(value) == 1:
+                            current_request['request'].data[key] = value[0]
+                else:
+                    current_request['request'].data = {}
+            except:
+                current_request['request'].data = {}
+
+    def after_request(self):
+        pass
+
+    def before_response(self):
+        pass
+
+    def after_response(self):
+        pass
