@@ -1,3 +1,6 @@
+from avishan.configure import get_avishan_config
+
+
 class AvishanTranslatable:
     EN = None
     FA = None
@@ -20,9 +23,8 @@ class AvishanTranslatable:
             raise ValueError
         except:
             try:
-                from avishan_config import AvishanConfig
-                if self.__dict__[AvishanConfig.LANGUAGE] is not None:
-                    return self.__dict__[AvishanConfig.LANGUAGE]
+                if self.__dict__[get_avishan_config().LANGUAGE] is not None:
+                    return self.__dict__[get_avishan_config().LANGUAGE]
                 raise ValueError
             except:
                 if len(self.__dict__.keys()) > 0:

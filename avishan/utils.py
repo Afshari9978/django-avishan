@@ -6,6 +6,7 @@ from django.http import HttpResponse
 from avishan.exceptions import AuthException, AvishanException
 from avishan.misc.bch_datetime import BchDatetime
 from . import current_request
+from .configure import get_avishan_config
 from .misc import status
 from .models import AuthenticationType
 
@@ -136,8 +137,7 @@ def discard_monitor(url: str) -> bool:
     :param url: request url. If straightly catch from request.path, it comes like: /admin, /api/v1
     :return:
     """
-    from avishan_config import AvishanConfig
-    if url.startswith(AvishanConfig.NOT_MONITORED_STARTS):
+    if url.startswith(get_avishan_config().NOT_MONITORED_STARTS):
         return True
     return False
 
@@ -234,7 +234,6 @@ def delete_token_from_request(rendered_response=None):
 def encode_token(authentication_object: 'AuthenticationType') -> Optional[str]:
     import jwt
     from datetime import timedelta
-    from avishan_config import AvishanConfig
 
     now = BchDatetime()
     token_data = {
@@ -246,19 +245,18 @@ def encode_token(authentication_object: 'AuthenticationType') -> Optional[str]:
         'lgn': BchDatetime(authentication_object.last_login).to_unix_timestamp()
     }
     return jwt.encode(token_data,
-                      AvishanConfig.JWT_KEY,
+                      get_avishan_config().JWT_KEY,
                       algorithm='HS256'
                       ).decode("utf8")
 
 
 def decode_token():
     import jwt
-    from avishan_config import AvishanConfig
     if not current_request['token']:
         raise AuthException(AuthException.TOKEN_NOT_FOUND)
     try:
         current_request['decoded_token'] = jwt.decode(
-            current_request['token'], AvishanConfig.JWT_KEY,
+            current_request['token'], get_avishan_config().JWT_KEY,
             algorithms=['HS256']
         )
         current_request['add_token'] = True

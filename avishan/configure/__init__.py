@@ -1,5 +1,9 @@
+from typing import Union, Type, List
+
 from django.core.management import BaseCommand
 
+
+# no import from avishan here
 
 class AvishanConfigure:
 
@@ -55,8 +59,34 @@ class AvishanConfigure:
 
 
 class AvishanConfigFather:
-    def __init__(self):
-        self.app_name = None
+    class LANGUAGES:
+        FA = 'FA'
+        EN = 'EN'
+
+    MONITORED_APPS_NAMES: List[str] = []
+    NOT_MONITORED_STARTS = []
+    JWT_KEY = ''
+    KAVENEGAR_API_TOKEN: str = None
+    USE_JALALI_DATETIME: bool = True
+    LANGUAGE = LANGUAGES.EN
+    EMAIL_SENDER_ADDRESS: str = None
+    EMAIL_VERIFICATION_GAP_SECONDS = 10
+    EMAIL_VERIFICATION_VALID_SECONDS = 200
+    EMAIL_VERIFICATION_TRIES_COUNT = 3
+    EMAIL_VERIFICATION_CODE_LENGTH = 4
+    SMS_SIGNIN_TEMPLATE = 'signin'
+    SMS_SIGNUP_TEMPLATE = 'signup'
+    PHONE_VERIFICATION_GAP_SECONDS = 10
+    PHONE_VERIFICATION_VALID_SECONDS = 200
+    PHONE_VERIFICATION_TRIES_COUNT = 1
+    PHONE_VERIFICATION_CODE_LENGTH = 4
 
     def check(self):
         pass
+
+
+def get_avishan_config() -> Union[Type[AvishanConfigFather]]:
+    for sub_class in AvishanConfigFather.__subclasses__():
+        sub_class: Type[AvishanConfigFather]
+        return sub_class
+    return AvishanConfigFather

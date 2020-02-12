@@ -2,7 +2,6 @@ import datetime
 import json
 from typing import List, get_type_hints, Type, Callable
 
-from django.db import models
 from django.http import JsonResponse
 from django.shortcuts import render
 from django.views import View
@@ -27,6 +26,7 @@ class AvishanView(View):
     sort: List[str] = []
     page: int = 0
     page_size: int = 20
+    page_offset: int = 0
 
     # todo if page is not 0, send page, page size, items count, next, prev
 
@@ -175,26 +175,26 @@ class AvishanTemplateView(AvishanView):
 class AvishanModelApiView(AvishanApiView):
     authenticate = False
     model: Type[AvishanModel] = None
-    model_plural_name: str = None
     model_item: AvishanModel = None
-    model_item_id: int = None
     model_function: Callable = None
-    model_function_name: str = None
 
     def setup(self, request, *args, **kwargs):
         super().setup(request, *args, **kwargs)
-        self.model = AvishanModel.get_model_by_plural_name(kwargs['model_plural_name'])
+        model_plural_name = kwargs.get(['model_plural_name'], None)
+        model_item_id = kwargs.get('model_item_id', None)
+        model_function_name = kwargs.get('model_function_name', None)
+        self.model = AvishanModel.get_model_by_plural_name(model_plural_name)
         if not self.model:
             raise ErrorMessageException('Entered model name not found')
 
-        if self.model_item_id is not None:
-            self.model_item = self.model.get(avishan_raise_400=True, id=self.model_item_id)
-        if self.model_function_name is not None:
+        if model_item_id is not None:
+            self.model_item = self.model.get(avishan_raise_400=True, id=int(model_item_id))
+        if model_function_name is not None:
             try:
                 if self.model_item is None:
-                    self.model_function = getattr(self.model, self.model_function_name)
+                    self.model_function = getattr(self.model, model_function_name)
                 else:
-                    self.model_function = getattr(self.model_item, self.model_function_name)
+                    self.model_function = getattr(self.model_item, model_function_name)
             except AttributeError:
                 raise ErrorMessageException(AvishanTranslatable(
                     EN=f'Requested method not found in model {self.model.class_name()}'

@@ -5,6 +5,7 @@ import requests
 from django.db.models import NOT_PROVIDED
 
 from avishan import current_request
+from avishan.configure import get_avishan_config
 from avishan.misc import status
 from avishan.misc.translation import AvishanTranslatable
 
@@ -163,9 +164,8 @@ class AvishanModel(models.Model):
                 if value is None:
                     dicted[field.name] = None
                 elif isinstance(field, models.DateField):
-                    from avishan_config import AvishanConfig
                     try:
-                        if AvishanConfig.USE_JALALI_DATETIME:
+                        if get_avishan_config().USE_JALALI_DATETIME:
                             dicted[field.name] = BchDatetime(value).to_dict(full=True)
                         else:
                             if value is None:
@@ -379,9 +379,8 @@ class AvishanModel(models.Model):
     @staticmethod
     def get_app_names() -> List[str]:
         from django.apps import apps
-        from avishan_config import AvishanConfig
         return [key.name for key in apps.get_app_configs() if
-                key.name in AvishanConfig.MONITORED_APPS_NAMES]
+                key.name in get_avishan_config().MONITORED_APPS_NAMES]
 
     @classmethod
     def get_fields(cls) -> List[models.Field]:
@@ -508,7 +507,6 @@ class AvishanModel(models.Model):
     # todo 0.2.2: check None amount for choice added fields
     def get_data_from_field(self, field: models.Field, string_format_dates: bool = False):
         from avishan.exceptions import ErrorMessageException
-        from avishan_config import AvishanConfig
         if field.choices is not None:
             for k, v in field.choices:
                 if k == self.__getattribute__(field.name):
@@ -520,11 +518,11 @@ class AvishanModel(models.Model):
         if string_format_dates:
             if string_format_dates:
                 if isinstance(field, models.DateTimeField):
-                    if AvishanConfig.USE_JALALI_DATETIME:
+                    if get_avishan_config().USE_JALALI_DATETIME:
                         return BchDatetime(self.__getattribute__(field.name)).to_str('%Y/%m/%d %H:%M:%S')
                     return self.__getattribute__(field.name).strftime("%Y/%m/%d %H:%M:%S")
                 if isinstance(field, models.DateField):
-                    if AvishanConfig.USE_JALALI_DATETIME:
+                    if get_avishan_config().USE_JALALI_DATETIME:
                         return BchDatetime(self.__getattribute__(field.name)).to_str('%Y/%m/%d')
                     return self.__getattribute__(field.name).strftime("%Y/%m/%d")
                 if isinstance(field, models.TimeField):
@@ -681,12 +679,11 @@ class Email(AvishanModel):
 
     @staticmethod
     def send_bulk_mail(subject: str, message: str, recipient_list: list, html_message: str = None):
-        from avishan_config import AvishanConfig
         from django.core.mail import send_mail
         if html_message is not None:
-            send_mail(subject, message, AvishanConfig.EMAIL_SENDER_ADDRESS, recipient_list, html_message)
+            send_mail(subject, message, get_avishan_config().EMAIL_SENDER_ADDRESS, recipient_list, html_message)
         else:
-            send_mail(subject, message, AvishanConfig.EMAIL_SENDER_ADDRESS, recipient_list)
+            send_mail(subject, message, get_avishan_config().EMAIL_SENDER_ADDRESS, recipient_list)
 
     def send_mail(self, subject: str, message: str, html_message: str = None):
         self.send_bulk_mail(subject, message, [self.address], html_message)
@@ -752,11 +749,11 @@ class EmailVerification(AvishanModel):
     @staticmethod
     def create_verification(email: Email) -> 'EmailVerification':
         from avishan.exceptions import ErrorMessageException
-        from avishan_config import AvishanConfig
 
         if hasattr(email, 'verification'):
             previous = email.verification
-            if BchDatetime() - BchDatetime(previous.verification_date) < AvishanConfig.EMAIL_VERIFICATION_GAP_SECONDS:
+            if BchDatetime() - BchDatetime(
+                    previous.verification_date) < get_avishan_config().EMAIL_VERIFICATION_GAP_SECONDS:
                 raise ErrorMessageException(AvishanTranslatable(
                     EN='Verification Code sent recently, Please try again later'
                 ), status_code=status.HTTP_401_UNAUTHORIZED)
@@ -766,14 +763,13 @@ class EmailVerification(AvishanModel):
     @staticmethod
     def check_email(email: Email, code: str) -> bool:
         from avishan.exceptions import ErrorMessageException
-        from avishan_config import AvishanConfig
         try:
             item = EmailVerification.get(email=email)
         except EmailVerification.DoesNotExist:
             raise ErrorMessageException(AvishanTranslatable(
                 EN=f'Email Verification not found for email {email}'
             ))
-        if BchDatetime() - BchDatetime(item.verification_date) > AvishanConfig.EMAIL_VERIFICATION_VALID_SECONDS:
+        if BchDatetime() - BchDatetime(item.verification_date) > get_avishan_config().EMAIL_VERIFICATION_VALID_SECONDS:
             item.remove()
             raise ErrorMessageException(AvishanTranslatable(
                 EN='Code Expired, Request new one'
@@ -781,10 +777,10 @@ class EmailVerification(AvishanModel):
         if item.verification_code == code:
             item.remove()
             return True
-        if len(item.tried_codes.splitlines()) > AvishanConfig.EMAIL_VERIFICATION_TRIES_COUNT - 1:
+        if len(item.tried_codes.splitlines()) > get_avishan_config().EMAIL_VERIFICATION_TRIES_COUNT - 1:
             item.remove()
             raise ErrorMessageException(AvishanTranslatable(
-                EN=f'Incorrect code repeated {AvishanConfig.EMAIL_VERIFICATION_TRIES_COUNT} times, request new code'
+                EN=f'Incorrect code repeated {get_avishan_config().EMAIL_VERIFICATION_TRIES_COUNT} times, request new code'
             ))
         item.tried_codes += f"{code}\n"
         item.save()
@@ -794,11 +790,10 @@ class EmailVerification(AvishanModel):
 
     @staticmethod
     def create_verification_code() -> str:
-        from avishan_config import AvishanConfig
         import random
         return str(random.randint(
-            10 ** AvishanConfig.EMAIL_VERIFICATION_CODE_LENGTH,
-            10 ** (AvishanConfig.EMAIL_VERIFICATION_CODE_LENGTH + 1) - 1)
+            10 ** get_avishan_config().EMAIL_VERIFICATION_CODE_LENGTH,
+            10 ** (get_avishan_config().EMAIL_VERIFICATION_CODE_LENGTH + 1) - 1)
         )
 
 
@@ -814,16 +809,13 @@ class Phone(AvishanModel):
         pass  # todo
 
     def send_verification_sms(self, code):
-        from avishan_config import AvishanConfig
-        self.send_template_sms(AvishanConfig.SMS_SIGNIN_TEMPLATE, token=code)
+        self.send_template_sms(get_avishan_config().SMS_SIGNIN_TEMPLATE, token=code)
 
     def send_signup_verification_sms(self, code):
-        from avishan_config import AvishanConfig
-        self.send_template_sms(AvishanConfig.SMS_SIGNUP_TEMPLATE, token=code)
+        self.send_template_sms(get_avishan_config().SMS_SIGNUP_TEMPLATE, token=code)
 
     def send_template_sms(self, template_name, **kwargs):
-        from avishan_config import AvishanConfig
-        url = "https://api.kavenegar.com/v1/" + AvishanConfig.KAVENEGAR_API_TOKEN + "/verify/lookup.json"
+        url = "https://api.kavenegar.com/v1/" + get_avishan_config().KAVENEGAR_API_TOKEN + "/verify/lookup.json"
         querystring = {**{"receptor": self.number, "template": template_name}, **kwargs}
         requests.request("GET", url, data="", headers={}, params=querystring)
 
@@ -901,11 +893,11 @@ class PhoneVerification(AvishanModel):
     @staticmethod
     def create_verification(phone: Phone) -> 'PhoneVerification':
         from avishan.exceptions import ErrorMessageException
-        from avishan_config import AvishanConfig
 
         if hasattr(phone, 'verification'):
             previous = phone.verification
-            if BchDatetime() - BchDatetime(previous.verification_date) < AvishanConfig.PHONE_VERIFICATION_GAP_SECONDS:
+            if BchDatetime() - BchDatetime(
+                    previous.verification_date) < get_avishan_config().PHONE_VERIFICATION_GAP_SECONDS:
                 raise ErrorMessageException(AvishanTranslatable(
                     EN='Verification Code sent recently, Please try again later'
                 ), status_code=status.HTTP_401_UNAUTHORIZED)
@@ -915,14 +907,13 @@ class PhoneVerification(AvishanModel):
     @staticmethod
     def check_phone(phone: Phone, code: str) -> bool:
         from avishan.exceptions import ErrorMessageException
-        from avishan_config import AvishanConfig
         try:
             item = PhoneVerification.get(phone=phone)
         except PhoneVerification.DoesNotExist:
             raise ErrorMessageException(AvishanTranslatable(
                 EN=f'Phone Verification not found for phone {phone}'
             ))
-        if BchDatetime() - BchDatetime(item.verification_date) > AvishanConfig.PHONE_VERIFICATION_VALID_SECONDS:
+        if BchDatetime() - BchDatetime(item.verification_date) > get_avishan_config().PHONE_VERIFICATION_VALID_SECONDS:
             item.remove()
             raise ErrorMessageException(AvishanTranslatable(
                 EN='Code Expired, Request new one'
@@ -930,10 +921,10 @@ class PhoneVerification(AvishanModel):
         if item.verification_code == code:
             item.remove()
             return True
-        if len(item.tried_codes.splitlines()) > AvishanConfig.PHONE_VERIFICATION_TRIES_COUNT - 1:
+        if len(item.tried_codes.splitlines()) > get_avishan_config().PHONE_VERIFICATION_TRIES_COUNT - 1:
             item.remove()
             raise ErrorMessageException(AvishanTranslatable(
-                EN=f'Incorrect Code repeated {AvishanConfig.PHONE_VERIFICATION_TRIES_COUNT} times, request new code'
+                EN=f'Incorrect Code repeated {get_avishan_config().PHONE_VERIFICATION_TRIES_COUNT} times, request new code'
             ))
         item.tried_codes += f"{code}\n"
         item.save()
@@ -943,11 +934,10 @@ class PhoneVerification(AvishanModel):
 
     @staticmethod
     def create_verification_code() -> str:
-        from avishan_config import AvishanConfig
         import random
         return str(random.randint(
-            10 ** AvishanConfig.PHONE_VERIFICATION_CODE_LENGTH,
-            10 ** (AvishanConfig.PHONE_VERIFICATION_CODE_LENGTH + 1) - 1)
+            10 ** get_avishan_config().PHONE_VERIFICATION_CODE_LENGTH,
+            10 ** (get_avishan_config().PHONE_VERIFICATION_CODE_LENGTH + 1) - 1)
         )
 
 
@@ -1123,18 +1113,18 @@ class OTPAuthentication(AuthenticationType):
 
     @staticmethod
     def create_otp_code() -> str:
-        from avishan_config import AvishanConfig
-        return str(random.randint(10 ** (AvishanConfig.OTP_CODE_LENGTH - 1), 10 ** AvishanConfig.OTP_CODE_LENGTH - 1))
+        return str(random.randint(10 ** (get_avishan_config().PHONE_VERIFICATION_CODE_LENGTH - 1),
+                                  10 ** get_avishan_config().PHONE_VERIFICATION_CODE_LENGTH - 1))
 
     def check_verification_code(self, entered_code: str) -> bool:
         from avishan.exceptions import ErrorMessageException
-        from avishan_config import AvishanConfig
         if self.code is None:
             raise ErrorMessageException(AvishanTranslatable(
                 EN='Code not found for this account',
                 FA='برای این حساب کدی پیدا نشد'
             ))
-        if (BchDatetime() - BchDatetime(self.date_sent)).total_seconds() > AvishanConfig.PHONE_OTP_CODE_VALID_SECONDS:
+        if (BchDatetime() - BchDatetime(
+                self.date_sent)).total_seconds() > get_avishan_config().PHONE_VERIFICATION_VALID_SECONDS:
             self.code = None
             self.save()
             raise ErrorMessageException(AvishanTranslatable(

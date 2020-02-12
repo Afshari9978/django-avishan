@@ -1,9 +1,8 @@
 from django.urls import path
 
-from avishan.views.function_based import avishan_model_store, avishan_model_details, avishan_model_function_caller, \
-    avishan_item_function_caller, avishan_hash_password, avishan_doc
+from avishan.views.function_based import avishan_hash_password, avishan_doc
 
-from avishan.views.class_based import AvishanModelApiView, AvishanApiView, AvishanView
+from avishan.views.class_based import AvishanModelApiView, AvishanView
 
 urlpatterns = [
     path('api/av1/hash_password/<str:password>', avishan_hash_password),

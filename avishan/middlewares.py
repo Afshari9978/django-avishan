@@ -6,12 +6,6 @@ from django.core.handlers.wsgi import WSGIRequest
 from django.http import JsonResponse
 
 from avishan.exceptions import AvishanException, save_traceback
-from avishan.libraries.dbml import create_dbml_file
-
-try:
-    from avishan_admin.avishan_config import AvishanConfig as PanelAvishanConfig
-except ImportError:
-    pass
 
 
 class Wrapper:
