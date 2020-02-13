@@ -6,6 +6,7 @@ from django.core.handlers.wsgi import WSGIRequest
 from django.http import JsonResponse
 
 from avishan.exceptions import AvishanException, save_traceback
+from avishan.libraries.openapi3.classes import OpenApi
 
 
 class Wrapper:

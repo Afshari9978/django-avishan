@@ -9,6 +9,7 @@ import stringcase
 
 
 def request_common_parameters() -> List[dict]:
+    # done
     return [{
         "name": 'lang',
         "in": 'query',

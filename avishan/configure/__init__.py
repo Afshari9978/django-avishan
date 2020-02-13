@@ -64,22 +64,30 @@ class AvishanConfigFather:
         EN = 'EN'
 
     MONITORED_APPS_NAMES: List[str] = []
-    NOT_MONITORED_STARTS = []
-    JWT_KEY = ''
+    NOT_MONITORED_STARTS: List[str] = ['/admin', '/static', '/media', '/favicon.ico']
+    JWT_KEY: str = None
     KAVENEGAR_API_TOKEN: str = None
-    USE_JALALI_DATETIME: bool = True
+    USE_JALALI_DATETIME: bool = False
     LANGUAGE = LANGUAGES.EN
     EMAIL_SENDER_ADDRESS: str = None
-    EMAIL_VERIFICATION_GAP_SECONDS = 10
-    EMAIL_VERIFICATION_VALID_SECONDS = 200
+    EMAIL_VERIFICATION_GAP_SECONDS = 5 * 60
+    EMAIL_VERIFICATION_VALID_SECONDS = 30 * 60
     EMAIL_VERIFICATION_TRIES_COUNT = 3
-    EMAIL_VERIFICATION_CODE_LENGTH = 4
+    EMAIL_VERIFICATION_CODE_LENGTH = 6
     SMS_SIGNIN_TEMPLATE = 'signin'
     SMS_SIGNUP_TEMPLATE = 'signup'
     PHONE_VERIFICATION_GAP_SECONDS = 10
     PHONE_VERIFICATION_VALID_SECONDS = 200
     PHONE_VERIFICATION_TRIES_COUNT = 1
     PHONE_VERIFICATION_CODE_LENGTH = 4
+
+    # open api
+    REQUEST_COMMON_URL_PARAMETERS = [{
+        "name": 'lang',
+        "in": 'query',
+        "description": 'set language for this request',
+        "required": False,
+    }]
 
     def check(self):
         pass
