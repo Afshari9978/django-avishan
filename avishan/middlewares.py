@@ -49,6 +49,9 @@ class Wrapper:
             save_traceback()
             AvishanException(e)
 
+        if current_request['language'] is None:
+            current_request['language'] = get_avishan_config().LANGUAGE
+
         try:
             """
             If avishan_admin installed and check method found, run it.
@@ -128,7 +131,7 @@ class Wrapper:
         current_request['status_code'] = 200
         current_request['exception'] = None
         current_request['traceback'] = None
-        current_request['lang'] = None
+        current_request['language'] = None
         current_request['request_track_object'] = None
         current_request['context'] = {}
         current_request['messages'] = {

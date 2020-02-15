@@ -16,18 +16,12 @@ class AvishanTranslatable:
             self.__setattr__(key.upper(), value)
 
     def __str__(self):
+        from avishan import current_request
+        from avishan.exceptions import ErrorMessageException
+
         try:
-            from avishan import current_request
-            if self.__dict__[current_request['lang']] is not None:
-                return self.__dict__[current_request['lang']]
+            if self.__dict__[current_request['language']] is not None:
+                return self.__dict__[current_request['language']]
             raise ValueError
         except:
-            try:
-                if self.__dict__[get_avishan_config().LANGUAGE] is not None:
-                    return self.__dict__[get_avishan_config().LANGUAGE]
-                raise ValueError
-            except:
-                if len(self.__dict__.keys()) > 0:
-                    return list(self.__dict__.values())[0]
-                from avishan.exceptions import ErrorMessageException
-                raise ErrorMessageException(str(AvishanTranslatable(EN='Not translated string', FA='رشته ترجمه نشده')))
+            raise ErrorMessageException(str(AvishanTranslatable(EN='Not translated string', FA='رشته ترجمه نشده')))

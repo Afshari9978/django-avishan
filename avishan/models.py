@@ -5,7 +5,7 @@ import requests
 from django.db.models import NOT_PROVIDED
 
 from avishan import current_request
-from avishan.configure import get_avishan_config
+from avishan.configure import get_avishan_config, AvishanConfigFather
 from avishan.misc import status
 from avishan.misc.translation import AvishanTranslatable
 
@@ -550,6 +550,7 @@ class BaseUser(AvishanModel):
 
     """Only active users can use system. This field checks on every request"""
     is_active = models.BooleanField(default=True, blank=True)
+    language = models.CharField(max_length=255, default=AvishanConfigFather.LANGUAGES.EN)
 
     """
     The first time user attracted with system. This will set on the first models.authentication.BaseUser model creation.
@@ -1413,12 +1414,12 @@ class TranslatableChar(AvishanModel):
 
         kwargs = {}
         if auto:
-            if current_request['lang'] is None:
+            if current_request['language'] is None:
                 raise ErrorMessageException(AvishanTranslatable(
                     EN='language not set',
                     FA='زبان تنظیم نشده است'
                 ))
-            kwargs[current_request['lang']] = auto
+            kwargs[current_request['language']] = auto
         if en is not None:
             en = str(en)
             if len(en) == 0:
@@ -1429,5 +1430,14 @@ class TranslatableChar(AvishanModel):
                 fa = None
         return super().create(en=en, fa=fa)
 
+    def to_dict(self, exclude_list: List[Union[models.Field, str]] = ()) -> str:
+        return str(self)
+
     def __str__(self):
-        return AvishanTranslatable(EN=self.en, FA=self.fa)
+        en = self.en
+        fa = self.fa
+        if en is None:
+            en = fa
+        if fa is None:
+            fa = en
+        return AvishanTranslatable(EN=en, FA=fa)

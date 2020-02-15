@@ -305,6 +305,8 @@ def populate_current_request(login_with: 'AuthenticationType'):
     current_request['user_group'] = login_with.user_user_group.user_group
     current_request['user_user_group'] = login_with.user_user_group
     current_request['authentication_object'] = login_with
+    if current_request['language'] is None:
+        current_request['language'] = login_with.user_user_group.base_user.language
     current_request['add_token'] = True
 
 
