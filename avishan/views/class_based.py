@@ -147,7 +147,7 @@ class AvishanApiView(AvishanView):
 
 class AvishanTemplateView(AvishanView):
     is_api = False
-    template_name: str = None
+    template_address: str = None
 
     def setup(self, request, *args, **kwargs):
         super().setup(request, *args, **kwargs)
@@ -168,8 +168,10 @@ class AvishanTemplateView(AvishanView):
             except:
                 self.current_request['request'].data = {}
 
-        super().dispatch(request, *args, **kwargs)
-        return render(request=self.request, template_name=self.template_name, context=self.context)
+        result = super().dispatch(request, *args, **kwargs)
+        if result is None:
+            return render(self.request, self.template_address, self.context)
+        return result
 
 
 class AvishanModelApiView(AvishanApiView):

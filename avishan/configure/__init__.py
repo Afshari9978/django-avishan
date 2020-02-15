@@ -5,6 +5,7 @@ from django.core.management import BaseCommand
 
 # no import from avishan here
 
+
 class AvishanConfigure:
 
     @staticmethod
@@ -74,12 +75,17 @@ class AvishanConfigFather:
     EMAIL_VERIFICATION_VALID_SECONDS = 30 * 60
     EMAIL_VERIFICATION_TRIES_COUNT = 3
     EMAIL_VERIFICATION_CODE_LENGTH = 6
-    SMS_SIGNIN_TEMPLATE = 'signin'
-    SMS_SIGNUP_TEMPLATE = 'signup'
+    SMS_SIGN_IN_TEMPLATE = 'signin'
+    SMS_SIGN_UP_TEMPLATE = 'signup'
     PHONE_VERIFICATION_GAP_SECONDS = 10
     PHONE_VERIFICATION_VALID_SECONDS = 200
     PHONE_VERIFICATION_TRIES_COUNT = 1
     PHONE_VERIFICATION_CODE_LENGTH = 4
+
+    PANEL_ROOT = 'panel'
+    PANEL_OTP_LOGIN = False
+    PANEL_LOGIN_CLASS = 'PhoneOtpAuthenticate'
+    PANEL_LOGIN_USER_GROUP_TITLE = 'admin'
 
     # open api
     REQUEST_COMMON_URL_PARAMETERS = [{
@@ -89,7 +95,8 @@ class AvishanConfigFather:
         "required": False,
     }]
 
-    def check(self):
+    @classmethod
+    def check(cls):
         pass
 
 

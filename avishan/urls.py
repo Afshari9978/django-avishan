@@ -3,6 +3,8 @@ from django.urls import path
 from avishan.views.function_based import avishan_hash_password, avishan_doc
 
 from avishan.views.class_based import AvishanModelApiView, AvishanView
+from avishan.configure import get_avishan_config
+from avishan.views.panel_views import AvishanPanelView, AvishanPanelLoginView
 
 urlpatterns = [
     path('api/av1/hash_password/<str:password>', avishan_hash_password),
@@ -14,5 +16,7 @@ urlpatterns = [
         AvishanModelApiView.as_view()
     ),
     path('api/doc', avishan_doc),
-    path('test_cbv', AvishanView.as_view())
+    path('test_cbv', AvishanView.as_view()),
+    path(f'{get_avishan_config().PANEL_ROOT}', AvishanPanelView.as_view()),
+    path(f'{get_avishan_config().PANEL_ROOT}/login', AvishanPanelLoginView.as_view()),
 ]

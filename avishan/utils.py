@@ -137,7 +137,7 @@ def discard_monitor(url: str) -> bool:
     :param url: request url. If straightly catch from request.path, it comes like: /admin, /api/v1
     :return:
     """
-    if url.startswith(get_avishan_config().NOT_MONITORED_STARTS):
+    if url.startswith(tuple(get_avishan_config().NOT_MONITORED_STARTS)):
         return True
     return False
 
@@ -242,7 +242,10 @@ def encode_token(authentication_object: 'AuthenticationType') -> Optional[str]:
         'exp': (now + timedelta(
             seconds=authentication_object.user_user_group.user_group.token_valid_seconds)).to_unix_timestamp(),
         'crt': now.to_unix_timestamp(),
-        'lgn': BchDatetime(authentication_object.last_login).to_unix_timestamp()
+        'lgn':
+            BchDatetime(authentication_object.last_login).to_unix_timestamp()
+            if authentication_object.last_login
+            else now.to_unix_timestamp()
     }
     return jwt.encode(token_data,
                       get_avishan_config().JWT_KEY,

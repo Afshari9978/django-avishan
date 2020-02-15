@@ -586,8 +586,15 @@ class UserGroup(AvishanModel):
     """Check if this group users can access to their specific space in this ways"""
     authenticate_with_email_password = models.BooleanField(default=False)
     authenticate_with_phone_password = models.BooleanField(default=False)
+    authenticate_with_phone_otp = models.BooleanField(default=False)
 
-    private_fields = [token_valid_seconds, 'id', authenticate_with_email_password, authenticate_with_phone_password]
+    private_fields = [
+        token_valid_seconds,
+        'id',
+        authenticate_with_email_password,
+        authenticate_with_phone_password,
+        authenticate_with_phone_otp
+    ]
 
     def add_user_to_user_group(self, base_user: BaseUser) -> 'UserUserGroup':
         """
@@ -809,10 +816,10 @@ class Phone(AvishanModel):
         pass  # todo
 
     def send_verification_sms(self, code):
-        self.send_template_sms(get_avishan_config().SMS_SIGNIN_TEMPLATE, token=code)
+        self.send_template_sms(get_avishan_config().SMS_SIGN_IN_TEMPLATE, token=code)
 
     def send_signup_verification_sms(self, code):
-        self.send_template_sms(get_avishan_config().SMS_SIGNUP_TEMPLATE, token=code)
+        self.send_template_sms(get_avishan_config().SMS_SIGN_UP_TEMPLATE, token=code)
 
     def send_template_sms(self, template_name, **kwargs):
         url = "https://api.kavenegar.com/v1/" + get_avishan_config().KAVENEGAR_API_TOKEN + "/verify/lookup.json"
@@ -964,18 +971,22 @@ class AuthenticationType(AvishanModel):
         self.save()
         populate_current_request(self)
 
-
-class KeyValueAuthentication(AuthenticationType):
-    hashed_password = models.CharField(max_length=255, blank=True, null=True, default=None)
-
     @classmethod
     def key_field(cls) -> models.ForeignKey:
         raise NotImplementedError()
+
+
+class KeyValueAuthentication(AuthenticationType):
+    hashed_password = models.CharField(max_length=255, blank=True, null=True, default=None)
 
     # todo 0.2.2: bara verification che bokonim?
 
     class Meta:
         abstract = True
+
+    @classmethod
+    def key_field(cls) -> models.ForeignKey:
+        raise NotImplementedError()
 
     @staticmethod
     def _hash_password(password: str) -> str:
@@ -1099,7 +1110,7 @@ class PhonePasswordAuthenticate(KeyValueAuthentication):
         return self.get_field('phone')
 
 
-class OTPAuthentication(AuthenticationType):
+class OtpAuthentication(AuthenticationType):
     code = models.CharField(max_length=255, blank=True, null=True)
     date_sent = models.DateTimeField(null=True, blank=True, default=None)
     tried_codes = models.TextField(blank=True, default="")
@@ -1133,7 +1144,7 @@ class OTPAuthentication(AuthenticationType):
             ))
 
         if self.code != entered_code:
-            self.tried_codes += f"{entered_code} - {BchDatetime().to_datetime()}\n"
+            self.tried_codes += f"{BchDatetime().to_datetime()} -> {entered_code}\n"
             self.save()
             return False
 
@@ -1143,7 +1154,7 @@ class OTPAuthentication(AuthenticationType):
         return True
 
     @classmethod
-    def create_new(cls, user_user_group: UserUserGroup, key: str) -> 'PhoneOTPAuthenticate':
+    def create_new(cls, user_user_group: UserUserGroup, key: str) -> 'PhoneOtpAuthenticate':
         from avishan.exceptions import AuthException
         try:
             key_item = cls.key_field().related_model.get(key)
@@ -1160,14 +1171,14 @@ class OTPAuthentication(AuthenticationType):
             cls.key_field().name: key_item
         })
 
-    def verify_account(self) -> Union['OTPAuthentication', 'PhoneOTPAuthenticate']:
+    def verify_account(self) -> Union['OtpAuthentication', 'PhoneOtpAuthenticate']:
         self.send_otp_code()
 
         return self
 
     @classmethod
     def check_authentication(cls, key: str, entered_code: str, user_group: UserGroup) -> Tuple[
-        'PhoneOTPAuthenticate', bool]:
+        'PhoneOtpAuthenticate', bool]:
         from avishan.exceptions import AuthException
         try:
             item = cls.find(key, user_group)[0]
@@ -1191,7 +1202,7 @@ class OTPAuthentication(AuthenticationType):
         raise NotImplementedError()
 
     @classmethod
-    def find(cls, key: str, user_group: UserGroup = None) -> List['PhoneOTPAuthenticate']:
+    def find(cls, key: str, user_group: UserGroup = None) -> List['PhoneOtpAuthenticate']:
         key = cls.key_field().related_model.validate_signature(key)
         kwargs = {}
         if user_group:
@@ -1203,8 +1214,34 @@ class OTPAuthentication(AuthenticationType):
 
         return cls.objects.filter(**kwargs)
 
+    @classmethod
+    def start_challenge(cls, key: str, user_group: UserGroup) -> Union['OtpAuthentication', 'PhoneOtpAuthenticate']:
+        key = cls.key_field().related_model.validate_signature(key)
+        found = cls.find(key)
+        exact = None
+        same_user = None
+        for item in found:
+            if item.user_user_group.user_group == user_group:
+                exact = item
+                break
+            else:
+                same_user = item
+        if exact:
+            return exact.verify_account()
+        return cls.create_new(
+            user_user_group=UserUserGroup.create(
+                user_group=user_group,
+                base_user=same_user.user_user_group.base_user if same_user else None),
+            key=key
+        ).verify_account()
 
-class PhoneOTPAuthenticate(OTPAuthentication):
+    @classmethod
+    def complete_challenge(cls, key: str, code: str, user_group: UserGroup) -> \
+            Union['OtpAuthentication', 'PhoneOtpAuthenticate']:
+        return cls.check_authentication(key, code, user_group)[0]
+
+
+class PhoneOtpAuthenticate(OtpAuthentication):
     phone = models.ForeignKey(Phone, on_delete=models.CASCADE, related_name='otp_authenticates')
 
     @classmethod
