@@ -208,13 +208,6 @@ class AvishanModel(models.Model):
         if 'is_api' in current_request.keys() and not current_request['is_api']:
             kwargs = cls._clean_form_post(kwargs)
 
-        delete_list = []
-        for key, value in kwargs.items():
-            if isinstance(value, str) and len(value) == 0:
-                delete_list.append(key)
-        for key in delete_list:
-            del kwargs[key]
-
         for field in cls.get_full_fields():
             """Check exists"""
             if cls.is_field_readonly(field):

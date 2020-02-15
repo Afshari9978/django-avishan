@@ -79,14 +79,18 @@ class ErrorMessageException(AvishanException):
                  status_code: int = status.HTTP_400_BAD_REQUEST):
         super().__init__(status_code=status_code)
         message = str(message)
+        # add_error_message_to_response(
+        #     body=message if message else AvishanTranslatable(
+        #         EN='Error details not provided',
+        #         FA='توضیحات خطا ارائه نشده').__str__(),
+        #     title=AvishanTranslatable(
+        #         EN='Error',
+        #         FA='خطا'
+        #     ).__str__()
+        # )
         add_error_message_to_response(
-            body=message if message else AvishanTranslatable(
-                EN='Error details not provided',
-                FA='توضیحات خطا ارائه نشده').__str__(),
-            title=AvishanTranslatable(
-                EN='Error',
-                FA='خطا'
-            ).__str__()
+            body=message if message else 'Error details not provided',
+            title='Error'
         )
 
 
