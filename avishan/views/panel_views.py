@@ -8,7 +8,6 @@ from avishan.exceptions import ErrorMessageException
 from avishan.misc.translation import AvishanTranslatable
 from avishan.models import AvishanModel, AuthenticationType, OtpAuthentication, KeyValueAuthentication, UserGroup, Phone
 from avishan.views.class_based import AvishanTemplateView
-from core.models import Employee
 
 
 class AvishanPanelView(AvishanTemplateView):
