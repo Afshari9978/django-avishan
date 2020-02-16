@@ -1,5 +1,6 @@
 import random
-from typing import List, Type, Union, Tuple
+from inspect import Parameter
+from typing import List, Type, Union, Tuple, Dict
 
 import requests
 from django.db.models import NOT_PROVIDED
@@ -21,6 +22,8 @@ class AvishanModel(models.Model):
     # todo 0.2.0 relation on_delete will call our remove() ?
     class Meta:
         abstract = True
+
+    UNCHANGED = '__UNCHANGED__'
 
     """
     Models default settings
@@ -95,6 +98,14 @@ class AvishanModel(models.Model):
         return created
 
     def update(self, **kwargs):
+
+        unchanged_list = []
+        for key, value in kwargs.items():
+            if value == self.UNCHANGED:
+                unchanged_list.append(key)
+        for key in unchanged_list:
+            del kwargs[key]
+
         base_kwargs, many_to_many_kwargs, _ = self.__class__._clean_model_data_kwargs(**kwargs)
         # todo 0.2.3: check for change. if not changed, dont update
         for key, value in base_kwargs.items():
@@ -114,6 +125,13 @@ class AvishanModel(models.Model):
         temp = self.to_dict()
         self.delete()
         return temp
+
+    @classmethod
+    def update_properties(cls) -> Dict[str, Parameter]:
+        from avishan.libraries.openapi3 import get_functions_properties
+        data = dict(get_functions_properties(getattr(cls, 'update')))
+        del data['self']
+        return data
 
     @classmethod
     def search(cls, query_set: models.QuerySet, search_text: str = None) -> models.QuerySet:

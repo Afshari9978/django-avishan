@@ -221,9 +221,10 @@ class AvishanModelApiView(AvishanApiView):
             self.response = {**self.model_function(**self.request.data), **self.response}
 
     def put(self, request, *args, **kwargs):
-        self.response[self.model.class_snake_case_name()] = self.model_item.update(
-            **request.data[self.model.class_snake_case_name()]
-        ).to_dict()
+
+        request_data = request.data[self.model.class_snake_case_name()].copy()
+
+        self.response[self.model.class_snake_case_name()] = self.model_item.update(**request_data).to_dict()
 
     def delete(self, request, *args, **kwargs):
         self.response[self.model.class_snake_case_name()] = self.model_item.remove()
