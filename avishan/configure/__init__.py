@@ -2,7 +2,6 @@ from typing import Union, Type, List
 
 from django.core.management import BaseCommand
 
-
 # no import from avishan here
 
 
@@ -98,6 +97,10 @@ class AvishanConfigFather:
     @classmethod
     def check(cls):
         pass
+
+    @classmethod
+    def get_otp_users(cls) -> List[Type]:
+        return []
 
 
 def get_avishan_config() -> Union[Type[AvishanConfigFather]]:

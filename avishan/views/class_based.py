@@ -8,6 +8,7 @@ from django.views import View
 
 from avishan import current_request
 from avishan.exceptions import ErrorMessageException, AvishanException, AuthException
+from avishan.libraries.openapi3.classes import ApiDocumentation
 from avishan.misc import status
 from avishan.misc.translation import AvishanTranslatable
 from avishan.models import AvishanModel, RequestTrack
@@ -17,6 +18,7 @@ class AvishanView(View):
     authenticate: bool = True
     track_it: bool = False
     is_api: bool = None
+    documentation = None
 
     # todo can override http_method_not_allowed method
     # todo implement time logs here
@@ -89,10 +91,9 @@ class AvishanView(View):
         if self.current_request['exception']:
             return
 
-        if self.authenticate and not self.is_authenticated():
-            raise AuthException(AuthException.ACCESS_DENIED)
-
         try:
+            if self.authenticate and not self.is_authenticated():
+                raise AuthException(AuthException.ACCESS_DENIED)
             self.current_request['view_start_time'] = datetime.datetime.now()
             result = super().dispatch(request, *args, **kwargs)
             self.current_request['view_end_time'] = datetime.datetime.now()
@@ -179,6 +180,13 @@ class AvishanModelApiView(AvishanApiView):
     model: Type[AvishanModel] = None
     model_item: AvishanModel = None
     model_function: Callable = None
+    documentation = True
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.documentation = ApiDocumentation()
+        for model in AvishanModel.get_non_abstract_models():
+            pass
 
     def setup(self, request, *args, **kwargs):
         super().setup(request, *args, **kwargs)

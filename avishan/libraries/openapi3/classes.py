@@ -1,4 +1,4 @@
-from typing import List, Union, Type, Optional
+from typing import List, Union, Type, Optional, Tuple
 
 from django.db import models
 
@@ -6,14 +6,33 @@ from avishan.configure import get_avishan_config
 from avishan.models import AvishanModel
 
 
+class ApiDocumentation:
+    paths: List[dict] = []
+
+    def add_get_path(self, url: str):
+        pass
+
+    def add_post_path(self, url: str):
+        pass
+
+    def add_put_path(self, url: str):
+        pass
+
+    def add_delete_path(self, url: str):
+        pass
+
+
 class OpenApi:
-    def __init__(self, api_version: str, api_title: str, open_api_version: str = "3.0.0"):
+    def __init__(self, api_version: str, api_title: str, open_api_version: str = "3.0.0", api_description: str = None,
+                 servers: Tuple[str] = ()):
         self.api_version = api_version
         self.api_title = api_title
+        self.api_description = api_description
+        self.servers = servers
         self.open_api_version = open_api_version
         self.models: List[Type[AvishanModel]] = []
         self.schemas = self.create_schemas()
-        a = 1
+        # todo security
 
     @staticmethod
     def request_common_url_parameters() -> List[dict]:
@@ -34,7 +53,7 @@ class OpenApi:
         return data
 
     def export_json(self) -> dict:
-        return {
+        data = {
             'openapi': self.open_api_version,
             'info': {
                 'version': self.api_version,
@@ -45,6 +64,11 @@ class OpenApi:
             },
             'paths': {}
         }
+        if self.api_description:
+            data['info']['description'] = self.api_description
+        if len(self.servers) > 0:
+            data['servers'] = [{'url': item} for item in self.servers]
+        return data
 
 
 class SchemaProperty:
@@ -134,3 +158,112 @@ class Schema:
 
     def __str__(self):
         return self.name
+
+
+class Content:
+    def __init__(self, schema: Schema, type: str):
+        self.schema = schema
+        self.type = type
+
+    def export_json(self) -> dict:
+        return {
+            'schema': self.schema.export_json()
+        }
+
+
+class PathRequest:
+    def __init__(self, required: bool = True, contents: List[Content] = ()):
+        self.required = required
+        self.contents = contents
+
+    def export_json(self) -> dict:
+        data = {
+            'required': self.required,
+        }
+        if len(self.contents) > 0:
+            data['content'] = {}
+        for content in self.contents:
+            data['content'][content.type] = content.export_json()
+        return data
+
+
+class PathResponses:
+    def __init__(self):
+        pass
+
+    def export_json(self) -> dict:
+        pass
+
+
+class PathMethod:
+    method = None
+
+    def __init__(self, summary: str = None, description: str = None, request: PathRequest = None,
+                 responses: List[PathResponses] = None, tags: List[str] = ()):
+        self.request = request
+        if responses is not None and len(responses) == 0:
+            self.responses = None
+        else:
+            self.responses = responses
+
+        self.tags = tags
+        self.summary = summary
+        self.description = description
+
+    def export_json(self) -> dict:
+        # todo added parameters
+        data = {}
+        if self.request:
+            data['requestBody'] = self.request.export_json()
+        if self.responses:
+            data['responses'] = {}
+            for response in self.responses.responses:
+                data['responses'][response.status_code] = response.export_json()
+        if len(self.tags) > 0:
+            data['tags'] = self.tags
+        if self.summary:
+            data['summary'] = self.summary
+        if self.description:
+            data['description'] = self.description
+        return data
+
+
+class PathGetMethod(PathMethod):
+    method = 'get'
+
+    def __init__(self, summary: str = None, description: str = None,
+                 responses: PathResponses = None, tags: List[str] = ()):
+        super().__init__(summary, description, None, responses, tags)
+
+
+class PathPostMethod(PathMethod):
+    method = 'post'
+
+
+class PathPutMethod(PathMethod):
+    method = 'put'
+
+
+class PathDeleteMethod(PathMethod):
+    method = 'delete'
+
+    def __init__(self, summary: str = None, description: str = None,
+                 responses: List[PathResponses] = None, tags: List[str] = ()):
+        super().__init__(summary, description, None, responses, tags)
+
+
+class Path:
+    def __init__(self, url: str, methods: List[PathMethod] = (), description: str = "", parameters: list = None):
+        self.methods = methods
+        self.url = url
+        self.description = description
+        self.parameters = OpenApi.request_common_url_parameters()
+        if parameters:
+            parameters.extend(parameters)
+
+    def export_json(self):
+        data = {}
+        for path_method in self.methods:
+            data[path_method.method] = path_method.export_json()
+
+        return data

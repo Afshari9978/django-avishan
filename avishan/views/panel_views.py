@@ -4,9 +4,9 @@ from django.contrib import messages
 from django.shortcuts import render, redirect
 
 from avishan.configure import get_avishan_config
-from avishan.exceptions import ErrorMessageException
+from avishan.exceptions import ErrorMessageException, AuthException
 from avishan.misc.translation import AvishanTranslatable
-from avishan.models import AvishanModel, AuthenticationType, OtpAuthentication, KeyValueAuthentication, UserGroup, Phone
+from avishan.models import AvishanModel, OtpAuthentication, KeyValueAuthentication, UserGroup, Phone
 from avishan.views.class_based import AvishanTemplateView
 
 
@@ -17,6 +17,12 @@ class AvishanPanelView(AvishanTemplateView):
     def setup(self, request, *args, **kwargs):
         super().setup(request, *args, **kwargs)
         self.context['CONFIG'] = get_avishan_config()
+
+    def dispatch(self, request, *args, **kwargs):
+        try:
+            return super().dispatch(request, *args, **kwargs)
+        except AuthException:
+            return redirect(AvishanPanelLoginView.template_url, permanent=True)
 
     def get(self, request, *args, **kwargs):
         return render(self.request, self.template_address, self.context)
@@ -53,15 +59,17 @@ class AvishanPanelLoginView(AvishanPanelView):
         if 'otp_send' in request.data.keys():
             # todo async it
             # todo age por bood shomare, focus on code
-            try:
-                Employee.get(phone=Phone.get_or_create_phone(request.data['otp_key']))
-            except Employee.DoesNotExist:
-                raise ErrorMessageException(
-                    AvishanTranslatable(
-                        EN='User not found',
-                        FA='کاربری با این شماره پیدا نشد'
+            for model in get_avishan_config().get_otp_users():
+                model: AvishanModel
+                try:
+                    model.get(phone=Phone.get_or_create_phone(request.data['otp_key']))
+                except model.DoesNotExist:
+                    raise ErrorMessageException(
+                        AvishanTranslatable(
+                            EN='User not found',
+                            FA='کاربری با این شماره پیدا نشد'
+                        )
                     )
-                )
             self.login_class.start_challenge(
                 key=request.data['otp_key'],
                 user_group=self.user_group
