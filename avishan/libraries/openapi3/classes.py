@@ -7,10 +7,12 @@ from avishan.models import AvishanModel
 
 
 class ApiDocumentation:
-    paths: List[dict] = []
+    paths: List['Path'] = []
 
-    def add_get_path(self, url: str):
-        pass
+    def add_get_path(self, url: str, summary: str = None, description: str = None, responses: List[
+        'PathResponseGroup'] = ()):
+        path = self.get_or_create_path(url)
+        get_method = PathGetMethod()
 
     def add_post_path(self, url: str):
         pass
@@ -21,54 +23,11 @@ class ApiDocumentation:
     def add_delete_path(self, url: str):
         pass
 
-
-class OpenApi:
-    def __init__(self, api_version: str, api_title: str, open_api_version: str = "3.0.0", api_description: str = None,
-                 servers: Tuple[str] = ()):
-        self.api_version = api_version
-        self.api_title = api_title
-        self.api_description = api_description
-        self.servers = servers
-        self.open_api_version = open_api_version
-        self.models: List[Type[AvishanModel]] = []
-        self.schemas = self.create_schemas()
-        # todo security
-
-    @staticmethod
-    def request_common_url_parameters() -> List[dict]:
-        return get_avishan_config().REQUEST_COMMON_URL_PARAMETERS
-
-    def create_schemas(self) -> List['Schema']:
-        schemas = []
-        for model in AvishanModel.__subclasses__():
-            model: Type[AvishanModel]
-            self.models.append(model)
-            schemas.append(Schema.create_from_model(model))
-        return schemas
-
-    def export_schemas_json(self) -> dict:
-        data = {}
-        for schema in self.schemas:
-            data[schema.name] = schema.export_json()
-        return data
-
-    def export_json(self) -> dict:
-        data = {
-            'openapi': self.open_api_version,
-            'info': {
-                'version': self.api_version,
-                'title': self.api_title
-            },
-            'components': {
-                'schemas': self.export_schemas_json()
-            },
-            'paths': {}
-        }
-        if self.api_description:
-            data['info']['description'] = self.api_description
-        if len(self.servers) > 0:
-            data['servers'] = [{'url': item} for item in self.servers]
-        return data
+    def get_or_create_path(self, url: str) -> 'Path':
+        for path in self.paths:
+            if path.url == url:
+                return path
+        return Path(url=url)
 
 
 class SchemaProperty:
@@ -160,6 +119,14 @@ class Schema:
         return self.name
 
 
+class Component:
+    def __init__(self, schemas: List[Schema]):
+        self.schemas = schemas
+
+    def export_json(self):
+        pass  # todo
+
+
 class Content:
     def __init__(self, schema: Schema, type: str):
         self.schema = schema
@@ -169,6 +136,20 @@ class Content:
         return {
             'schema': self.schema.export_json()
         }
+
+
+class Parameter:
+    def __init__(self, name: str, schema: Schema, where: str = 'query', description: str = None, required: bool = False,
+                 style: str = None):
+        self.name = name
+        self.schema = schema
+        self.where = where
+        self.description = description
+        self.required = required
+        self.style = style
+
+    def export_json(self):
+        pass  # todo
 
 
 class PathRequest:
@@ -187,7 +168,12 @@ class PathRequest:
         return data
 
 
-class PathResponses:
+class PathResponse:
+    def __init__(self):
+        pass
+
+
+class PathResponseGroup:
     def __init__(self):
         pass
 
@@ -199,7 +185,7 @@ class PathMethod:
     method = None
 
     def __init__(self, summary: str = None, description: str = None, request: PathRequest = None,
-                 responses: List[PathResponses] = None, tags: List[str] = ()):
+                 responses: List[PathResponseGroup] = None, tags: List[str] = ()):
         self.request = request
         if responses is not None and len(responses) == 0:
             self.responses = None
@@ -232,7 +218,7 @@ class PathGetMethod(PathMethod):
     method = 'get'
 
     def __init__(self, summary: str = None, description: str = None,
-                 responses: PathResponses = None, tags: List[str] = ()):
+                 responses: PathResponseGroup = None, tags: List[str] = ()):
         super().__init__(summary, description, None, responses, tags)
 
 
@@ -248,7 +234,7 @@ class PathDeleteMethod(PathMethod):
     method = 'delete'
 
     def __init__(self, summary: str = None, description: str = None,
-                 responses: List[PathResponses] = None, tags: List[str] = ()):
+                 responses: List[PathResponseGroup] = None, tags: List[str] = ()):
         super().__init__(summary, description, None, responses, tags)
 
 
@@ -266,4 +252,83 @@ class Path:
         for path_method in self.methods:
             data[path_method.method] = path_method.export_json()
 
+        return data
+
+
+class OpenApi:
+    def __init__(self, api_version: str, api_title: str, open_api_version: str = "3.0.0", api_description: str = None,
+                 servers: Tuple[str] = ()):
+        self.api_version = api_version
+        self.api_title = api_title
+        self.api_description = api_description
+        self.servers = servers
+        self.open_api_version = open_api_version
+        self.models: List[Type[AvishanModel]] = []
+        self.schemas = self.create_schemas_from_models()
+        self.paths = self.create_paths_from_views()
+        # todo security
+
+    @staticmethod
+    def request_common_url_parameters() -> List[dict]:
+        # todo load from dict
+        return get_avishan_config().REQUEST_COMMON_URL_PARAMETERS
+
+    def create_schemas_from_models(self) -> List['Schema']:
+        schemas = []
+        for model in AvishanModel.__subclasses__():
+            model: Type[AvishanModel]
+            self.models.append(model)
+            schemas.append(Schema.create_from_model(model))
+        return schemas
+
+    def create_paths_from_views(self) -> List['Path']:
+        pass  # todo
+
+    def export_schemas_json(self) -> dict:
+        data = {}
+        for schema in self.schemas:
+            data[schema.name] = schema.export_json()
+        return data
+
+    def export_json(self) -> dict:
+        # todo tags
+        """
+        "tags": [
+            {
+              "name": "pet",
+              "description": "Everything about your Pets",
+              "externalDocs": {
+                "description": "Find out more",
+                "url": "http://swagger.io"
+              }
+            },
+            {
+              "name": "store",
+              "description": "Access to Petstore orders"
+            },
+            {
+              "name": "user",
+              "description": "Operations about user",
+              "externalDocs": {
+                "description": "Find out more about our store",
+                "url": "http://swagger.io"
+              }
+            }
+          ]
+        """
+        data = {
+            'openapi': self.open_api_version,
+            'info': {
+                'version': self.api_version,
+                'title': self.api_title
+            },
+            'components': {
+                'schemas': self.export_schemas_json()
+            },
+            'paths': {}
+        }
+        if self.api_description:
+            data['info']['description'] = self.api_description
+        if len(self.servers) > 0:
+            data['servers'] = [{'url': item} for item in self.servers]
         return data

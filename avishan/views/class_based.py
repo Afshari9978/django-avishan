@@ -7,6 +7,7 @@ from django.shortcuts import render
 from django.views import View
 
 from avishan import current_request
+from avishan.configure import get_avishan_config
 from avishan.exceptions import ErrorMessageException, AvishanException, AuthException
 from avishan.libraries.openapi3.classes import ApiDocumentation
 from avishan.misc import status
@@ -179,14 +180,16 @@ class AvishanModelApiView(AvishanApiView):
     authenticate = False
     model: Type[AvishanModel] = None
     model_item: AvishanModel = None
-    model_function: Callable = None
-    documentation = True
+    model_function: Callable = None  # todo these sends model not dict
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.documentation = ApiDocumentation()
+
         for model in AvishanModel.get_non_abstract_models():
-            pass
+            self.documentation.add_get_path(
+                url=f'{get_avishan_config().AVISHAN_URLS_START}/{model.class_plural_snake_case_name()}'
+            )
 
     def setup(self, request, *args, **kwargs):
         super().setup(request, *args, **kwargs)

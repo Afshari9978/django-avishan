@@ -65,6 +65,7 @@ class AvishanConfigFather:
 
     MONITORED_APPS_NAMES: List[str] = []
     NOT_MONITORED_STARTS: List[str] = ['/admin', '/static', '/media', '/favicon.ico']
+    AVISHAN_URLS_START = 'api/av1'
     JWT_KEY: str = None
     KAVENEGAR_API_TOKEN: str = None
     USE_JALALI_DATETIME: bool = False

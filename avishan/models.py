@@ -17,6 +17,7 @@ from avishan.misc.bch_datetime import BchDatetime
 from django.db import models
 
 
+# todo related name on abstracts
 class AvishanModel(models.Model):
     # todo 0.2.1: use manager or simply create functions here?
     # todo 0.2.0 relation on_delete will call our remove() ?
