@@ -42,7 +42,7 @@ class AuthException(AvishanException):
     TOKEN_NOT_FOUND = 4, AvishanTranslatable(EN='Token not found', FA='توکن پیدا نشد')
     TOKEN_EXPIRED = 5, AvishanTranslatable(EN='Token timed out', FA='زمان استفاده از توکن تمام شده است')
     ERROR_IN_TOKEN = 6, AvishanTranslatable(EN='Error in token', FA='خطا در توکن')
-    ACCESS_DENIED = 7, AvishanTranslatable(EN='Access Denied', FA='دسترسی نامجاز')
+    ACCESS_DENIED = 7, AvishanTranslatable(EN='Access Denied', FA='دسترسی غیرمجاز')
     HTTP_METHOD_NOT_ALLOWED = 8, AvishanTranslatable(EN='HTTP method not allowed in this url')
     INCORRECT_PASSWORD = 9, AvishanTranslatable(EN='Incorrect Password', FA='رمز اشتباه است')
     DUPLICATE_AUTHENTICATION_IDENTIFIER = 10, AvishanTranslatable(
@@ -68,10 +68,10 @@ class AuthException(AvishanException):
         if error_kind[0] == AuthException.HTTP_METHOD_NOT_ALLOWED[0]:
             status_code = status.HTTP_405_METHOD_NOT_ALLOWED
         super().__init__(status_code=status_code)
-        add_error_message_to_response(code=error_kind[0], body=str(error_kind[1]), title=AvishanTranslatable(
+        add_error_message_to_response(code=error_kind[0], body=str(error_kind[1]), title=str(AvishanTranslatable(
             EN='Authentication Exception',
             FA='خطای احراز هویت'
-        ).__str__())
+        )))
 
 
 class ErrorMessageException(AvishanException):

@@ -10,6 +10,7 @@
             <div class="card-body login-card-body">
                 <h3 class="login-box-msg mb-3">پنل مدیریت</h3>
                 <form action="/panel/login" method="post" id="login-form">
+                    {% csrf_token %}
                     <div class="input-group mb-2">
                         <input type="{{ login_key_placeholder }}"
                                class="form-control"
@@ -87,12 +88,12 @@
             }
         </script>
     {% endif %}
-{#    <script>#}
-{#        $(document).ready(function () {#}
-{##}
-{#            $("input").hover(function () {#}
-{#                $(this).focus();#}
-{#            });#}
-{#        });#}
-{#    </script>#}
+    {#    <script>#}
+    {#        $(document).ready(function () {#}
+    {##}
+    {#            $("input").hover(function () {#}
+    {#                $(this).focus();#}
+    {#            });#}
+    {#        });#}
+    {#    </script>#}
 {% endblock body_scripts %}

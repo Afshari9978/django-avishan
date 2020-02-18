@@ -1,0 +1,521 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Background Removal API",
+    "description": "Remove the background of any image",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "https://api.remove.bg/v1.0"
+    }
+  ],
+  "security": [
+    {
+      "APIKeyHeader": []
+    }
+  ],
+  "paths": {
+    "/removebg": {
+      "post": {
+        "tags": [
+          "Background Removal"
+        ],
+        "summary": "Remove the background of an image",
+        "description": "Removes the background of a JPG/PNG image.\n\n* File size: up to 12 MB\n* Image source: File upload (binary or as base64 encoded string) or download from URL\n* Image Content: Any photo with a foreground [(e.g. people, products, animals, cars, etc.)](/supported-images)\n* Output resolutions available: Preview (up to 0.25 megapixels), Full (up to 25 megapixels)\n\nRequires an API key to be provided in the `X-API-Key` request header.\n",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/RemoveBgMultipart"
+              }
+            },
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RemoveBgJson"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/RemoveBgJson"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Image background removed",
+            "content": {
+              "image/*": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary",
+                  "example": "(binary image data)"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RemoveBgJsonResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Type": {
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "person",
+                    "product",
+                    "animal",
+                    "car",
+                    "other"
+                  ]
+                },
+                "description": "Detected foreground type (\"person\", \"product\", \"animal\", \"car\", \"other\")"
+              },
+              "X-Width": {
+                "schema": {
+                  "type": "integer"
+                },
+                "description": "Width of the result image"
+              },
+              "X-Height": {
+                "schema": {
+                  "type": "integer"
+                },
+                "description": "Height of the result image"
+              },
+              "X-Credits-Charged": {
+                "schema": {
+                  "type": "float"
+                },
+                "description": "Amount of credits charged for this call"
+              }
+            }
+          },
+          "400": {
+            "description": "Error: Invalid parameters or input file unprocessable (no credits charged)",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "title": {
+                            "type": "string",
+                            "description": "Error message",
+                            "example": "File too large"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Error: Insufficient credits (no credits charged)",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "title": {
+                            "type": "string",
+                            "description": "Error message",
+                            "example": "Insufficient credits"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error: Authentication failed (no credits charged)",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthFailed"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Error: Rate limit exceeded (no credits charged)",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/RateLimit"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/account": {
+      "get": {
+        "tags": [
+          "Fetch account info"
+        ],
+        "summary": "Fetch credit balance and free API calls.",
+        "description": "Get the current credit balance and number of free API calls.\n\nNotes:\n\n* Balance changes may be delayed by several seconds. To locally keep track of your credit balance, you should therefore only call this endpoint initially (or e.g. when the user manually triggers a refresh), then use the `X-Credits-Charged` response header returned with each image processing response to adjust the local balance.\n\n* The \"*sizes*\" field is always \"all\", is deprecated and will soon be removed.\n",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "attributes": {
+                          "type": "object",
+                          "properties": {
+                            "credits": {
+                              "type": "object",
+                              "properties": {
+                                "total": {
+                                  "type": "float",
+                                  "example": 200
+                                },
+                                "subscription": {
+                                  "type": "float",
+                                  "example": 150
+                                },
+                                "payg": {
+                                  "type": "float",
+                                  "example": 50
+                                },
+                                "enterprise": {
+                                  "type": "float",
+                                  "example": 0
+                                }
+                              }
+                            },
+                            "api": {
+                              "type": "object",
+                              "properties": {
+                                "free_calls": {
+                                  "type": "integer",
+                                  "example": 50
+                                },
+                                "sizes": {
+                                  "type": "string",
+                                  "example": "all"
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error: Authentication failed",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthFailed"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Error: Rate limit exceeded",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/RateLimit"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "APIKeyHeader": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-API-Key"
+      }
+    },
+    "schemas": {
+      "RemoveBgMultipart": {
+        "type": "object",
+        "properties": {
+          "image_file": {
+            "type": "string",
+            "format": "binary",
+            "description": "Source image file (binary). (If this parameter is present, the other image source parameters must be empty.)"
+          },
+          "image_file_b64": {
+            "type": "string",
+            "example": "",
+            "description": "Source image file (base64-encoded string). (If this parameter is present, the other image source parameters must be empty.)"
+          },
+          "image_url": {
+            "type": "string",
+            "example": "https://www.remove.bg/example-hd.jpg",
+            "description": "Source image URL. (If this parameter is present, the other image source parameters must be empty.)"
+          },
+          "size": {
+            "type": "string",
+            "enum": [
+              "preview",
+              "full",
+              "auto"
+            ],
+            "default": "preview",
+            "description": "Maximum output image resolution:\n\"preview\" (default) = Resize image to 0.25 megapixels (e.g. 625×400 pixels) – 0.25 credits per image,\n\"full\" = Use original image resolution, up to 25 megapixels (e.g. 6250x4000) with formats ZIP or JPG, or up to 10 megapixels (e.g. 4000x2500) with PNG – 1 credit per image),\n\"auto\" = Use highest available resolution (based on image size and available credits).\n\nFor backwards-compatibility this parameter also accepts the values \"medium\" (up to 1.5 megapixels) and \"hd\" (up to 4 megapixels) for 1 credit per image. The value \"full\" is also available under the name \"4k\" and the value \"preview\" is aliased as \"small\" and \"regular\".\n"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "person",
+              "product",
+              "car"
+            ],
+            "default": "auto",
+            "description": "Foreground type:\n\"auto\" = Automatically detect kind of foreground,\n\"person\" = Use person(s) as foreground,\n\"product\" = Use product(s) as foreground.\n\"car\" = Use car as foreground,\n"
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "png",
+              "jpg",
+              "zip"
+            ],
+            "default": "auto",
+            "description": "Result image format:\n\"auto\" = Use PNG format if transparent regions exist, otherwise use JPG format (default),\n\"png\" = PNG format with alpha transparency,\n\"jpg\" = JPG format, no transparency,\n\"zip\" = ZIP format, contains color image and alpha matte image, supports transparency (recommended).\n"
+          },
+          "roi": {
+            "type": "string",
+            "description": "Region of interest: Only contents of this rectangular region can be detected as foreground. Everything outside is considered background and will be removed. The rectangle is defined as two x/y coordinates in the format \"<x1> <y1> <x2> <y2>\". The coordinates can be in absolute pixels (suffix 'px') or relative to the width/height of the image (suffix '%'). By default, the whole image is the region of interest (\"0% 0% 100% 100%\").\n",
+            "default": "0% 0% 100% 100%"
+          },
+          "crop": {
+            "type": "boolean",
+            "description": "Whether to crop off all empty regions (default: false). Note that cropping has no effect on the amount of charged credits.\n",
+            "default": "false"
+          },
+          "crop_margin": {
+            "type": "string",
+            "description": "Adds a margin around the cropped subject (default: 0). Can be an absolute value (e.g. \"30px\") or relative to the subject size (e.g. \"10%\"). Can be a single value (all sides), two values (top/bottom and left/right) or four values (top, right, bottom, left). This parameter only has an effect when \"crop=true\". The maximum margin that can be added on each side is 50% of the subject dimensions or 500 pixels.\n",
+            "default": "0"
+          },
+          "scale": {
+            "type": "string",
+            "description": "Scales the subject relative to the total image size. Can be any value from \"10%\" to \"100%\", or \"original\" (default). Scaling the subject implies \"position=center\" (unless specified otherwise).\n",
+            "default": "original"
+          },
+          "position": {
+            "type": "string",
+            "description": "Positions the subject within the image canvas. Can be \"original\" (default unless \"scale\" is given), \"center\" (default when \"scale\" is given) or a value from \"0%\" to \"100%\" (both horizontal and vertical) or two values (horizontal, vertical).\n",
+            "default": "original"
+          },
+          "channels": {
+            "type": "string",
+            "enum": [
+              "rgba",
+              "alpha"
+            ],
+            "default": "rgba",
+            "description": "Request either the finalized image (\"rgba\", default) or an alpha mask (\"alpha\"). Note: Since remove.bg also applies RGB color corrections on edges, using only the alpha mask often leads to a lower final image quality. Therefore \"rgba\" is recommended.\n"
+          },
+          "add_shadow": {
+            "type": "boolean",
+            "description": "Whether to add an artificial shadow to the result (default: false). NOTE: Adding shadows is currently only supported for car photos. Other subjects are returned without shadow, even if set to true (this might change in the future).\n",
+            "default": "false"
+          },
+          "bg_color": {
+            "type": "string",
+            "example": "",
+            "description": "Adds a solid color background. Can be a hex color code (e.g. 81d4fa, fff) or a color name (e.g. green). For semi-transparency, 4-/8-digit hex codes are also supported (e.g. 81d4fa77). (If this parameter is present, the other bg_ parameters must be empty.)\n"
+          },
+          "bg_image_url": {
+            "type": "string",
+            "example": "",
+            "description": "Adds a background image from a URL. The image is centered and resized to fill the canvas while preserving the aspect ratio, unless it already has the exact same dimensions as the foreground image. (If this parameter is present, the other bg_ parameters must be empty.)"
+          },
+          "bg_image_file": {
+            "type": "string",
+            "format": "binary",
+            "description": "Adds a background image from a file (binary). The image is centered and resized to fill the canvas while preserving the aspect ratio, unless it already has the exact same dimensions as the foreground image. (If this parameter is present, the other bg_ parameters must be empty.)"
+          }
+        }
+      },
+      "RemoveBgJson": {
+        "type": "object",
+        "properties": {
+          "image_file_b64": {
+            "type": "string",
+            "example": "",
+            "description": "Source image file (base64-encoded string). (If this parameter is present, the other image source parameters must be empty.)"
+          },
+          "image_url": {
+            "type": "string",
+            "example": "https://www.remove.bg/example-hd.jpg",
+            "description": "Source image URL. (If this parameter is present, the other image source parameters must be empty.)"
+          },
+          "size": {
+            "type": "string",
+            "enum": [
+              "preview",
+              "full",
+              "auto"
+            ],
+            "default": "preview",
+            "description": "Maximum output image resolution:\n\"preview\" (default) = Resize image to 0.25 megapixels (e.g. 625×400 pixels) – 0.25 credits per image,\n\"full\" = Use original image resolution, up to 25 megapixels (e.g. 6250x4000) with formats ZIP or JPG, or up to 10 megapixels (e.g. 4000x2500) with PNG – 1 credit per image),\n\"auto\" = Use highest available resolution (based on image size and available credits).\n\nFor backwards-compatibility this parameter also accepts the values \"medium\" (up to 1.5 megapixels) and \"hd\" (up to 4 megapixels) for 1 credit per image. The value \"full\" is also available under the name \"4k\" and the value \"preview\" is aliased as \"small\" and \"regular\".\n"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "person",
+              "product",
+              "car"
+            ],
+            "default": "auto",
+            "description": "Foreground type:\n\"auto\" = Automatically detect kind of foreground,\n\"person\" = Use person(s) as foreground,\n\"product\" = Use product(s) as foreground.\n\"car\" = Use car as foreground,\n"
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "png",
+              "jpg",
+              "zip"
+            ],
+            "default": "auto",
+            "description": "Result image format:\n\"auto\" = Use PNG format if transparent regions exist, otherwise use JPG format (default),\n\"png\" = PNG format with alpha transparency,\n\"jpg\" = JPG format, no transparency,\n\"zip\" = ZIP format, contains color image and alpha matte image, supports transparency (recommended).\n"
+          },
+          "roi": {
+            "type": "string",
+            "description": "Region of interest: Only contents of this rectangular region can be detected as foreground. Everything outside is considered background and will be removed. The rectangle is defined as two x/y coordinates in the format \"<x1> <y1> <x2> <y2>\". The coordinates can be in absolute pixels (suffix 'px') or relative to the width/height of the image (suffix '%'). By default, the whole image is the region of interest (\"0% 0% 100% 100%\").\n",
+            "default": "0% 0% 100% 100%"
+          },
+          "crop": {
+            "type": "boolean",
+            "description": "Whether to crop off all empty regions (default: false). Note that cropping has no effect on the amount of charged credits.\n",
+            "default": "false"
+          },
+          "crop_margin": {
+            "type": "string",
+            "description": "Adds a margin around the cropped subject (default: 0). Can be an absolute value (e.g. \"30px\") or relative to the subject size (e.g. \"10%\"). Can be a single value (all sides), two values (top/bottom and left/right) or four values (top, right, bottom, left). This parameter only has an effect when \"crop=true\". The maximum margin that can be added on each side is 50% of the subject dimensions or 500 pixels.\n",
+            "default": "0"
+          },
+          "scale": {
+            "type": "string",
+            "description": "Scales the subject relative to the total image size. Can be any value from \"10%\" to \"100%\", or \"original\" (default). Scaling the subject implies \"position=center\" (unless specified otherwise).\n",
+            "default": "original"
+          },
+          "position": {
+            "type": "string",
+            "description": "Positions the subject within the image canvas. Can be \"original\" (default unless \"scale\" is given), \"center\" (default when \"scale\" is given) or a value from \"0%\" to \"100%\" (both horizontal and vertical) or two values (horizontal, vertical).\n",
+            "default": "original"
+          },
+          "channels": {
+            "type": "string",
+            "enum": [
+              "rgba",
+              "alpha"
+            ],
+            "default": "rgba",
+            "description": "Request either the finalized image (\"rgba\", default) or an alpha mask (\"alpha\"). Note: Since remove.bg also applies RGB color corrections on edges, using only the alpha mask often leads to a lower final image quality. Therefore \"rgba\" is recommended.\n"
+          },
+          "add_shadow": {
+            "type": "boolean",
+            "description": "Whether to add an artificial shadow to the result (default: false). NOTE: Adding shadows is currently only supported for car photos. Other subjects are returned without shadow, even if set to true (this might change in the future).\n",
+            "default": "false"
+          },
+          "bg_color": {
+            "type": "string",
+            "example": "",
+            "description": "Adds a solid color background. Can be a hex color code (e.g. 81d4fa, fff) or a color name (e.g. green). For semi-transparency, 4-/8-digit hex codes are also supported (e.g. 81d4fa77). (If this parameter is present, the other bg_ parameters must be empty.)\n"
+          },
+          "bg_image_url": {
+            "type": "string",
+            "example": "",
+            "description": "Adds a background image from a URL. The image is centered and resized to fill the canvas while preserving the aspect ratio, unless it already has the exact same dimensions as the foreground image. (If this parameter is present, the other bg_ parameters must be empty.)"
+          }
+        }
+      },
+      "RemoveBgJsonResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "result_b64": {
+                "type": "string",
+                "description": "Base64 encoded string of result image",
+                "example": "iVBORw0KGgoAAAANSUhEUgAAAIsAAACFC..."
+              }
+            }
+          }
+        }
+      },
+      "RateLimit": {
+        "type": "object",
+        "properties": {
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string",
+                  "description": "Error message",
+                  "example": "Rate limit exceeded"
+                }
+              }
+            }
+          }
+        }
+      },
+      "AuthFailed": {
+        "type": "object",
+        "properties": {
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string",
+                  "description": "Error message",
+                  "example": "Missing API Key"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -102,12 +102,11 @@ class AvishanView(View):
             if self.track_it:
                 self.current_request['request_track_object'].create_exec_infos(
                     self.current_request['request_track_exec'])
-
-        except AvishanException:
-            return
+        except AvishanException as e:
+            raise e
         except Exception as e:
             AvishanException(wrap_exception=e)
-            return
+            raise e
         if current_request['exception']:
             return
         return result
@@ -170,10 +169,7 @@ class AvishanTemplateView(AvishanView):
             except:
                 self.current_request['request'].data = {}
 
-        result = super().dispatch(request, *args, **kwargs)
-        if result is None:
-            return render(self.request, self.template_address, self.context)
-        return result
+        return super().dispatch(request, *args, **kwargs)
 
 
 class AvishanModelApiView(AvishanApiView):

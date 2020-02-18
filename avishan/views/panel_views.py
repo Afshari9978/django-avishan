@@ -17,6 +17,15 @@ class AvishanPanelView(AvishanTemplateView):
     def setup(self, request, *args, **kwargs):
         super().setup(request, *args, **kwargs)
         self.context['CONFIG'] = get_avishan_config()
+        self.context['sidebar_items'] = [
+            {
+                'title': 'داشبورد',
+                'icon': 'fa-dashboard',
+                'link': ''
+            }
+        ]
+        self.template_url = self.request.path
+        self.context['page_title'] = "حذف شود"
 
     def dispatch(self, request, *args, **kwargs):
         try:
@@ -40,6 +49,7 @@ class AvishanPanelLoginView(AvishanPanelView):
         self.user_group = UserGroup.get(
             title=get_avishan_config().PANEL_LOGIN_USER_GROUP_TITLE
         )
+        self.context['login_key_placeholder'] = self.login_class.key_field().name
 
     def get(self, request, *args, **kwargs):
         if get_avishan_config().PANEL_OTP_LOGIN:
@@ -47,7 +57,7 @@ class AvishanPanelLoginView(AvishanPanelView):
         else:
             self.login_class: KeyValueAuthentication
 
-        self.context['login_key_placeholder'] = self.login_class.key_field().name
+        self.context['otp_key'] = ""
         return render(self.request, self.template_address, self.context)
 
     def post(self, request, *args, **kwargs):
@@ -88,4 +98,8 @@ class AvishanPanelLoginView(AvishanPanelView):
                 code=request.data['otp_code'],
                 user_group=self.user_group
             )
-            return redirect(AvishanPanelView.template_url, permanent=True)
+            return redirect(AvishanPanelView.template_url)
+
+
+class AvishanPanelListView(AvishanPanelView):
+    pass
