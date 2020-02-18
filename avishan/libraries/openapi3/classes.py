@@ -3,25 +3,14 @@ from typing import List, Union, Type, Optional, Tuple
 from django.db import models
 
 from avishan.configure import get_avishan_config
+
+from inspect import Parameter as InspectParameter
+
 from avishan.models import AvishanModel
 
 
 class ApiDocumentation:
     paths: List['Path'] = []
-
-    def add_get_path(self, url: str, summary: str = None, description: str = None, responses: List[
-        'PathResponseGroup'] = ()):
-        path = self.get_or_create_path(url)
-        get_method = PathGetMethod()
-
-    def add_post_path(self, url: str):
-        pass
-
-    def add_put_path(self, url: str):
-        pass
-
-    def add_delete_path(self, url: str):
-        pass
 
     def get_or_create_path(self, url: str) -> 'Path':
         for path in self.paths:
@@ -70,7 +59,7 @@ class SchemaProperty:
         raise NotImplementedError()
 
     def export_json(self):
-        if isinstance(self.type, SchemaProperty):
+        if not isinstance(self.type, str):
             return {
                 '$ref': f"#/components/schemas/{self.type.name}"
             }
@@ -83,10 +72,11 @@ class SchemaProperty:
 
 
 class Schema:
-    def __init__(self, name: str, type: str = 'object', properties: List[SchemaProperty] = ()):
+    def __init__(self, name: str, type: str = 'object', properties: List[SchemaProperty] = (), items: 'Schema' = None):
         self.name = name
         self.type = type
         self.properties = properties
+        self.items: Optional[Schema] = items
         self.model: Optional[AvishanModel] = None
 
     @classmethod
@@ -99,11 +89,49 @@ class Schema:
     def create_model_properties(cls, model: Type[AvishanModel]) -> List[SchemaProperty]:
         return [SchemaProperty.create_from_model_field(field) for field in model.get_fields()]
 
+    @classmethod
+    def create_from_function(cls, name: str, function):
+        import inspect
+
+        properties = []
+        for key, value in dict(inspect.signature(function).parameters.items()).items():
+            value: InspectParameter
+            if key in ['self', 'cls']:
+                continue
+            if type(value.annotation) is inspect._empty:
+                raise ValueError(f'Method ({function}) parameter ({key}) type not defined')
+            param_type = value.annotation
+            if issubclass(value.annotation, AvishanModel):
+                param_type = Schema.create_from_model(value.annotation)
+
+            properties.append(SchemaProperty(
+                name=key,
+                type=param_type,
+                required=True  # todo check
+            ))
+
+        return cls(
+            name=name,
+            type='object',
+            properties=properties
+        )
+
     def export_json(self) -> dict:
         return {
             "type": self.type,
             "properties": self.export_properties_json(),
             "required": self.export_required_json()
+        } if self.items is None else {
+            'type': self.type,
+            'items': self.items.export_json()
+        }
+
+    def export_reference(self) -> dict:
+        return {
+            "$ref": f"#/components/schemas/{self.name}"
+        } if self.items is None else {
+            'type': self.type,
+            'items': self.items.export_reference()
         }
 
     def export_required_json(self) -> List[str]:
@@ -115,6 +143,16 @@ class Schema:
             data[prop.name] = prop.export_json()
         return data
 
+    @classmethod
+    def schema_in_json(cls, name: str, schema: 'Schema'):
+        return Schema(
+            name=name,
+            properties=[SchemaProperty(
+                name=name,
+                type=schema
+            )]
+        )
+
     def __str__(self):
         return self.name
 
@@ -124,7 +162,12 @@ class Component:
         self.schemas = schemas
 
     def export_json(self):
-        pass  # todo
+        data = {
+            'schemas': {}
+        }
+        for schema in self.schemas:
+            data['schemas'][schema.name] = schema.export_json()
+        return data
 
 
 class Content:
@@ -134,8 +177,18 @@ class Content:
 
     def export_json(self) -> dict:
         return {
-            'schema': self.schema.export_json()
+            'schema': self.schema.export_reference()
         }
+
+
+def __str__(self):
+    return f'{self.schema}'
+
+
+class ContentArray(Content):
+
+    def __init__(self, schema: Schema, type: str):
+        super().__init__(schema, type)
 
 
 class Parameter:
@@ -150,6 +203,9 @@ class Parameter:
 
     def export_json(self):
         pass  # todo
+
+    def __str__(self):
+        return self.name
 
 
 class PathRequest:
@@ -167,27 +223,49 @@ class PathRequest:
             data['content'][content.type] = content.export_json()
         return data
 
+    def __str__(self):
+        return f'{len(self.contents)} requests'
+
 
 class PathResponse:
-    def __init__(self):
-        pass
+    def __init__(self, status_code: int, content: Content, description: str = None):
+        self.status_code = status_code
+        self.content = content
+        self.description = description
+
+    def export_json(self) -> dict:
+        data = {
+            'content': self.content.export_json()
+        }
+        if self.description:
+            data['description'] = self.description
+        return data
+
+    def __str__(self):
+        return self.status_code
 
 
 class PathResponseGroup:
-    def __init__(self):
-        pass
+    def __init__(self, responses: List[PathResponse]):
+        self.responses = responses
 
     def export_json(self) -> dict:
-        pass
+        data = {}
+        for item in self.responses:
+            data[item.status_code] = item.export_json()
+        return data
+
+    def __str__(self):
+        return f'{len(self.responses)} responses'
 
 
 class PathMethod:
     method = None
 
     def __init__(self, summary: str = None, description: str = None, request: PathRequest = None,
-                 responses: List[PathResponseGroup] = None, tags: List[str] = ()):
+                 responses: PathResponseGroup = None, tags: List[str] = ()):
         self.request = request
-        if responses is not None and len(responses) == 0:
+        if responses is not None and len(responses.responses) == 0:
             self.responses = None
         else:
             self.responses = responses
@@ -212,6 +290,9 @@ class PathMethod:
         if self.description:
             data['description'] = self.description
         return data
+
+    def __str__(self):
+        return f'{self.method.upper()}'
 
 
 class PathGetMethod(PathMethod):
@@ -254,6 +335,9 @@ class Path:
 
         return data
 
+    def __str__(self):
+        return self.url
+
 
 class OpenApi:
     def __init__(self, api_version: str, api_title: str, open_api_version: str = "3.0.0", api_description: str = None,
@@ -266,6 +350,7 @@ class OpenApi:
         self.models: List[Type[AvishanModel]] = []
         self.schemas = self.create_schemas_from_models()
         self.paths = self.create_paths_from_views()
+
         # todo security
 
     @staticmethod
@@ -274,15 +359,32 @@ class OpenApi:
         return get_avishan_config().REQUEST_COMMON_URL_PARAMETERS
 
     def create_schemas_from_models(self) -> List['Schema']:
+        def all_subclasses(cls):
+            return set(cls.__subclasses__()).union(
+                [s for c in cls.__subclasses__() for s in all_subclasses(c)])
+
         schemas = []
-        for model in AvishanModel.__subclasses__():
+        for model in all_subclasses(AvishanModel):
             model: Type[AvishanModel]
             self.models.append(model)
             schemas.append(Schema.create_from_model(model))
         return schemas
 
-    def create_paths_from_views(self) -> List['Path']:
-        pass  # todo
+    @staticmethod
+    def create_paths_from_views() -> List['Path']:
+        from avishan.views.class_based import AvishanView
+
+        def all_subclasses(cls):
+            return set(cls.__subclasses__()).union(
+                [s for c in cls.__subclasses__() for s in all_subclasses(c)])
+
+        data = []
+        for view in all_subclasses(AvishanView):
+            view: AvishanView
+            doc = view.documentation()
+            if doc is not None:
+                data.extend(doc.paths)
+        return data
 
     def export_schemas_json(self) -> dict:
         data = {}
@@ -290,32 +392,14 @@ class OpenApi:
             data[schema.name] = schema.export_json()
         return data
 
+    def export_paths_json(self) -> dict:
+        data = {}
+        for path in self.paths:
+            data[path.url] = path.export_json()
+        return data
+
     def export_json(self) -> dict:
         # todo tags
-        """
-        "tags": [
-            {
-              "name": "pet",
-              "description": "Everything about your Pets",
-              "externalDocs": {
-                "description": "Find out more",
-                "url": "http://swagger.io"
-              }
-            },
-            {
-              "name": "store",
-              "description": "Access to Petstore orders"
-            },
-            {
-              "name": "user",
-              "description": "Operations about user",
-              "externalDocs": {
-                "description": "Find out more about our store",
-                "url": "http://swagger.io"
-              }
-            }
-          ]
-        """
         data = {
             'openapi': self.open_api_version,
             'info': {
@@ -325,7 +409,7 @@ class OpenApi:
             'components': {
                 'schemas': self.export_schemas_json()
             },
-            'paths': {}
+            'paths': self.export_paths_json()
         }
         if self.api_description:
             data['info']['description'] = self.api_description

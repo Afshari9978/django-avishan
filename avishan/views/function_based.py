@@ -115,8 +115,9 @@ def avishan_hash_password(request, password: str):
 
 @AvishanTemplateView(authenticate=False)
 def avishan_doc(request):
-    from avishan.libraries.openapi3 import create_openapi_object
     import json
-    data = json.dumps(create_openapi_object('Snappion API Documentation', '1.0.0'))
+    from avishan.libraries.openapi3.classes import OpenApi
+    a = OpenApi('1.1.0', 'snappion').export_json()
+    data = json.dumps(a)
     from django.shortcuts import render
     return render(request, 'avishan/swagger.html', context={'data': data})

@@ -1,6 +1,6 @@
 import datetime
 import json
-from typing import List, get_type_hints, Type, Callable
+from typing import List, get_type_hints, Type, Callable, Optional
 
 from django.http import JsonResponse
 from django.shortcuts import render
@@ -9,7 +9,8 @@ from django.views import View
 from avishan import current_request
 from avishan.configure import get_avishan_config
 from avishan.exceptions import ErrorMessageException, AvishanException, AuthException
-from avishan.libraries.openapi3.classes import ApiDocumentation
+from avishan.libraries.openapi3.classes import ApiDocumentation, Path, PathMethod, PathGetMethod, PathResponseGroup, \
+    PathResponse, Content, Schema, PathPostMethod, PathRequest
 from avishan.misc import status
 from avishan.misc.translation import AvishanTranslatable
 from avishan.models import AvishanModel, RequestTrack
@@ -19,7 +20,6 @@ class AvishanView(View):
     authenticate: bool = True
     track_it: bool = False
     is_api: bool = None
-    documentation = None
 
     # todo can override http_method_not_allowed method
     # todo implement time logs here
@@ -127,6 +127,10 @@ class AvishanView(View):
             return self.class_attributes_type[key].__args__[0](value)
         return value
 
+    @staticmethod
+    def documentation() -> Optional[ApiDocumentation]:
+        return None
+
 
 class AvishanApiView(AvishanView):
     is_api = True
@@ -178,14 +182,66 @@ class AvishanModelApiView(AvishanApiView):
     model_item: AvishanModel = None
     model_function: Callable = None  # todo these sends model not dict
 
+    @staticmethod
+    def documentation() -> Optional[ApiDocumentation]:
+        doc = ApiDocumentation()
+        for model in AvishanModel.get_non_abstract_models():
+            doc.paths.append(
+                Path(
+                    url=f'{get_avishan_config().AVISHAN_URLS_START}/{model.class_plural_snake_case_name()}',
+                    methods=[
+                        PathGetMethod(
+                            responses=PathResponseGroup(
+                                responses=[
+                                    PathResponse(
+                                        status_code=200,
+                                        content=Content(
+                                            schema=Schema(
+                                                name=model.class_name(),
+                                                type='array',
+                                                items=Schema(name=model.class_name())),
+                                            type='ref'
+                                        ),
+                                        description='Get list of all items'
+                                    )
+                                ]
+                            )
+                        ),
+                        PathPostMethod(
+                            responses=PathResponseGroup(
+                                responses=[
+                                    PathResponse(
+                                        status_code=200,
+                                        content=Content(
+                                            schema=Schema.schema_in_json(
+                                                name=model.class_name(),
+                                                schema=Schema(
+                                                    name=model.class_name()
+                                                )
+                                            ),
+                                            type='application/json'
+                                        )
+                                    )
+                                ]
+                            ),
+                            request=PathRequest(
+                                contents=[
+                                    Content(
+                                        schema=Schema(
+                                            name=model.class_name()
+                                        ),
+                                        type='application/json'
+                                    )
+                                ]
+                            )
+                        )
+                    ]
+                )
+            )
+        return doc
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.documentation = ApiDocumentation()
-
-        for model in AvishanModel.get_non_abstract_models():
-            self.documentation.add_get_path(
-                url=f'{get_avishan_config().AVISHAN_URLS_START}/{model.class_plural_snake_case_name()}'
-            )
 
     def setup(self, request, *args, **kwargs):
         super().setup(request, *args, **kwargs)
@@ -213,7 +269,8 @@ class AvishanModelApiView(AvishanApiView):
     def get(self, request, *args, **kwargs):
         if self.model_function is None:
             if self.model_item is None:
-                self.response[self.model.class_plural_snake_case_name()] = [item.to_dict() for item in self.model.all()]
+                self.response[self.model.class_plural_snake_case_name()] = [item.to_dict() for item in
+                                                                            self.model.all()]
             else:
                 self.response[self.model.class_snake_case_name()] = self.model_item.to_dict()
         else:

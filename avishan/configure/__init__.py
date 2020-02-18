@@ -89,7 +89,7 @@ class AvishanConfigFather:
 
     # open api
     REQUEST_COMMON_URL_PARAMETERS = [{
-        "name": 'lang',
+        "name": 'language',
         "in": 'query',
         "description": 'set language for this request',
         "required": False,
