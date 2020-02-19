@@ -177,7 +177,7 @@ class AvishanTemplateView(AvishanView):
 
 
 class AvishanModelApiView(AvishanApiView):
-    authenticate = False
+    authenticate = True
     model: Type[AvishanModel] = None
     model_item: AvishanModel = None
     model_function: Callable = None  # todo these sends model not dict
@@ -365,7 +365,7 @@ class AvishanModelApiView(AvishanApiView):
 
     def setup(self, request, *args, **kwargs):
         super().setup(request, *args, **kwargs)
-        model_plural_name = kwargs.get(['model_plural_name'], None)
+        model_plural_name = kwargs.get('model_plural_name', None)
         model_item_id = kwargs.get('model_item_id', None)
         model_function_name = kwargs.get('model_function_name', None)
         self.model = AvishanModel.get_model_by_plural_name(model_plural_name)
@@ -375,8 +375,11 @@ class AvishanModelApiView(AvishanApiView):
         if model_item_id is not None:
             self.model_item = self.model.get(avishan_raise_400=True, id=int(model_item_id))
         if model_function_name is not None:
-            if model_function_name not in self.model.direct_callable_methods:
+            if model_function_name not in \
+                    self.model.direct_callable_methods + self.model.direct_non_authenticated_callable_methods:
                 raise AuthException(AuthException.METHOD_NOT_DIRECT_CALLABLE)
+            if model_function_name in self.model.direct_non_authenticated_callable_methods:
+                self.authenticate = False
             try:
                 if self.model_item is None:
                     self.model_function = getattr(self.model, model_function_name)
@@ -404,7 +407,17 @@ class AvishanModelApiView(AvishanApiView):
                 **request.data[self.model.class_snake_case_name()]
             ).to_dict()
         else:
-            self.response = {**self.model_function(**self.request.data), **self.response}
+            returned = self.model_function(**self.request.data)
+            if isinstance(returned, list):
+                for i, item in enumerate(returned):
+                    if isinstance(item, AvishanModel):
+                        returned.insert(i, item.to_dict())
+                self.response[self.model.class_plural_snake_case_name()] = returned
+            else:
+
+                if isinstance(returned, AvishanModel):
+                    returned = returned.to_dict()
+                self.response[self.model.class_snake_case_name()] = returned
 
     def put(self, request, *args, **kwargs):
 

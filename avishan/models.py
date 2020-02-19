@@ -31,6 +31,7 @@ class AvishanModel(models.Model):
     """
     private_fields: List[Union[models.Field, str]] = []
     direct_callable_methods = []
+    direct_non_authenticated_callable_methods = []
 
     """
     Django admin default values. Set this for all inherited models
@@ -696,7 +697,7 @@ class UserUserGroup(AvishanModel):
 
 class Email(AvishanModel):
     address = models.CharField(max_length=255, unique=True)
-    is_verified = models.BooleanField(default=False)
+    date_verified = models.DateTimeField(default=None, null=True, blank=True)
 
     @staticmethod
     def send_bulk_mail(subject: str, message: str, recipient_list: list, html_message: str = None):
@@ -719,7 +720,8 @@ class Email(AvishanModel):
 
     def verify(self, code: str):
         if EmailVerification.check_email(self, code):
-            self.is_verified = True
+            self.date_verified = datetime.datetime.now()
+            self.save()
 
     def __str__(self):
         return self.address
@@ -820,7 +822,7 @@ class EmailVerification(AvishanModel):
 
 class Phone(AvishanModel):
     number = models.CharField(max_length=255, unique=True)
-    is_verified = models.BooleanField(default=False)
+    date_verified = models.DateTimeField(default=None, null=True, blank=True)
 
     @staticmethod
     def send_bulk_sms():
@@ -842,7 +844,8 @@ class Phone(AvishanModel):
 
     def verify(self, code: str):
         if PhoneVerification.check_phone(self, code):
-            self.is_verified = True
+            self.date_verified = datetime.datetime.now()
+            self.save()
 
     def __str__(self):
         return self.number
@@ -1116,7 +1119,6 @@ class EmailPasswordAuthenticate(KeyValueAuthentication):
 
 class PhonePasswordAuthenticate(KeyValueAuthentication):
     phone = models.ForeignKey(Phone, on_delete=models.CASCADE, related_name='password_authenticates')
-
     django_admin_list_display = ['user_user_group', phone]
 
     @classmethod
