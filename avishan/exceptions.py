@@ -62,6 +62,11 @@ class AuthException(AvishanException):
         FA='چند حساب با این شناسه پیدا شد، گروه کاربری را در پارامتر url مشخص کنید'
     )
 
+    METHOD_NOT_DIRECT_CALLABLE = 14, AvishanTranslatable(
+        EN='Method is not callable direct to model',
+        FA='تابع به طور مستقیم قابل صدا زدن نیست'
+    )
+
     def __init__(self, error_kind: tuple = NOT_DEFINED):
         from .misc.translation import AvishanTranslatable
         status_code = status.HTTP_403_FORBIDDEN

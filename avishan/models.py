@@ -30,6 +30,7 @@ class AvishanModel(models.Model):
     Models default settings
     """
     private_fields: List[Union[models.Field, str]] = []
+    direct_callable_methods = []
 
     """
     Django admin default values. Set this for all inherited models

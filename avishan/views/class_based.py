@@ -1,16 +1,16 @@
 import datetime
+import inspect
 import json
 from typing import List, get_type_hints, Type, Callable, Optional
 
 from django.http import JsonResponse
-from django.shortcuts import render
 from django.views import View
 
 from avishan import current_request
 from avishan.configure import get_avishan_config
 from avishan.exceptions import ErrorMessageException, AvishanException, AuthException
-from avishan.libraries.openapi3.classes import ApiDocumentation, Path, PathMethod, PathGetMethod, PathResponseGroup, \
-    PathResponse, Content, Schema, PathPostMethod, PathRequest
+from avishan.libraries.openapi3.classes import ApiDocumentation, Path, PathGetMethod, PathResponseGroup, \
+    PathResponse, Content, Schema, PathPostMethod, PathRequest, PathPutMethod, PathDeleteMethod
 from avishan.misc import status
 from avishan.misc.translation import AvishanTranslatable
 from avishan.models import AvishanModel, RequestTrack
@@ -184,8 +184,27 @@ class AvishanModelApiView(AvishanApiView):
 
     @staticmethod
     def documentation() -> Optional[ApiDocumentation]:
+        # todo remove private fields from responses
         doc = ApiDocumentation()
         for model in AvishanModel.get_non_abstract_models():
+            model_create = getattr(model, 'create')
+            model_update = getattr(model, 'update')
+            if len(dict(inspect.signature(model_create).parameters.items()).keys()) == 1 and \
+                    list(dict(inspect.signature(model_create).parameters.items()).keys())[0] == 'kwargs':
+                model_create_schema = Schema(
+                    name=model.class_name()
+                )
+            else:
+                model_create_schema = Schema.create_from_function(model.class_name(), model_create)
+            if len(dict(inspect.signature(model_update).parameters.items()).keys()) == 2 and \
+                    list(dict(inspect.signature(model_update).parameters.items()).keys())[1] == 'kwargs' and \
+                    list(dict(inspect.signature(model_update).parameters.items()).keys())[0] == 'self':
+                model_update_schema = Schema(
+                    name=model.class_name()
+                )
+            else:
+                model_update_schema = Schema.create_from_function(model.class_name(), model_update)
+
             doc.paths.append(
                 Path(
                     url=f'{get_avishan_config().AVISHAN_URLS_START}/{model.class_plural_snake_case_name()}',
@@ -195,13 +214,16 @@ class AvishanModelApiView(AvishanApiView):
                                 responses=[
                                     PathResponse(
                                         status_code=200,
-                                        content=Content(
-                                            schema=Schema(
-                                                name=model.class_name(),
-                                                type='array',
-                                                items=Schema(name=model.class_name())),
-                                            type='ref'
-                                        ),
+                                        contents=[Content(
+                                            schema=Schema.schema_in_json(
+                                                schema=Schema(
+                                                    name=model.class_name(),
+                                                    type='array',
+                                                    items=Schema(name=model.class_name())),
+                                                name=model.class_name()
+                                            ),
+                                            type='application/json'
+                                        )],
                                         description='Get list of all items'
                                     )
                                 ]
@@ -212,24 +234,22 @@ class AvishanModelApiView(AvishanApiView):
                                 responses=[
                                     PathResponse(
                                         status_code=200,
-                                        content=Content(
+                                        contents=[Content(
                                             schema=Schema.schema_in_json(
                                                 name=model.class_name(),
-                                                schema=Schema(
-                                                    name=model.class_name()
+                                                schema=Schema.create_from_model(
+                                                    model
                                                 )
                                             ),
                                             type='application/json'
-                                        )
+                                        )]
                                     )
                                 ]
                             ),
                             request=PathRequest(
                                 contents=[
                                     Content(
-                                        schema=Schema(
-                                            name=model.class_name()
-                                        ),
+                                        schema=model_create_schema,
                                         type='application/json'
                                     )
                                 ]
@@ -238,6 +258,106 @@ class AvishanModelApiView(AvishanApiView):
                     ]
                 )
             )
+            doc.paths.append(Path(
+                url=f'{get_avishan_config().AVISHAN_URLS_START}/{model.class_plural_snake_case_name()}/'
+                    + "{item_id}",
+                methods=[
+                    PathGetMethod(
+                        responses=PathResponseGroup(
+                            responses=[
+                                PathResponse(
+                                    status_code=200,
+                                    contents=[Content(
+                                        schema=Schema.schema_in_json(
+                                            name=model.class_name(),
+                                            schema=Schema.create_from_model(
+                                                model
+                                            )
+                                        ),
+                                        type='application/json'
+                                    )],
+                                    description='Get item'
+                                )
+                            ]
+                        )
+                    ),
+                    PathPutMethod(
+                        responses=PathResponseGroup(
+                            responses=[
+                                PathResponse(
+                                    status_code=200,
+                                    contents=[Content(
+                                        schema=Schema.schema_in_json(
+                                            name=model.class_name(),
+                                            schema=Schema.create_from_model(
+                                                model
+                                            )
+                                        ),
+                                        type='application/json'
+                                    )]
+                                )
+                            ]
+                        ),
+                        request=PathRequest(
+                            contents=[
+                                Content(
+                                    schema=model_update_schema,
+                                    type='application/json'
+                                )
+                            ]
+                        )
+                    ),
+                    PathDeleteMethod(
+                        responses=PathResponseGroup(
+                            responses=[
+                                PathResponse(
+                                    status_code=200,
+                                    contents=[Content(
+                                        schema=Schema.schema_in_json(
+                                            name=model.class_name(),
+                                            schema=Schema.create_from_model(
+                                                model
+                                            )
+                                        ),
+                                        type='application/json'
+                                    )],
+                                    description='Delete item'
+                                )
+                            ]
+                        )
+                    )
+                ]
+            )
+            )
+            # todo custom function
+            # for method in model.direct_callable_methods:
+            #     method = getattr(model, method)
+            #     method_name = method.__name__
+            #     method_signature = dict(inspect.signature(method).parameters.items())
+            #     method_return = inspect.signature(method).return_annotation
+            #     if inspect.isclass(method_return) and issubclass(method_return, AvishanModel):
+            #         method_response_schema = Schema.schema_in_json(
+            #             name=model.class_name(),
+            #             schema=Schema.create_from_model(
+            #                 method_return
+            #             )
+            #         )
+            #
+            #     method_response_schema = None  # todo force for return type
+            #     method_request_schema = None
+            #
+            #     if inspect.ismethod(method) and method.__self__ is model:
+            #         # class method
+            #         a = 1
+            #
+            #     else:
+            #         # object method
+            #         if len(method_signature.keys()) == 1 and list(method_signature.keys())[0] == 'self':
+            #             method_method = 'get'
+            #         else:
+            #             method_method = 'post'
+            #         a = 1
+
         return doc
 
     def __init__(self, *args, **kwargs):
@@ -255,6 +375,8 @@ class AvishanModelApiView(AvishanApiView):
         if model_item_id is not None:
             self.model_item = self.model.get(avishan_raise_400=True, id=int(model_item_id))
         if model_function_name is not None:
+            if model_function_name not in self.model.direct_callable_methods:
+                raise AuthException(AuthException.METHOD_NOT_DIRECT_CALLABLE)
             try:
                 if self.model_item is None:
                     self.model_function = getattr(self.model, model_function_name)

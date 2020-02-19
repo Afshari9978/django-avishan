@@ -19,46 +19,68 @@ class ApiDocumentation:
         return Path(url=url)
 
 
+# todo example for data
+def type_map(input: Union[str, type, models.Field]) -> Tuple[Union[str, 'Schema'], Optional[str]]:
+    if isinstance(input, str):
+        return input, None
+    if isinstance(input, Schema):
+        return input, None
+    if isinstance(input, models.Field):
+        if isinstance(input, models.BooleanField):
+            return "boolean", None
+        if isinstance(input, (models.IntegerField, models.AutoField)):
+            return "number", "int64"
+        if isinstance(input, models.FloatField):
+            return "number", "float"
+        if isinstance(input, (models.CharField, models.TextField)):
+            return "string", None
+        if isinstance(input, models.DateTimeField):
+            return "string", "date-time"
+        if isinstance(input, models.DateField):
+            return "string", "full-date"
+        if isinstance(input, models.TimeField):
+            return "string", 'full-time'
+        if isinstance(input, (models.OneToOneField, models.ForeignKey)):
+            return Schema.create_from_model(input.related_model), None
+        if isinstance(input, models.FileField):
+            return "string", None
+        raise NotImplementedError()
+    if isinstance(input, type):
+        if input is str:
+            return 'string', None
+        if input is bool:
+            return 'boolean', None
+        if input is int:
+            return 'number', 'int64'
+        if input is float:
+            return 'number', 'float'
+        raise NotImplementedError()
+
+    raise NotImplementedError()
+
+
 class SchemaProperty:
-    def __init__(self, name: str, type: Union[str, 'Schema'], required: bool = False):
+    def __init__(self, name: str, type: Union[str, type, models.Field, 'Schema'], required: bool = False,
+                 raw: bool = False):
         self.name = name
-        self.type = type
+        self.type, self.format = type_map(type)
         self.required = required
         self.field: Optional[models.Field] = None
+        self.raw = raw
 
     @classmethod
     def create_from_model_field(cls, field: models.Field) -> 'SchemaProperty':
         schema_property = SchemaProperty(
             name=field.name,
-            type=cls.get_type_from_field(field),
+            type=field,
             required=AvishanModel.is_field_required(field)
         )
         schema_property.field = field
         return schema_property
 
-    @staticmethod
-    def get_type_from_field(field: models.Field) -> Union[str, 'Schema']:
-        if isinstance(field, models.BooleanField):
-            return "boolean"
-        if isinstance(field, (models.IntegerField, models.AutoField)):
-            return "number"
-        if isinstance(field, models.FloatField):
-            return "float"
-        if isinstance(field, (models.CharField, models.TextField)):
-            return "string"
-        if isinstance(field, models.DateTimeField):
-            return "date-time"
-        if isinstance(field, models.DateField):
-            return "date"
-        if isinstance(field, models.TimeField):
-            return "string"
-        if isinstance(field, (models.OneToOneField, models.ForeignKey)):
-            return Schema.create_from_model(field.related_model)
-        if isinstance(field, models.FileField):
-            return "string"
-        raise NotImplementedError()
-
     def export_json(self):
+        if self.raw:
+            return self.type.export_json()
         if not isinstance(self.type, str):
             return {
                 '$ref': f"#/components/schemas/{self.type.name}"
@@ -72,12 +94,17 @@ class SchemaProperty:
 
 
 class Schema:
-    def __init__(self, name: str, type: str = 'object', properties: List[SchemaProperty] = (), items: 'Schema' = None):
+    def __init__(self, name: str, type: str = 'object', properties: List[SchemaProperty] = (), items: 'Schema' = None,
+                 raw: bool = False):
         self.name = name
         self.type = type
         self.properties = properties
         self.items: Optional[Schema] = items
         self.model: Optional[AvishanModel] = None
+        self.raw = raw
+        if self.raw:
+            for prop in self.properties:
+                prop.raw = True
 
     @classmethod
     def create_from_model(cls, model: Type[AvishanModel]):
@@ -100,9 +127,13 @@ class Schema:
                 continue
             if type(value.annotation) is inspect._empty:
                 raise ValueError(f'Method ({function}) parameter ({key}) type not defined')
-            param_type = value.annotation
-            if issubclass(value.annotation, AvishanModel):
+            if inspect.isclass(value.annotation) and issubclass(value.annotation, AvishanModel):
                 param_type = Schema.create_from_model(value.annotation)
+            else:
+                try:
+                    param_type = Schema.create_from_model(value.annotation.__args__[0])
+                except:
+                    param_type = value.annotation
 
             properties.append(SchemaProperty(
                 name=key,
@@ -127,6 +158,8 @@ class Schema:
         }
 
     def export_reference(self) -> dict:
+        if self.raw:
+            return self.export_json()
         return {
             "$ref": f"#/components/schemas/{self.name}"
         } if self.items is None else {
@@ -147,10 +180,75 @@ class Schema:
     def schema_in_json(cls, name: str, schema: 'Schema'):
         return Schema(
             name=name,
+            type='object',
             properties=[SchemaProperty(
                 name=name,
                 type=schema
             )]
+        )
+
+    @classmethod
+    def raw_schema_from_dict(cls, data: dict) -> Union['Schema', 'SchemaProperty']:
+        import inspect
+
+        name = list(data.keys())[0]
+        properties = []
+        items = None
+        if isinstance(data[name], dict):
+            type = 'object'
+            for key, value in data[name].items():
+                if isinstance(value, dict):
+                    inner_type = SchemaProperty(
+                        name=key,
+                        type=Schema.raw_schema_from_dict(
+                            {key: value}
+                        )
+                    )
+                elif isinstance(value, list):
+                    inner_type = SchemaProperty(
+                        name=key,
+                        type=Schema.raw_schema_from_dict({
+                            key: [value[0]]
+                        })
+                    )
+                elif inspect.isclass(value) and issubclass(value, AvishanModel):
+                    inner_type = SchemaProperty(
+                        name=key,
+                        type=Schema.create_from_model(
+                            value
+                        )
+                    )
+                else:
+                    inner_type = SchemaProperty(
+                        name=key,
+                        type=value
+                    )
+
+                properties.append(
+                    inner_type
+                )
+        elif isinstance(data[name], list):
+            type = 'array'
+            items = Schema(
+                name=name,
+                type='array',
+                items=Schema.raw_schema_from_dict(data[name][0])
+            )
+        else:
+            if issubclass(data[name], AvishanModel):
+                return SchemaProperty(
+                    name=name,
+                    type=Schema.create_from_model(data[name])
+                )
+            return SchemaProperty(
+                name=name,
+                type=data[name]
+            )
+        return Schema(
+            name=name,
+            type=type,
+            properties=properties,
+            items=items
         )
 
     def __str__(self):
@@ -171,13 +269,16 @@ class Component:
 
 
 class Content:
-    def __init__(self, schema: Schema, type: str):
+    def __init__(self, schema: Schema, type: str, raw: bool = False):
         self.schema = schema
         self.type = type
+        self.raw = raw
 
     def export_json(self) -> dict:
         return {
             'schema': self.schema.export_reference()
+        } if not self.raw else {
+            'schema': self.schema.export_json()
         }
 
 
@@ -228,15 +329,17 @@ class PathRequest:
 
 
 class PathResponse:
-    def __init__(self, status_code: int, content: Content, description: str = None):
+    def __init__(self, status_code: int, contents: List[Content], description: str = None):
         self.status_code = status_code
-        self.content = content
+        self.contents = contents
         self.description = description
 
     def export_json(self) -> dict:
-        data = {
-            'content': self.content.export_json()
-        }
+        data = {}
+        if len(self.contents) > 0:
+            data['content'] = {}
+        for content in self.contents:
+            data['content'][content.type] = content.export_json()
         if self.description:
             data['description'] = self.description
         return data
@@ -315,7 +418,7 @@ class PathDeleteMethod(PathMethod):
     method = 'delete'
 
     def __init__(self, summary: str = None, description: str = None,
-                 responses: List[PathResponseGroup] = None, tags: List[str] = ()):
+                 responses: PathResponseGroup = None, tags: List[str] = ()):
         super().__init__(summary, description, None, responses, tags)
 
 
