@@ -67,7 +67,7 @@
                 <div class="container-fluid">
                     <div class="row mb-2">
                         <div class="col-sm-12">
-                            <h1 class="m-0 text-dark">{{ page_title }}</h1>
+                            <h1 class="m-0 text-dark">{{ page_header }}</h1>
                         </div><!-- /.col -->
                     </div><!-- /.row -->
                 </div><!-- /.container-fluid -->
@@ -77,9 +77,13 @@
             <!-- Main content -->
             <section class="content">
                 <div class="container-fluid">
-                    {% block page_content %}
-{#                        inja ye chizi bashe#}
-                    {% endblock page_content %}
+                    <div class="row">
+                        <div class="col-12">
+                            {% block page_content %}
+                                {#                        todo inja ye chizi bashe#}
+                            {% endblock page_content %}
+                        </div>
+                    </div>
                 </div><!-- /.container-fluid -->
             </section>
             <!-- /.content -->

@@ -556,6 +556,11 @@ class AvishanModel(models.Model):
             return total
         return 0
 
+    @staticmethod
+    def all_subclasses(cls):
+        return set(cls.__subclasses__()).union(
+            [s for c in cls.__subclasses__() for s in AvishanModel.all_subclasses(c)])
+
 
 class BaseUser(AvishanModel):
     """
@@ -824,6 +829,8 @@ class Phone(AvishanModel):
     number = models.CharField(max_length=255, unique=True)
     date_verified = models.DateTimeField(default=None, null=True, blank=True)
 
+    direct_non_authenticated_callable_methods = ['start_verification', 'check_verification']
+
     @staticmethod
     def send_bulk_sms():
         pass  # todo
@@ -841,6 +848,16 @@ class Phone(AvishanModel):
         url = "https://api.kavenegar.com/v1/" + get_avishan_config().KAVENEGAR_API_TOKEN + "/verify/lookup.json"
         querystring = {**{"receptor": self.number, "template": template_name}, **kwargs}
         requests.request("GET", url, data="", headers={}, params=querystring)
+
+    def start_verification(self):
+        self.send_verification_sms(PhoneVerification.create_verification(self).verification_code)
+        return self
+
+    def check_verification(self, code):
+        if PhoneVerification.check_phone(self, code):
+            self.date_verified = datetime.datetime.now()
+            self.save()
+        return self
 
     def verify(self, code: str):
         if PhoneVerification.check_phone(self, code):
@@ -1234,7 +1251,7 @@ class OtpAuthentication(AuthenticationType):
     def start_challenge(cls, key: str, user_group: UserGroup) -> Union['OtpAuthentication', 'PhoneOtpAuthenticate']:
         key = cls.key_field().related_model.validate_signature(key)
         found = cls.find(key)
-        exact = None
+        exact: Optional[PhoneOtpAuthenticate] = None
         same_user = None
         for item in found:
             if item.user_user_group.user_group == user_group:
