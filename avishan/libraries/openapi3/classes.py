@@ -20,7 +20,7 @@ class ApiDocumentation:
 
 
 # todo example for data
-def type_map(input: Union[str, type, models.Field]) -> Tuple[Union[str, 'Schema'], Optional[str]]:
+def type_map(input: Union[str, type, models.Field], name: str = None) -> Tuple[Union[str, 'Schema'], Optional[str]]:
     if isinstance(input, str):
         return input, None
     if isinstance(input, Schema):
@@ -44,7 +44,7 @@ def type_map(input: Union[str, type, models.Field]) -> Tuple[Union[str, 'Schema'
             return Schema.create_from_model(input.related_model), None
         if isinstance(input, models.FileField):
             return "string", None
-        raise NotImplementedError()
+        raise NotImplementedError(name)
     if isinstance(input, type):
         if input is str:
             return 'string', None
@@ -54,16 +54,16 @@ def type_map(input: Union[str, type, models.Field]) -> Tuple[Union[str, 'Schema'
             return 'number', 'int64'
         if input is float:
             return 'number', 'float'
-        raise NotImplementedError()
+        raise NotImplementedError(name)
 
-    raise NotImplementedError()
+    raise NotImplementedError(name)
 
 
 class SchemaProperty:
     def __init__(self, name: str, type: Union[str, type, models.Field, 'Schema'], required: bool = False,
                  raw: bool = False):
         self.name = name
-        self.type, self.format = type_map(type)
+        self.type, self.format = type_map(type, name)
         self.required = required
         self.field: Optional[models.Field] = None
         self.raw = raw
@@ -123,7 +123,7 @@ class Schema:
         properties = []
         for key, value in dict(inspect.signature(function).parameters.items()).items():
             value: InspectParameter
-            if key in ['self', 'cls']:
+            if key in ['self', 'cls', 'kwargs']:
                 continue
             if type(value.annotation) is inspect._empty:
                 raise ValueError(f'Method ({function}) parameter ({key}) type not defined')

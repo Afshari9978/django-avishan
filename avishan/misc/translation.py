@@ -20,8 +20,12 @@ class AvishanTranslatable:
         from avishan.exceptions import ErrorMessageException
 
         try:
-            if self.__dict__[current_request['language']] is not None:
-                return self.__dict__[current_request['language']]
+            if current_request['language'] is None:
+                lang = get_avishan_config().LANGUAGE
+            else:
+                lang = current_request['language']
+            if self.__dict__[lang.upper()] is not None:
+                return self.__dict__[lang.upper()]
             raise ValueError
-        except:
-            raise ErrorMessageException(str(AvishanTranslatable(EN='Not translated string', FA='رشته ترجمه نشده')))
+        except Exception as e:
+            raise ErrorMessageException('Not translated string')

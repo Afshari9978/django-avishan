@@ -3,6 +3,7 @@ import inspect
 import json
 from typing import List, get_type_hints, Type, Callable, Optional
 
+from django.db.models import QuerySet
 from django.http import JsonResponse
 from django.views import View
 
@@ -178,6 +179,7 @@ class AvishanTemplateView(AvishanView):
 
 class AvishanModelApiView(AvishanApiView):
     authenticate = True
+    track_it = True
     model: Type[AvishanModel] = None
     model_item: AvishanModel = None
     model_function: Callable = None  # todo these sends model not dict
@@ -330,7 +332,7 @@ class AvishanModelApiView(AvishanApiView):
             )
             )
             # todo custom function
-            # for method in model.direct_callable_methods:
+            # for method in model.direct_callable_methods():
             #     method = getattr(model, method)
             #     method_name = method.__name__
             #     method_signature = dict(inspect.signature(method).parameters.items())
@@ -376,9 +378,9 @@ class AvishanModelApiView(AvishanApiView):
             self.model_item = self.model.get(avishan_raise_400=True, id=int(model_item_id))
         if model_function_name is not None:
             if model_function_name not in \
-                    self.model.direct_callable_methods + self.model.direct_non_authenticated_callable_methods:
+                    self.model.direct_callable_methods() + self.model.direct_non_authenticated_callable_methods():
                 raise AuthException(AuthException.METHOD_NOT_DIRECT_CALLABLE)
-            if model_function_name in self.model.direct_non_authenticated_callable_methods:
+            if model_function_name in self.model.direct_non_authenticated_callable_methods():
                 self.authenticate = False
             try:
                 if self.model_item is None:
@@ -391,6 +393,19 @@ class AvishanModelApiView(AvishanApiView):
                 ))
             # todo have check on callables from model
 
+    def parse_returned_data(self, returned):
+        if isinstance(returned, QuerySet):
+            returned = [item.to_dict() for item in returned]
+            self.response[self.model.class_plural_snake_case_name()] = returned
+        elif isinstance(returned, list):
+            if len(returned) > 0 and isinstance(returned[0], AvishanModel):
+                returned = [item.to_dict() for item in returned]
+            self.response[self.model.class_plural_snake_case_name()] = returned
+        elif isinstance(returned, AvishanModel):
+            self.response[self.model.class_snake_case_name()] = returned.to_dict()
+        else:
+            self.response[self.model.class_plural_snake_case_name()] = returned
+
     def get(self, request, *args, **kwargs):
         if self.model_function is None:
             if self.model_item is None:
@@ -399,7 +414,7 @@ class AvishanModelApiView(AvishanApiView):
             else:
                 self.response[self.model.class_snake_case_name()] = self.model_item.to_dict()
         else:
-            self.response = {**self.model_function(), **self.response}
+            self.parse_returned_data(self.model_function())
 
     def post(self, request, *args, **kwargs):
         if self.model_function is None:
@@ -407,17 +422,7 @@ class AvishanModelApiView(AvishanApiView):
                 **request.data[self.model.class_snake_case_name()]
             ).to_dict()
         else:
-            returned = self.model_function(**self.request.data)
-            if isinstance(returned, list):
-                for i, item in enumerate(returned):
-                    if isinstance(item, AvishanModel):
-                        returned.insert(i, item.to_dict())
-                self.response[self.model.class_plural_snake_case_name()] = returned
-            else:
-
-                if isinstance(returned, AvishanModel):
-                    returned = returned.to_dict()
-                self.response[self.model.class_snake_case_name()] = returned
+            self.parse_returned_data(self.model_function(**self.request.data))
 
     def put(self, request, *args, **kwargs):
 

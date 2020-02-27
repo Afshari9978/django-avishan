@@ -1,0 +1,32 @@
+{% extends "avishan/panel/panel_page.html" %}
+{% load static %}
+{% block page_content %}
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title" style="color: white">داده ها</h3>
+
+            <div class="card-tools">
+                <div class="input-group input-group-sm" style="width: 80px;">
+                    <a type="button" class="btn btn-block btn-primary" style="color: white"
+                       href="{{ head_url }}/create">ایجاد</a>
+                </div>
+            </div>
+
+            {#                  todo add filter here#}
+            {% comment %}   todo add search
+                <div class="card-tools">
+                  <div class="input-group input-group-sm" style="width: 150px;">
+                    <input type="text" name="table_search" class="form-control float-right" placeholder="جستجو">
+
+                    <div class="input-group-append">
+                      <button type="submit" class="btn btn-default"><i class="fa fa-search"></i></button>
+                    </div>
+                  </div>
+                </div>
+{% endcomment %}
+        </div>
+        <!-- /.card-header -->
+        {% include "avishan/panel/components/list.html" with data_list=data_list %}
+        <!-- /.card-body -->
+    </div>
+{% endblock page_content %}

@@ -1,0 +1,99 @@
+{% extends "avishan/panel/base.html" %}
+{% load static %}
+{% load avishan_tags %}
+{% block body_class %}hold-transition login-page{% endblock body_class %}
+{% block body_start %}
+    <div class="login-box">
+        <!-- /.login-logo -->
+        <div class="card">
+
+            <div class="card-body login-card-body">
+                <h3 class="login-box-msg mb-3">پنل مدیریت</h3>
+                <form action="/panel/login" method="post" id="login-form">
+                    {% csrf_token %}
+                    <div class="input-group mb-2">
+                        <input type="{{ login_key_placeholder }}"
+                               class="form-control"
+                               placeholder="{{ login_key_placeholder|translator }}"
+                               id="login-key-input"
+                               name="otp_key"
+                               value="{{ otp_key }}"
+                               autofocus>
+                        <div class="input-group-append">
+                            <span class="fa fa-phone input-group-text"></span>
+                        </div>
+                    </div>
+                    {% if CONFIG.PANEL_OTP_LOGIN %}
+                        <div class="text-center mb-4" id="otp-send">
+                            <button type="submit" class="btn btn-primary btn-block btn-flat">ارسال کد</button>
+                        </div>
+                    {% endif %}
+                    <div class="input-group mb-2">
+                        <input type="text" class="form-control" name="otp_code" placeholder="کد ورود">
+                        <div class="input-group-append">
+                            <span class="fa fa-lock input-group-text"></span>
+                        </div>
+                    </div>
+                    <div class="text-center">
+                        {#                        todo center button and samller #}
+                        <button type="submit" class="btn btn-primary btn-block btn-flat">ورود</button>
+                    </div>
+                    {% for message in messages %}
+                        <div class="alert alert-{{ message.tags }} alert-dismissible mt-4" role="alert">
+                            <button type="button" class="close pull-left" data-dismiss="alert" aria-hidden="true"
+                                    aria-label="Close">
+                                &times;
+                            </button>
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                </form>
+            </div>
+            <!-- /.login-card-body -->
+        </div>
+    </div>
+{% endblock body_start %}
+{% block body_scripts %}
+    {{ block.super }}
+    <script>
+        $(function () {
+            $('input').iCheck({
+                checkboxClass: 'icheckbox_square-blue',
+                radioClass: 'iradio_square-blue',
+                increaseArea: '15%' // optional
+            })
+        })
+    </script>
+    {% if CONFIG.PANEL_OTP_LOGIN %}
+        <script>
+            $("#otp-send").click(function (event) {
+                {#event.preventDefault();#}
+                $("<input />").attr("type", "hidden")
+                    .attr("name", "otp_send")
+                    .attr("value", true)
+                    .appendTo("#login-form");
+                return true;
+            });
+
+            function makeAjaxRequest() {
+                console.log("here");
+                let login_key = $("#login-key-input").val();
+                $.post(
+                    "/panel/login",
+                    {otp_key: login_key, otp_send: true},
+                    function (result) {
+                        console.log('return');
+                        console.log(result);
+                    });
+            }
+        </script>
+    {% endif %}
+    {#    <script>#}
+    {#        $(document).ready(function () {#}
+    {##}
+    {#            $("input").hover(function () {#}
+    {#                $(this).focus();#}
+    {#            });#}
+    {#        });#}
+    {#    </script>#}
+{% endblock body_scripts %}

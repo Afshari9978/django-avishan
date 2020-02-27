@@ -30,8 +30,6 @@ class AvishanModel(models.Model):
     Models default settings
     """
     private_fields: List[Union[models.Field, str]] = []
-    direct_callable_methods = []
-    direct_non_authenticated_callable_methods = []
 
     """
     Django admin default values. Set this for all inherited models
@@ -48,6 +46,14 @@ class AvishanModel(models.Model):
     """
     CRUD functions
     """
+
+    @classmethod
+    def direct_callable_methods(cls) -> List[str]:
+        return []
+
+    @classmethod
+    def direct_non_authenticated_callable_methods(cls) -> List[str]:
+        return []
 
     @classmethod
     def get(cls, avishan_to_dict: bool = False, avishan_raise_400: bool = False,
@@ -72,6 +78,11 @@ class AvishanModel(models.Model):
         # todo show filterable fields on doc
         if avishan_to_dict:
             return [item.to_dict() for item in cls.filter(**kwargs)]
+
+        for item in current_request['request'].GET.keys():
+            if item.startswith('filter_'):
+                field = cls.get_field(item[7:])
+                kwargs[field.name] = field.related_model.get(id=current_request['request'].GET[item])
 
         if len(kwargs.items()) > 0:
             return cls.objects.filter(**kwargs)
@@ -250,7 +261,19 @@ class AvishanModel(models.Model):
                     if kwargs[field.name] == {'id': 0} or kwargs[field.name] is None:
                         base_kwargs[field.name] = None
                     else:
-                        base_kwargs[field.name] = field.related_model.__get_object_from_dict(kwargs[field.name])
+                        if field.related_model == TranslatableChar:
+                            if isinstance(kwargs[field.name], dict):
+                                en = kwargs[field.name].get('en', None)
+                                fa = kwargs[field.name].get('fa', None)
+                            elif isinstance(kwargs[field.name], str):
+                                en = kwargs[field.name]
+                                fa = kwargs[field.name]
+                            else:
+                                en = 'NOT TRANSLATED'
+                                fa = 'NOT TRANSLATED'
+                            base_kwargs[field.name] = TranslatableChar.create(en=en, fa=fa)
+                        else:
+                            base_kwargs[field.name] = field.related_model.__get_object_from_dict(kwargs[field.name])
             elif isinstance(field, models.ManyToManyField):
                 many_to_many_kwargs[field.name] = []
                 for input_item in kwargs[field.name]:
@@ -704,8 +727,27 @@ class Email(AvishanModel):
     address = models.CharField(max_length=255, unique=True)
     date_verified = models.DateTimeField(default=None, null=True, blank=True)
 
+    @classmethod
+    def direct_non_authenticated_callable_methods(cls) -> List[str]:
+        return super().direct_non_authenticated_callable_methods() + ['start_verification', 'check_verification']
+
+    def start_verification(self):
+        self.send_verification_email(EmailVerification.create_verification(self).verification_code)
+        return self
+
+    def check_verification(self, code):
+        if EmailVerification.check_email(self, code):
+            self.date_verified = datetime.datetime.now()
+            self.save()
+        return self
+
+    def send_verification_email(self, verification_code):
+        from avishan.libraries.mailgun.functions import send_mail
+        send_mail(recipient_list=[self.address], subject='Cayload Verification Code',
+                  message=f'Your verification code is: {verification_code}')
+
     @staticmethod
-    def send_bulk_mail(subject: str, message: str, recipient_list: list, html_message: str = None):
+    def send_bulk_mail(subject: str, message: str, recipient_list: List[str], html_message: str = None):
         from django.core.mail import send_mail
         if html_message is not None:
             send_mail(subject, message, get_avishan_config().EMAIL_SENDER_ADDRESS, recipient_list, html_message)
@@ -713,7 +755,17 @@ class Email(AvishanModel):
             send_mail(subject, message, get_avishan_config().EMAIL_SENDER_ADDRESS, recipient_list)
 
     def send_mail(self, subject: str, message: str, html_message: str = None):
-        self.send_bulk_mail(subject, message, [self.address], html_message)
+        from avishan.exceptions import ErrorMessageException
+        from avishan.libraries.mailgun.functions import send_mail as mailgun_send_mail
+
+        if get_avishan_config().EMAIL_SENDER_ADDRESS is not None:
+            self.send_bulk_mail(subject, message, [self.address], html_message)
+        elif get_avishan_config().MAILGUN_API_KEY is not None:
+            mailgun_send_mail(recipient_list=[self.address], subject=subject, message=message)
+        else:
+            raise ErrorMessageException(AvishanTranslatable(
+                EN='Email Provider not found'
+            ))
 
     def send_verification_code(self):
         # todo calculate time
@@ -747,7 +799,9 @@ class Email(AvishanModel):
     @classmethod
     def get(cls, address: str = None, avishan_to_dict: bool = False, avishan_raise_400: bool = False,
             **kwargs) -> 'Email':
-        return super().get(avishan_to_dict, avishan_raise_400, address=cls.validate_signature(address), **kwargs)
+        if address is not None:
+            kwargs['address'] = cls.validate_signature(address)
+        return super().get(avishan_to_dict, avishan_raise_400, **kwargs)
 
     @classmethod
     def create(cls, address: str = None) -> 'Email':
@@ -780,8 +834,8 @@ class EmailVerification(AvishanModel):
 
         if hasattr(email, 'verification'):
             previous = email.verification
-            if BchDatetime() - BchDatetime(
-                    previous.verification_date) < get_avishan_config().EMAIL_VERIFICATION_GAP_SECONDS:
+            if (BchDatetime() - BchDatetime(
+                    previous.verification_date)).total_seconds() < get_avishan_config().EMAIL_VERIFICATION_GAP_SECONDS:
                 raise ErrorMessageException(AvishanTranslatable(
                     EN='Verification Code sent recently, Please try again later'
                 ), status_code=status.HTTP_401_UNAUTHORIZED)
@@ -797,7 +851,8 @@ class EmailVerification(AvishanModel):
             raise ErrorMessageException(AvishanTranslatable(
                 EN=f'Email Verification not found for email {email}'
             ))
-        if BchDatetime() - BchDatetime(item.verification_date) > get_avishan_config().EMAIL_VERIFICATION_VALID_SECONDS:
+        if (BchDatetime() - BchDatetime(
+                item.verification_date)).total_seconds() > get_avishan_config().EMAIL_VERIFICATION_VALID_SECONDS:
             item.remove()
             raise ErrorMessageException(AvishanTranslatable(
                 EN='Code Expired, Request new one'
@@ -820,8 +875,8 @@ class EmailVerification(AvishanModel):
     def create_verification_code() -> str:
         import random
         return str(random.randint(
-            10 ** get_avishan_config().EMAIL_VERIFICATION_CODE_LENGTH,
-            10 ** (get_avishan_config().EMAIL_VERIFICATION_CODE_LENGTH + 1) - 1)
+            10 ** (get_avishan_config().PHONE_VERIFICATION_CODE_LENGTH - 1),
+            10 ** get_avishan_config().PHONE_VERIFICATION_CODE_LENGTH - 1)
         )
 
 
@@ -829,7 +884,9 @@ class Phone(AvishanModel):
     number = models.CharField(max_length=255, unique=True)
     date_verified = models.DateTimeField(default=None, null=True, blank=True)
 
-    direct_non_authenticated_callable_methods = ['start_verification', 'check_verification']
+    @classmethod
+    def direct_non_authenticated_callable_methods(cls) -> List[str]:
+        return super().direct_non_authenticated_callable_methods() + ['start_verification', 'check_verification']
 
     @staticmethod
     def send_bulk_sms():
@@ -868,29 +925,14 @@ class Phone(AvishanModel):
         return self.number
 
     @staticmethod
-    def validate_signature(phone: str, country_code: str = "98") -> str:
-        from avishan.exceptions import ErrorMessageException
+    def validate_signature(phone: str) -> str:
         from .utils import en_numbers
         phone = en_numbers(phone)
         phone = phone.replace(" ", "")
         phone = phone.replace("-", "")
 
-        if phone.startswith("00"):
-            if not phone.startswith("00" + country_code):
-                raise ErrorMessageException('شماره موبایل', status_code=status.HTTP_417_EXPECTATION_FAILED)
-            if phone.startswith("00" + country_code + "09"):
-                phone = "00" + country_code + phone[5:]
-        elif phone.startswith("+"):
-            if not phone.startswith("+" + country_code):
-                raise ErrorMessageException('شماره موبایل', status_code=status.HTTP_417_EXPECTATION_FAILED)
+        if phone.startswith("+"):
             phone = "00" + phone[1:]
-            if phone.startswith("00" + country_code + "09"):
-                phone = "00" + country_code + phone[5:]
-        elif phone.startswith("09"):
-            phone = "00" + country_code + phone[1:]
-
-        if len(phone) != 14 or not phone.isdigit():
-            raise ErrorMessageException('شماره موبایل', status_code=status.HTTP_417_EXPECTATION_FAILED)
 
         return phone
 
@@ -904,7 +946,9 @@ class Phone(AvishanModel):
     @classmethod
     def get(cls, number: str = None, avishan_to_dict: bool = False, avishan_raise_400: bool = False,
             **kwargs) -> 'Phone':
-        return super().get(avishan_to_dict, avishan_raise_400, number=cls.validate_signature(number), **kwargs)
+        if number is not None:
+            kwargs['number'] = cls.validate_signature(number)
+        return super().get(avishan_to_dict, avishan_raise_400, **kwargs)
 
     @classmethod
     def create(cls, number: str = None) -> 'Phone':
@@ -937,11 +981,12 @@ class PhoneVerification(AvishanModel):
 
         if hasattr(phone, 'verification'):
             previous = phone.verification
-            if BchDatetime() - BchDatetime(
-                    previous.verification_date) < get_avishan_config().PHONE_VERIFICATION_GAP_SECONDS:
+            if (BchDatetime() - BchDatetime(
+                    previous.verification_date)).total_seconds() < get_avishan_config().PHONE_VERIFICATION_GAP_SECONDS:
                 raise ErrorMessageException(AvishanTranslatable(
-                    EN='Verification Code sent recently, Please try again later'
-                ), status_code=status.HTTP_401_UNAUTHORIZED)
+                    EN='Verification Code sent recently, Please try again later',
+                    FA='برای ارسال مجدد کد، کمی صبر کنید'
+                ))
             previous.remove()
         return PhoneVerification.create(phone=phone, verification_code=PhoneVerification.create_verification_code())
 
@@ -954,7 +999,8 @@ class PhoneVerification(AvishanModel):
             raise ErrorMessageException(AvishanTranslatable(
                 EN=f'Phone Verification not found for phone {phone}'
             ))
-        if BchDatetime() - BchDatetime(item.verification_date) > get_avishan_config().PHONE_VERIFICATION_VALID_SECONDS:
+        if (BchDatetime() - BchDatetime(
+                item.verification_date)).total_seconds() > get_avishan_config().PHONE_VERIFICATION_VALID_SECONDS:
             item.remove()
             raise ErrorMessageException(AvishanTranslatable(
                 EN='Code Expired, Request new one'
@@ -977,8 +1023,8 @@ class PhoneVerification(AvishanModel):
     def create_verification_code() -> str:
         import random
         return str(random.randint(
-            10 ** get_avishan_config().PHONE_VERIFICATION_CODE_LENGTH,
-            10 ** (get_avishan_config().PHONE_VERIFICATION_CODE_LENGTH + 1) - 1)
+            10 ** (get_avishan_config().PHONE_VERIFICATION_CODE_LENGTH - 1),
+            10 ** get_avishan_config().PHONE_VERIFICATION_CODE_LENGTH - 1)
         )
 
 
@@ -1296,6 +1342,10 @@ class Image(AvishanModel):
     def __str__(self):
         return self.file.url
 
+    @classmethod
+    def direct_callable_methods(cls) -> List[str]:
+        return super().direct_callable_methods() + ['image_from_multipart_form_data_request']
+
     @staticmethod
     def image_from_url(url: str) -> 'Image':
         """
@@ -1316,7 +1366,7 @@ class Image(AvishanModel):
     def to_dict(self, exclude_list: List[Union[models.Field, str]] = ()) -> dict:
         return {
             'id': self.id,
-            'url': self.file.url
+            'file': self.file.url
         }
 
     @classmethod
@@ -1346,7 +1396,7 @@ class File(AvishanModel):
     def to_dict(self, exclude_list: List[Union[models.Field, str]] = ()) -> dict:
         return {
             'id': self.id,
-            'url': self.file.url
+            'file': self.file.url
         }
 
 
@@ -1369,6 +1419,8 @@ class RequestTrack(AvishanModel):
     view_execution_milliseconds = models.BigIntegerField(null=True, blank=True)
     authentication_type_class_title = models.CharField(max_length=255, blank=True, null=True)
     authentication_type_object_id = models.IntegerField(blank=True, null=True)
+
+    django_admin_search_fields = [url]
 
     django_admin_list_display = [view_name, method, status_code, user_user_group, start_time,
                                  total_execution_milliseconds, url]
@@ -1442,16 +1494,6 @@ class TranslatableChar(AvishanModel):
 
     @classmethod
     def create(cls, en: str = None, fa: str = None, auto: str = None):
-        from avishan.exceptions import ErrorMessageException
-
-        kwargs = {}
-        if auto:
-            if current_request['language'] is None:
-                raise ErrorMessageException(AvishanTranslatable(
-                    EN='language not set',
-                    FA='زبان تنظیم نشده است'
-                ))
-            kwargs[current_request['language']] = auto
         if en is not None:
             en = str(en)
             if len(en) == 0:
@@ -1462,14 +1504,16 @@ class TranslatableChar(AvishanModel):
                 fa = None
         return super().create(en=en, fa=fa)
 
-    def to_dict(self, exclude_list: List[Union[models.Field, str]] = ()) -> str:
+    def to_dict(self, exclude_list: List[Union[models.Field, str]] = ()) -> Union[str, dict]:
+        if current_request['language'] == 'all':
+            return {
+                'en': self.en,
+                'fa': self.fa
+            }
         return str(self)
 
     def __str__(self):
-        en = self.en
-        fa = self.fa
-        if en is None:
-            en = fa
-        if fa is None:
-            fa = en
-        return AvishanTranslatable(EN=en, FA=fa)
+        try:
+            return self.__getattribute__(current_request['language'].lower())
+        except:
+            return self.__getattribute__(get_avishan_config().LANGUAGE.lower())

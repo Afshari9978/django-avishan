@@ -1,0 +1,32 @@
+<div class="card-body table-responsive p-0">
+    <table class="table table-hover">
+        <tr>
+            {% for item in data_list.headers %}
+                <th>{{ item }}</th>
+            {% endfor %}
+        </tr>
+        {% for item in data_list.raw %}
+            <tr>
+                {% for data in item.data %}
+                    <td>
+                        <a style="color:inherit;  text-decoration: none;" href="{{ head_url }}/{{ item.id }}">
+                            <div>
+                                {{ data }}
+                            </div>
+                        </a>
+                    </td>
+                {% endfor %}
+            </tr>
+        {% endfor %}
+    </table>
+</div>
+{% comment %}<div class="card-footer clearfix">
+    <ul class="pagination pagination-sm m-0 float-right">
+        <li class="page-item"><a class="page-link" href="#">&laquo;</a></li>
+        <li class="page-item"><a class="page-link" href="#">1</a></li>
+        <li class="page-item"><a class="page-link" href="#">2</a></li>
+        <li class="page-item"><a class="page-link" href="#">3</a></li>
+        <li class="page-item"><a class="page-link" href="#">&raquo;</a></li>
+    </ul>
+</div>{% endcomment %}
+{#todo pagination#}

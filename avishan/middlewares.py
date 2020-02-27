@@ -25,6 +25,7 @@ class Wrapper:
 
         self.initialize_request_storage(current_request)
         current_request['request'] = request
+        current_request['language'] = request.GET.get('language', current_request['language'])
 
         """Checks for avoid-touch requests"""
         if discard_monitor(current_request['request'].get_full_path()):
