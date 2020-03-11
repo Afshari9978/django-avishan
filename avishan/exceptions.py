@@ -4,6 +4,17 @@ from . import current_request
 from .misc import status
 from .misc.translation import AvishanTranslatable
 
+"""
+try:
+    b = json.dumps(a, default=lambda o: o.__dict__, indent=2)
+except Exception as e:
+    c = 1
+current_request['locals'] = json.dumps(exc_value.__traceback__.tb_frame.f_locals, default=lambda o: o.__dict__,
+                                       indent=2)                                      
+"""
+
+
+# todo save locals too
 
 class AvishanException(Exception):
     def __init__(

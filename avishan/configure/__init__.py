@@ -70,6 +70,7 @@ class AvishanConfigFather:
     JWT_KEY: str = None
     USE_JALALI_DATETIME: bool = False
     LANGUAGE = LANGUAGES.EN
+    NEW_USERS_LANGUAGE = None
     EMAIL_VERIFICATION_GAP_SECONDS = 5 * 60
     EMAIL_VERIFICATION_VALID_SECONDS = 30 * 60
     EMAIL_VERIFICATION_TRIES_COUNT = 3
@@ -81,6 +82,10 @@ class AvishanConfigFather:
     PHONE_VERIFICATION_TRIES_COUNT = 1
     PHONE_VERIFICATION_CODE_LENGTH = 4
 
+    # visitor token
+    VISITOR_KEY_LENGTH = 40
+
+    # panel
     PANEL_ROOT = 'panel'
     PANEL_OTP_LOGIN = False
     PANEL_LOGIN_CLASS = 'PhoneOtpAuthenticate'
@@ -115,6 +120,18 @@ class AvishanConfigFather:
     @classmethod
     def get_otp_users(cls) -> List[Type]:
         return []
+
+    @classmethod
+    def create_or_update_user_group(cls, title: str, token_valid_seconds: int):
+        from avishan.models import UserGroup
+        return UserGroup.create_or_update(
+            fixed_kwargs={'title': title},
+            new_additional_kwargs={
+                'token_valid_seconds': token_valid_seconds,
+                'authenticate_with_email_password': True,
+                'authenticate_with_phone_password': True
+            }
+        )
 
 
 def get_avishan_config() -> Union[Type[AvishanConfigFather]]:

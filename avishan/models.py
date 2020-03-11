@@ -606,7 +606,12 @@ class BaseUser(AvishanModel):
 
     @classmethod
     def create(cls, is_active: bool = True):
-        return super().create(is_active=is_active)
+        return super().create(
+            is_active=is_active,
+            language=get_avishan_config().NEW_USERS_LANGUAGE
+            if get_avishan_config().NEW_USERS_LANGUAGE is not None
+            else get_avishan_config().LANGUAGE
+        )
 
     def __str__(self):
         if hasattr(self, 'user'):
@@ -1029,6 +1034,7 @@ class PhoneVerification(AvishanModel):
 
 
 class AuthenticationType(AvishanModel):
+    # todo check last_used to work
     user_user_group = models.OneToOneField(UserUserGroup, on_delete=models.CASCADE)
     last_used = models.DateTimeField(default=None, blank=True, null=True)
     last_login = models.DateTimeField(default=None, blank=True, null=True)
@@ -1332,6 +1338,56 @@ class PhoneOtpAuthenticate(OtpAuthentication):
         self.date_sent = BchDatetime().to_datetime()
         self.phone.send_verification_sms(self.code)
         self.save()
+
+
+# todo email otp authenticate
+
+class VisitorKey(AuthenticationType):
+    key = models.CharField(max_length=255, unique=True)
+
+    @classmethod
+    def key_field(cls) -> models.Field:
+        return cls.get_field('key')
+
+    @staticmethod
+    def create_key() -> str:
+        import secrets
+        return secrets.token_urlsafe(get_avishan_config().VISITOR_KEY_LENGTH)
+
+    @classmethod
+    def register(cls, user_user_group: UserUserGroup) -> 'VisitorKey':
+
+        key = cls.create_key()
+        while True:
+            try:
+                cls.get(key=key)
+                key = cls.create_key()
+            except cls.DoesNotExist:
+                break
+
+        data = {
+            'user_user_group': user_user_group,
+            'key': key,
+        }
+
+        return cls.objects.create(**data)
+
+    @classmethod
+    def login(cls, key: str, user_group: UserGroup) -> 'VisitorKey':
+        from avishan.exceptions import AuthException
+
+        try:
+            found_object = cls.objects.get(
+                **{
+                    'key': key,
+                    "user_user_group__user_group": user_group
+                }
+            )
+        except (cls.DoesNotExist, cls.key_field().related_model.DoesNotExist):
+            raise AuthException(AuthException.ACCOUNT_NOT_FOUND)
+
+        found_object._login()
+        return found_object
 
 
 class Image(AvishanModel):
