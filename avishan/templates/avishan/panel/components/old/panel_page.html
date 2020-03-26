@@ -2,7 +2,7 @@
 {% load static %}
 {% block body_start %}
     <div class="wrapper">
-
+    
         <!-- Navbar -->
         <nav class="main-header navbar navbar-expand bg-green navbar-light">
             <!-- Left navbar links -->
@@ -42,6 +42,7 @@
 
                     <!-- Sidebar Menu -->
                     <nav class="mt-2">
+
                         <ul class="nav nav-pills nav-sidebar flex-column" data-widget="treeview" role="menu"
                             data-accordion="false">
                             {% for item in sidebar_items %}
@@ -54,6 +55,15 @@
                                     </a>
                                 </li>
                             {% endfor %}
+                            {#                        <hr>#}
+                            {#                        <li class="nav-item">#}
+                            {#                            <a href="/panel/logout" class="nav-link">#}
+                            {#                                <i class="nav-icon fa fa-sign-out"></i>#}
+                            {#                                        <p>#}
+                            {#                                            خروج#}
+                            {#                                        </p>#}
+                            {#                            </a>#}
+                            {#                        </li>#}
                         </ul>
                     </nav>
                 </div>
@@ -79,6 +89,10 @@
                 <div class="container-fluid">
                     <div class="row">
                         <div class="col-12">
+                            {% block messages_stage %}
+                                {% include "avishan/panel/components/messages_list.html" %}
+                            {% endblock messages_stage %}
+
                             {% block page_content %}
                                 {#                        todo inja ye chizi bashe#}
                             {% endblock page_content %}
@@ -95,3 +109,72 @@
         <!-- /.control-sidebar -->
     </div>
 {% endblock body_start %}
+
+{% block body_scripts %}
+    {{ block.super }}
+    <!-- Select2 -->
+    <script src="{% static "plugins/select2/select2.full.min.js" %}"></script>
+    <script>
+        $(function () {
+
+            var enToFaDigits = function (input) {
+                if (input === undefined)
+                    return;
+                var returnModel = "", symbolMap = {
+                    '1': '۱',
+                    '2': '۲',
+                    '3': '۳',
+                    '4': '۴',
+                    '5': '۵',
+                    '6': '۶',
+                    '7': '۷',
+                    '8': '۸',
+                    '9': '۹',
+                    '0': '۰'
+                };
+                input = input.toString();
+                for (var i = 0; i < input.length; i++)
+                    if (symbolMap[input[i]])
+                        returnModel += symbolMap[input[i]];
+                    else
+                        returnModel += input[i];
+                return returnModel;
+            };
+
+            //Initialize Select2 Elements
+            function matchCustom(params, data) {
+                // If there are no search terms, return all of the data
+                if ($.trim(params.term) === '') {
+                    return data;
+                }
+
+                // Do not display the item if there is no 'text' property
+                if (typeof data.text === 'undefined') {
+                    return null;
+                }
+
+                // `params.term` should be the term that is used for searching
+                // `data.text` is the text that is displayed for the data object
+                if (data.text.indexOf(params.term) > -1 || data.text.indexOf(enToFaDigits(params.term)) > -1) {
+                    console.log(params.term, data.text);
+                    {#modifiedData.text += ' (matched)';#}
+
+                    // You can return modified objects from here
+                    // This includes matching the `children` how you want in nested data sets
+                    return $.extend({}, data, true);
+                }
+
+                // Return `null` if the term should not be displayed
+                return null;
+            }
+
+            $('.select2').select2({
+                matcher: matchCustom
+            });
+        })
+    </script>
+{% endblock body_scripts %}
+{% block head_tail %}
+    <!-- Select2 -->
+    <link rel="stylesheet" href="{% static "plugins/select2/select2.min.css" %}">
+{% endblock head_tail %}

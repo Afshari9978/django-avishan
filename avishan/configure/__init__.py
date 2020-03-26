@@ -74,7 +74,7 @@ class AvishanConfigFather:
     EMAIL_VERIFICATION_GAP_SECONDS = 5 * 60
     EMAIL_VERIFICATION_VALID_SECONDS = 30 * 60
     EMAIL_VERIFICATION_TRIES_COUNT = 3
-    EMAIL_VERIFICATION_CODE_LENGTH = 4
+    EMAIL_VERIFICATION_CODE_LENGTH = 6
     SMS_SIGN_IN_TEMPLATE = 'signin'
     SMS_SIGN_UP_TEMPLATE = 'signup'
     PHONE_VERIFICATION_GAP_SECONDS = 10
@@ -87,9 +87,11 @@ class AvishanConfigFather:
 
     # panel
     PANEL_ROOT = 'panel'
-    PANEL_OTP_LOGIN = False
-    PANEL_LOGIN_CLASS = 'PhoneOtpAuthenticate'
+    PANEL_TITLE = 'پنل مدیریت'
+    PANEL_ENABLE_LOG: bool = False  # todo
+    PANEL_LOGIN_CLASS_NAME = 'PhonePasswordAuthenticate'
     PANEL_LOGIN_USER_GROUP_TITLE = 'admin'
+    PANEL_TRANSLATION_DICT: dict = {}
 
     # open api
     REQUEST_COMMON_URL_PARAMETERS = [{
@@ -128,8 +130,6 @@ class AvishanConfigFather:
             fixed_kwargs={'title': title},
             new_additional_kwargs={
                 'token_valid_seconds': token_valid_seconds,
-                'authenticate_with_email_password': True,
-                'authenticate_with_phone_password': True
             }
         )
 

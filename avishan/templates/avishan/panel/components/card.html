@@ -1,0 +1,29 @@
+{% extends 'avishan/panel/components/div.html' %}
+{% block div_content %}
+    {% if card.header %}
+        <div class="card-header d-flex p-2" style="align-items: center">
+            {% if card.header.title %}
+                <h3 class="card-title">
+                    {{ card.header.title }}
+                </h3>
+            {% endif %}
+            {% if card.header.buttons|length > 0 %}
+                <ul class="nav nav-pills mr-auto p-0">
+                    {% for button in card.header.buttons %}
+                        <li class="nav-item mr-1">
+                            {% include 'avishan/panel/components/button.html' %}
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% endif %}
+        </div>
+    {% endif %}
+    {% if card.body %}
+        <div class="card-body {{ card.body_added_classes }}">
+            {% include 'avishan/panel/components/div_component.html' with div_component=card.body %}
+        </div>
+    {% endif %}
+    {% if card.footer %}
+        {% include 'avishan/panel/components/div_component.html' with div_component=card.footer %}
+    {% endif %}
+{% endblock %}

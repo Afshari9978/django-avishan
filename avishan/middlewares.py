@@ -17,6 +17,7 @@ class Wrapper:
         self.get_response = get_response
         get_avishan_config().check()
 
+
     def __call__(self, request: WSGIRequest):
         from avishan.utils import discard_monitor, find_token, decode_token, add_token_to_response, find_and_check_user
         from avishan import current_request
@@ -166,7 +167,9 @@ class Wrapper:
         request_headers = ""
         for key, value in current_request['request'].META.items():
             if key.startswith('HTTP_'):
-                request_headers += f'({key[5:]}: {value}),\n'
+                request_headers += f'{key[5:]}={value}\n'
+        for key in current_request['request'].FILES.keys():
+            request_headers += f'FILE({key})\n'
 
         authentication_type_class_title = "NOT_AVAILABLE"
         authentication_type_object_id = 0

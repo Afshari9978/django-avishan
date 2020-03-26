@@ -8,13 +8,11 @@
     <!-- Tell the browser to be responsive to screen width -->
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <!-- Font Awesome -->
-    <link rel="stylesheet" href="{% static "plugins/font-awesome/css/font-awesome.min.css" %}">
+    <link rel="stylesheet" href="{% static "plugins/font-awesome/css/font-awesome.css" %}">
     <!-- Ionicons -->
     <link rel="stylesheet" href="{% static "plugins/ionicons/ionicons.min.css" %}">
     <!-- Theme style -->
     <link rel="stylesheet" href="{% static "dist/css/adminlte.min.css" %}">
-    <!-- iCheck -->
-    <link rel="stylesheet" href="{% static "plugins/iCheck/flat/blue.css" %}">
     <!-- Morris chart -->
     <link rel="stylesheet" href="{% static "plugins/morris/morris.css" %}">
     <!-- jvectormap -->
@@ -25,12 +23,19 @@
     <link rel="stylesheet" href="{% static "plugins/daterangepicker/daterangepicker-bs3.css" %}">
     <!-- bootstrap wysihtml5 - text editor -->
     <link rel="stylesheet" href="{% static "plugins/bootstrap-wysihtml5/bootstrap3-wysihtml5.min.css" %}">
+    <!-- Ionicons -->
+    <link rel="stylesheet" href="{% static "plugins/ionicons/ionicons.min.css" %}">
+    <!-- Ion Slider -->
+    <link rel="stylesheet" href={% static "plugins/ionslider/ion.rangeSlider.css" %}>
+    <!-- ion slider Nice -->
+    <link rel="stylesheet" href={% static "plugins/ionslider/ion.rangeSlider.skinNice.css" %}>
     <!-- Google Font: Source Sans Pro -->
-    <link href="https://fonts.googleapis.com/css?family=Source+Sans+Pro:300,400,400i,700" rel="stylesheet">
+    {#    <link href="https://fonts.googleapis.com/css?family=Source+Sans+Pro:300,400,400i,700" rel="stylesheet">#}
     <!-- bootstrap rtl -->
     <link rel="stylesheet" href="{% static "dist/css/bootstrap-rtl.min.css" %}">
     <!-- template rtl version -->
     <link rel="stylesheet" href="{% static "dist/css/custom-style.css" %}">
+    {% block head_tail %}{% endblock head_tail %}
 </head>
 <body class="{% block body_class %}hold-transition sidebar-mini{% endblock body_class %}">
 {% block body_start %}{% endblock body_start %}
@@ -47,6 +52,8 @@
     </script>
     <!-- Bootstrap 4 -->
     <script src="{% static "plugins/bootstrap/js/bootstrap.bundle.min.js" %}"></script>
+    <!-- Ion Slider -->
+    <script src="{% static "plugins/ionslider/ion.rangeSlider.min.js" %}"></script>
     <!-- Morris.js charts -->
     <script src="{% static "plugins/ajax/raphael-min.js" %}"></script>
     <script src="{% static "plugins/morris/morris.min.js" %}"></script>
@@ -68,8 +75,6 @@
     <script src="{% static "plugins/slimScroll/jquery.slimscroll.min.js" %}"></script>
     <!-- FastClick -->
     <script src="{% static "plugins/fastclick/fastclick.js" %}"></script>
-    <!-- iCheck -->
-    <script src="{% static "plugins/iCheck/icheck.min.js" %}"></script>
     <!-- AdminLTE App -->
     <script src="{% static "dist/js/adminlte.js" %}"></script>
     <!-- AdminLTE dashboard demo (This is only for demo purposes) -->

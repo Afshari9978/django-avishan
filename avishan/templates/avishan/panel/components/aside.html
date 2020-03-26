@@ -1,0 +1,35 @@
+{% load static %}
+<aside class="main-sidebar sidebar-dark-primary elevation-4">
+    <a href="" class="brand-link">
+        <img
+                src="{% static "dist/img/AdminLTELogo.png" %}"
+                alt="AdminLTE Logo"
+                class="brand-image img-circle elevation-3"
+                style="opacity: .9; background-color: white; padding: 2px"
+        >
+        <span class="brand-text font-weight-light">{{ AVISHAN_CONFIG.PANEL_TITLE }}</span>
+    </a>
+    <div class="sidebar" style="direction: ltr">
+        <div style="direction: rtl">
+            <div class="user-panel mt-3 pb-3 mb-3 d-flex">
+                <div class="image">
+                    <img src="{% static "dist/img/account.svg" %}"
+                         class="img-circle elevation-2" alt="User Image">
+                </div>
+                <div class="info">
+                    <a href="" class="d-block">{{ CURRENT_REQUEST.base_user }}</a>
+                </div>
+            </div>
+            <nav class="mt-2">
+                <ul class="nav nav-pills nav-sidebar flex-column" data-widget="treeview" role="menu"
+                    data-accordion="false">
+                    {% for sidebar_item in sidebar.sidebar_items %}
+                        {% with element_address='avishan/panel/components/'|add:sidebar_item.element_type|add:'.html' %}
+                            {% include element_address %}
+                        {% endwith %}
+                    {% endfor %}
+                </ul>
+            </nav>
+        </div>
+    </div>
+</aside>

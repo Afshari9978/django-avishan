@@ -1,0 +1,13 @@
+<div
+        {% if div_component.element_kind or div_component.added_classes %}
+            class="{{ div_component.element_kind|default_if_none:"" }} {{ div_component.added_classes|default_if_none:"" }}"
+        {% endif %}
+>
+    {% block div_content %}
+        {% for item in div_component.items %}
+            {% with element_address='avishan/panel/components/div_component.html' %}
+                {% include element_address with div_component=item %}
+            {% endwith %}
+        {% endfor %}
+    {% endblock %}
+</div>

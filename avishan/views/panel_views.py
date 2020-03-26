@@ -1,170 +1,236 @@
-from typing import Type, Optional
+from typing import Optional, List, Type, Union
 
-from django.contrib import messages
 from django.shortcuts import redirect
 
+from avishan import current_request
 from avishan.configure import get_avishan_config
-from avishan.exceptions import ErrorMessageException, AuthException
-from avishan.libraries.admin_lte.classes import DataList
+from avishan.exceptions import AvishanException, AuthException, ErrorMessageException
+from avishan.libraries.admin_lte.classes import *
+from avishan.libraries.admin_lte.model import AvishanModelPanelEnabled
 from avishan.misc.translation import AvishanTranslatable
-from avishan.models import AvishanModel, OtpAuthentication, KeyValueAuthentication, UserGroup, Phone
+from avishan.models import AvishanModel, KeyValueAuthentication, EmailPasswordAuthenticate, PhonePasswordAuthenticate, \
+    OtpAuthentication, AuthenticationType, UserGroup
+from avishan.utils import all_subclasses
 from avishan.views.class_based import AvishanTemplateView
 
 
-class AvishanPanelView(AvishanTemplateView):
-    template_address = 'avishan/panel/panel_page.html'
-    template_url = '/panel'
-    show_on_sidebar = False
-    title: str = None
-    icon: str = 'fa-circle-o'
+class AvishanPanelWrapperView(AvishanTemplateView):
+    template_file_address: str = 'avishan/panel/pages/panel_page.html'
+    template_url: str = None
 
-    def setup(self, request, *args, **kwargs):
-        super().setup(request, *args, **kwargs)
-        self.context['CONFIG'] = get_avishan_config()
-        self.context['sidebar_items'] = [
-            {
-                'title': 'داشبورد',
-                'icon': 'fa-dashboard',
-                'link': ''
-            }
-        ]
-        for item in AvishanModel.all_subclasses(AvishanPanelView):
-            item: AvishanPanelView
-            if item.show_on_sidebar:
-                self.context['sidebar_items'].append({
-                    'title': item.title,
-                    'icon': item.icon if item.icon is not None else 'fa-circle',
-                    'link': item.template_url
-                })
-        self.template_url = self.request.path
-        self.context['page_header'] = "حذف شود"
+    # sidebar
+    sidebar_visible: bool = False
+    sidebar_title: Optional[str] = 'Untitled'
+    sidebar_fa_icon: Optional[str] = 'fa-circle-o'
+    sidebar_parent_view: Optional['AvishanPanelWrapperView'] = None
+    sidebar_order: int = -1
 
     def dispatch(self, request, *args, **kwargs):
+        self.parse_request_post_to_data()
         try:
-            return super().dispatch(request, *args, **kwargs)
-        except AuthException as e:
-            return redirect(AvishanPanelLoginView.template_url, permanent=True)
+            result = self._dispatch(request, *args, **kwargs)
+            if result is None:
+                return self.render()
+            return result
+        except AvishanException as e:
+            if isinstance(e, AuthException) and e.error_kind in AuthException.get_login_required_errors():
+                return redirect(to=AvishanPanelLoginPage.template_url)
+        except Exception as e:
+            AvishanException(wrap_exception=e)
+        return redirect(to=AvishanPanelErrorPage.template_url + f'?from={self.template_url}', felan=self.template_url)
+
+    def _dispatch(self, request, *args, **kwargs):
+        return super().dispatch(request, *args, **kwargs)
 
     def get(self, request, *args, **kwargs):
         return self.render()
 
-    def render(self):
-        from django.shortcuts import render as django_render
-        return django_render(self.request, self.template_address, self.context)
 
-
-class AvishanPanelLoginView(AvishanPanelView):
+class AvishanPanelLoginPage(AvishanPanelWrapperView):
+    template_file_address = 'avishan/panel/pages/login_page.html'
+    template_url = f'/{get_avishan_config().PANEL_ROOT}/login'
+    login_class: Type[AuthenticationType] = None
     authenticate = False
-    template_address = 'avishan/panel/pages/login.html'
-    template_url = '/panel/login'
 
-    def setup(self, request, *args, **kwargs):
-        super().setup(request, *args, **kwargs)
-        self.login_class = AvishanModel.get_model_with_class_name(
-            get_avishan_config().PANEL_LOGIN_CLASS)
-        self.user_group = UserGroup.get(
-            title=get_avishan_config().PANEL_LOGIN_USER_GROUP_TITLE
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.login_class: Type = AvishanModel.get_model_with_class_name(get_avishan_config().PANEL_LOGIN_CLASS_NAME)
+        self.form = Form(
+            action_url=self.template_url,
+            method='post',
+            button=Button(text='ورود'),
+            items_margin=Margin(bottom=2),
+            name='sign_in'
         )
-        self.context['login_key_placeholder'] = self.login_class.key_field().name
+        if issubclass(self.login_class, KeyValueAuthentication):
+            if issubclass(self.login_class, EmailPasswordAuthenticate):
+                self.form.add_item(IconAddedInputFormElement(
+                    name='key',
+                    input_type='email',
+                    fa_icon='fa-envelope',
+                    label='ایمیل'
+                ))
+            elif issubclass(self.login_class, PhonePasswordAuthenticate):
+                self.form.add_item(IconAddedInputFormElement(
+                    name='key',
+                    input_type='tel',
+                    fa_icon='fa-phone-square',
+                    label='شماره همراه'
+                ))
+            else:
+                raise NotImplementedError
 
-    def get(self, request, *args, **kwargs):
-        if get_avishan_config().PANEL_OTP_LOGIN:
-            self.login_class: OtpAuthentication
+            self.context['login_type'] = 'key_value'
+            self.form.add_item(IconAddedInputFormElement(
+                name='value',
+                input_type='password',
+                fa_icon='fa-lock',
+                label='رمز عبور'
+            ))
+        elif issubclass(self.login_class, OtpAuthentication):
+            self.context['login_type'] = 'otp'
+            raise NotImplementedError  # todo
         else:
-            self.login_class: KeyValueAuthentication
-
-        self.context['otp_key'] = ""
-        return self.render()
+            raise NotImplementedError
 
     def post(self, request, *args, **kwargs):
-        if get_avishan_config().PANEL_OTP_LOGIN:
-            self.login_class: OtpAuthentication
-        else:
-            self.login_class: KeyValueAuthentication
 
-        if 'otp_send' in request.data.keys():
-            # todo async it
-            # todo age por bood shomare, focus on code
-            for model in get_avishan_config().get_otp_users():
-                model: AvishanModel
-                try:
-                    model.get(phone=Phone.get_or_create_phone(request.data['otp_key']))
-                except model.DoesNotExist:
-                    raise ErrorMessageException(
-                        AvishanTranslatable(
-                            EN='User not found',
-                            FA='کاربری با این شماره پیدا نشد'
-                        )
-                    )
-            self.login_class.start_challenge(
-                key=request.data['otp_key'],
-                user_group=self.user_group
+        if issubclass(self.login_class, OtpAuthentication):
+            raise NotImplementedError
+        elif issubclass(self.login_class, KeyValueAuthentication):
+            self.login_class.login(
+                key=self.request.data['sign_in__key'],
+                password=self.request.data['sign_in__value'],
+                user_group=UserGroup.get(title=get_avishan_config().PANEL_LOGIN_USER_GROUP_TITLE)
             )
-            messages.success(self.request, AvishanTranslatable(
-                EN=f'Otp code sent successfully',
-                FA=f'کد ورود با موفقیت ارسال شد',
+        return redirect(AvishanPanelPage.template_url)
+
+
+class AvishanPanelLogoutPage(AvishanPanelWrapperView):
+    template_url = f'/{get_avishan_config().PANEL_ROOT}/logout'
+
+    def get(self, request, *args, **kwargs):
+        self.current_request['add_token'] = False
+        return redirect(AvishanPanelLoginPage.template_url)
+
+
+class AvishanPanelErrorPage(AvishanPanelWrapperView):
+    template_file_address = 'avishan/panel/pages/error_page.html'
+    template_url = f'/{get_avishan_config().PANEL_ROOT}/error'
+    authenticate = False
+
+    def get(self, request, *args, **kwargs):
+        self.redirected_from = self.request.GET.get('from', None)
+        if self.redirected_from == self.template_url:
+            self.redirected_from = get_avishan_config().PANEL_ROOT
+        return self.render()
+
+
+class AvishanPanelPage(AvishanPanelWrapperView):
+    template_url = f'/{get_avishan_config().PANEL_ROOT}'
+    page_header_text: str = ''
+    track_it = True
+    contents: List[DivComponent] = []
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.clean_class()
+
+        self.sidebar = Sidebar()
+        for sub_class in all_subclasses(AvishanModelPanelEnabled):
+            if sub_class._meta.abstract or not sub_class.sidebar_visible:
+                continue
+            sub_class: Union[AvishanModel, AvishanModelPanelEnabled]
+            self.sidebar.add_item(
+                SidebarItem(
+                    text=sub_class.panel_plural_name(),
+                    link=f'/{get_avishan_config().PANEL_ROOT}/{sub_class.class_plural_snake_case_name()}',
+                    icon=sub_class.sidebar_fa_icon
+                )
+            )
+
+        self.navbar = Navbar(background_color=Color('white'))
+        self.navbar.navbar_items.append(NavbarItem(link=AvishanPanelLogoutPage.template_url, icon='fa-sign-out'))
+
+    def clean_class(self):
+        # todo can we do something to prevent this shit? maybe not static values
+        self.page_header_text = ""
+        self.contents = []
+
+    def get(self, request, *args, **kwargs):
+        pass
+
+
+class AvishanPanelModelPage(AvishanPanelPage):
+    model: Optional[Type[Union[AvishanModel, AvishanModelPanelEnabled]]] = None
+    item: Optional[Union[AvishanModel, AvishanModelPanelEnabled]] = None
+    model_function: Optional[str] = None
+    item_id: Optional[int] = None
+    item_function: Optional[str] = None
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.clean_class()
+        self.populate_from_url()
+
+        if self.model is None:
+            raise ErrorMessageException(AvishanTranslatable(
+                EN='Model not found'
             ))
+        if not issubclass(self.model, AvishanModelPanelEnabled):
+            raise ErrorMessageException(AvishanTranslatable(
+                EN='Model not inherited from "AvishanPanelEnabled" class'
+            ))
+        self.model.panel_view = self
 
-            # todo do something when code sent
-            self.context['otp_key'] = self.request.data['otp_key']
-            return self.render()
-        else:
-            self.login_class.complete_challenge(
-                key=request.data['otp_key'],
-                code=request.data['otp_code'],
-                user_group=self.user_group
-            )
-            return redirect(AvishanPanelView.template_url)
+    def _dispatch(self, request, *args, **kwargs):
+        if self.model_function:
+            return self.model.call_panel_model_function(self.model_function)
+        if self.item_id:
+            try:
+                self.item = self.model.get(id=self.item_id)
+            except self.model.DoesNotExist:
+                ErrorMessageException(AvishanTranslatable(
+                    EN=f'Item not found with id={self.item_id}'
+                ))
+
+            if self.item_function:
+                return self.item.call_panel_item_function(self.item_function)
+            return redirect(self.request.path + "/detail", permanent=True)
+        return self.model.call_panel_model_function('list')
+
+    @property
+    def template_url(self) -> str:
+        return f'/{get_avishan_config().PANEL_ROOT}/{self.model.class_plural_snake_case_name()}'
+
+    def populate_from_url(self):
+        url = current_request['request'].path[len(get_avishan_config().PANEL_ROOT) + 2:]
+        url = url.split("/")
+
+        self.model = AvishanModel.get_model_by_plural_snake_case_name(url[0])
+        if len(url) > 1:
+            try:
+                self.item_id = int(url[1])
+                if len(url) > 2:
+                    self.item_function = url[2]
+            except ValueError:
+                self.model_function = url[1]
+        # todo add more conditions here
+
+    def clean_class(self):
+        super().clean_class()
+        self.model = None
+        self.item = None
+        self.model_function = None
+        self.item_id = None
+        self.item_function = None
 
 
-class AvishanPanelListView(AvishanPanelView):
-    template_address = 'avishan/panel/pages/list_page.html'
-    item_id = None
-    view_action = None
-    item_action = None
-    head_url = None
-    data_list = DataList()
+# todo font awesome 5
 
-    def setup(self, request, *args, **kwargs):
-        super().setup(request, *args, **kwargs)
-        self.head_url = "/" + self.request.path.split("/")[1] + "/" + self.request.path.split("/")[2]
-        self.context['head_url'] = self.head_url
+class AvishanPanelTestPage(AvishanTemplateView):
+    authenticate = False
+    template_file_address = 'avishan/panel/test_page.html'
 
-    def dispatch(self, request, *args, **kwargs):
-        if 'item_id' in kwargs.keys():
-            self.item_id = kwargs['item_id']
-        if 'view_action' in kwargs.keys():
-            self.view_action = kwargs['view_action']
-        if 'item_action' in kwargs.keys():
-            self.item_action = kwargs['item_action']
-
-        if self.view_action == 'create':
-            return self.create(request, *args, **kwargs)
-        if self.item_id is not None:
-            if self.item_action == 'delete':
-                return self.delete(request, *args, **kwargs)
-            if self.item_action == 'edit':
-                return self.edit(request, *args, **kwargs)
-            return self.detail(request, *args, **kwargs)
-        return self.list(request, *args, **kwargs)
-
-    def list(self, request, *args, **kwargs):
-        print('list')
-        self.context['data_list'] = self.data_list
-        return self.render()
-
-    def create(self, request, *args, **kwargs):
-        print('create')
-        return self.render()
-
-    def edit(self, request, *args, **kwargs):
-        print('edit')
-        return self.render()
-
-    def delete(self, request, *args, **kwargs):
-        print('delete')
-        return self.render()
-
-    def detail(self, request, *args, **kwargs):
-        print('detail')
+    def get(self, request, *args, **kwargs):
         return self.render()

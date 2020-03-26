@@ -2,16 +2,16 @@ from django.db import models
 from django.http import JsonResponse
 
 from avishan import current_request
-from avishan.decorators import AvishanApiView, AvishanTemplateView
+from avishan.decorators import AvishanApiDecorator, AvishanTemplateDecorator
 from avishan.exceptions import ErrorMessageException
 from avishan.misc.translation import AvishanTranslatable
-from avishan.models import AvishanModel, AuthenticationType
+from avishan.models import AvishanModel, AuthenticationType, KeyValueAuthentication
 
 
 # todo fix cors motherfucker
-@AvishanApiView(methods=['GET', 'POST'], track_it=True)
+@AvishanApiDecorator(methods=['GET', 'POST'], track_it=True)
 def avishan_model_store(request, model_plural_name):
-    model = AvishanModel.get_model_by_plural_name(model_plural_name)
+    model = AvishanModel.get_model_by_plural_snake_case_name(model_plural_name)
     if not model:
         raise ErrorMessageException('Entered model name not found')
 
@@ -38,9 +38,9 @@ def avishan_model_store(request, model_plural_name):
     return JsonResponse(current_request['response'])
 
 
-@AvishanApiView(methods=['GET', 'PUT', 'DELETE'], track_it=True)
+@AvishanApiDecorator(methods=['GET', 'PUT', 'DELETE'], track_it=True)
 def avishan_model_details(request, model_plural_name, item_id):
-    model = AvishanModel.get_model_by_plural_name(model_plural_name)
+    model = AvishanModel.get_model_by_plural_snake_case_name(model_plural_name)
     if not model:
         raise ErrorMessageException('Entered model name not found')
 
@@ -59,10 +59,10 @@ def avishan_model_details(request, model_plural_name, item_id):
     return JsonResponse(current_request['response'])
 
 
-@AvishanApiView(methods=['POST', 'GET', 'PUT'], track_it=True)
+@AvishanApiDecorator(methods=['POST', 'GET', 'PUT'], track_it=True)
 def avishan_model_function_caller(request, model_plural_name, function_name):
     # todo add parameter 'function_caller_methods' to each model and check them here
-    model = AvishanModel.get_model_by_plural_name(model_plural_name)
+    model = AvishanModel.get_model_by_plural_snake_case_name(model_plural_name)
     if not model:
         raise ErrorMessageException('Entered model name not found')
 
@@ -80,9 +80,9 @@ def avishan_model_function_caller(request, model_plural_name, function_name):
     return JsonResponse(current_request['response'])
 
 
-@AvishanApiView(methods=['POST', 'GET', 'PUT'], track_it=True)
+@AvishanApiDecorator(methods=['POST', 'GET', 'PUT'], track_it=True)
 def avishan_item_function_caller(request, model_plural_name, item_id, function_name):
-    model = AvishanModel.get_model_by_plural_name(model_plural_name)
+    model = AvishanModel.get_model_by_plural_snake_case_name(model_plural_name)
     if not model:
         raise ErrorMessageException('Entered model name not found')
 
@@ -104,16 +104,16 @@ def avishan_item_function_caller(request, model_plural_name, item_id, function_n
     return JsonResponse(current_request['response'])
 
 
-@AvishanApiView(authenticate=False, track_it=True)
+@AvishanApiDecorator(authenticate=False, track_it=True)
 def avishan_hash_password(request, password: str):
     # todo change it to accept get / post request
     current_request['response'] = {
-        'hashed_password': AuthenticationType._hash_password(password)
+        'hashed_password': KeyValueAuthentication._hash_password(password)
     }
     return JsonResponse(current_request['response'])
 
 
-@AvishanTemplateView(authenticate=False)
+@AvishanTemplateDecorator(authenticate=False)
 def avishan_doc(request):
     import json
     from avishan.libraries.openapi3.classes import OpenApi

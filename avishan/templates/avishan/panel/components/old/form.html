@@ -1,0 +1,35 @@
+{% autoescape off %}
+    <form role="form" method="post" {{ form_encode }} >
+{% endautoescape %}
+{% csrf_token %}
+<div class="card-body">
+    {% include "avishan/panel/components/old/inner_form.html" with form=form %}
+
+    {% comment %}<div class="form-group">
+            <label for="exampleInputFile">ارسال فایل</label>
+            <div class="input-group">
+                <div class="custom-file">
+                    <input type="file" class="custom-file-input" id="exampleInputFile">
+                    <label class="custom-file-label" for="exampleInputFile">انتخاب
+                        فایل</label>
+                </div>
+                <div class="input-group-append">
+                    <span class="input-group-text" id="">Upload</span>
+                </div>
+            </div>
+        </div>{% endcomment %}
+
+
+    {% comment %}    <div class="form-check">
+            <input type="checkbox" class="form-check-input" id="exampleCheck1">
+            <label class="form-check-label" for="exampleCheck1">مرا بخاطر بسپار</label>
+        </div>
+    {% endcomment %}
+
+</div>
+<!-- /.card-body -->
+
+<div class="card-footer" style="text-align: left">
+    <button type="submit" class="btn btn-primary align-left">{{ submit_button_text|default:"ثبت" }}</button>
+</div>
+</form>

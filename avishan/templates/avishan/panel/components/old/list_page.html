@@ -1,0 +1,133 @@
+{% extends "avishan/panel/pages/panel_page.html" %}
+{% load static %}
+{% block page_content %}
+    {% if model.class_name == 'Announcement' %}
+        <div class="card card-default">
+            <script src="{% static "plugins/jquery/jquery.min.js" %}"></script>
+            <!-- jQuery UI 1.11.4 -->
+            <script src="{% static "plugins/jquery/jquery-ui.min.js" %}"></script>
+            <!-- Ion Slider -->
+            <script src="{% static "plugins/ionslider/ion.rangeSlider.min.js" %}"></script>
+            <div class="card-header" data-widget="collapse">
+                <h3 class="card-title"><a>جستجو</a></h3>
+            </div>
+            <form action="" method="get">
+
+                <div class="card-body">
+                    <div class="row">
+                        {% for filter_item in filter_items %}
+                            {% if filter_item.type == 'select' %}
+                                <div class="col-lg-4 col-md-6 col-sm-12">
+                                    <div class="form-group">
+                                        <label>{{ filter_item.title }}</label>
+                                        <select class="form-control" style="width: 100%;" name="{{ filter_item.name }}">
+                                            {% for item in filter_item.items %}
+                                                <option value="{{ item.0 }}"
+                                                        {% if item.0 == filter_item.selected.0 %}
+                                                        selected="selected"
+                                                        {% endif %}
+                                                >{{ item.1 }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                </div>
+                            {% elif filter_item.type == 'slider' %}
+                                <div class="{{ filter_item.bootstrap_class|default:"col-md-6" }}">
+                                    <div class="form-group">
+                                        <label>{{ filter_item.title }}</label>
+                                        <input id="{{ filter_item.name }}" type="text" name="{{ filter_item.name }}"
+                                               value="" class="form-control">
+                                        <script>
+                                            {% autoescape off %}
+                                                function prettify(ts) {
+                                                    {{ filter_item.prettify|default:"return ts;" }}
+                                                }
+                                            {% endautoescape %}
+
+                                            $('#{{ filter_item.name }}').ionRangeSlider({
+                                                min: {{ filter_item.min }},
+                                                max: {{ filter_item.max }},
+                                                from: {{ filter_item.from }},
+                                                to: {{ filter_item.to }},
+                                                type: 'double',
+                                                step: {{ filter_item.step }},
+                                                {#postfix: "{{ filter_item.postfix }}",#}
+                                                {#prefix: "{{ filter_item.prefix }}",#}
+                                                prettify: prettify,
+                                                hasGrid: false,
+                                            })
+                                        </script>
+                                    </div>
+                                </div>
+                            {% elif filter_item.type == 'number-select' %}
+                                <div class="col-lg-3 col-md-6 col-sm-12">
+                                    <label>{{ filter_item.title }}</label>
+
+                                    <div class="input-group">
+                                        <input type="text" name="{{ filter_item.name }}" class="form-control">
+                                        <div class="input-group-append">
+                                            <select class="form-control" name="{{ filter_item.name }}">
+                                                {% for item in filter_item.items %}
+                                                    <option value="{{ item.0 }}"
+                                                            {% if item.0 == filter_item.selected.0 %}
+                                                            selected="selected"
+                                                            {% endif %}
+                                                    >{{ item.1 }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                            {% endif %}
+                        {% endfor %}
+                        <!-- /.col -->
+                    </div>
+                </div>
+                <div class="card-footer" style="text-align: left">
+                    <a href="/panel/announcements" class="btn btn-default align-left">نمایش همه</a>
+                    <button type="submit" class="btn btn-primary align-left">جستجو</button>
+                </div>
+            </form>
+            <!-- /.row -->
+        </div>
+    {% endif %}
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title" style="color: white">داده ها</h3>
+
+            <div class="card-tools">
+                {% if model.class_name != 'Announcement' %}
+                    {% if model.class_name == 'Employee' and not employee.can_manipulation_employees %}
+                    {% else %}
+                        {#                        <div class="input-group input-group-sm" style="width: 80px;">#}
+                        <a type="button" class="btn btn-block btn-primary" style="color: white"
+                           href="{{ head_url }}/create">ایجاد</a>
+                        {#                        </div>#}
+                    {% endif %}
+                {% endif %}
+                {% for added_button in added_buttons %}
+                    {#                    <div class="input-group input-group-sm">#}
+                    <a type="button" class="btn btn-block btn-default" style="color: black"
+                       href="{{ added_button.url }}">{{ added_button.text }}</a>
+                    {#                    </div>#}
+                {% endfor %}
+            </div>
+
+            {#                  todo add filter here#}
+            {% comment %}   todo add search
+                <div class="card-tools">
+                  <div class="input-group input-group-sm" style="width: 150px;">
+                    <input type="text" name="table_search" class="form-control float-right" placeholder="جستجو">
+
+                    <div class="input-group-append">
+                      <button type="submit" class="btn btn-default"><i class="fa fa-search"></i></button>
+                    </div>
+                  </div>
+                </div>
+{% endcomment %}
+        </div>
+        <!-- /.card-header -->
+        {% include "avishan/panel/components/old/list.html" with data_list=data_list %}
+        <!-- /.card-body -->
+    </div>
+{% endblock page_content %}

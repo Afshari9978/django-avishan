@@ -1,0 +1,91 @@
+{% extends "avishan/panel/pages/panel_page.html" %}
+{% load static %}
+{% block page_content %}
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title" style="color: white">داده ها</h3>
+
+            <div class="card-tools">
+                <div class="input-group input-group-sm" style="width: 130px;">
+                    <a type="button" class="btn btn-block btn-default"
+                       href="{{ head_url }}">بازگشت</a>
+                    {% if model.class_name != 'Announcement' and model.class_name != 'Employee' %}
+                        <a type="button" class="btn btn-block btn-success" style="color: white"
+                           href="{{ item_id }}/edit">ویرایش</a>
+                    {% endif %}
+                    {% if model.class_name == 'Announcement' and employee.can_delete_announcement %}
+                        <a type="button" class="btn btn-block btn-danger" style="color: white"
+                           href="{{ item_id }}/delete" data-toggle="modal"
+                           data-target="#modal-default">حذف</a>
+                    {% endif %}
+                    {% for added_button in added_buttons %}
+                        <a type="button" class="btn btn-block btn-default" style="color: black"
+                           href="{{ added_button.url }}">{{ added_button.text }}</a>
+                    {% endfor %}
+                </div>
+            </div>
+
+        </div>
+        <!-- /.card-header -->
+        <div class="card-body p-0">
+            <div class="mailbox-read-info" style="padding: 25px">
+                <h5>{{ item.title }}</h5>
+                <br><br>
+                <div class="row">
+                    {% for field_full in item.panel_full_field %}
+                        {% if field_full.field.verbose_name == 'hr' %}
+                            <div class="col-lg-12">
+                                <h6 style="color: white">w</h6>
+                                <h4>{{ field_full.data }}</h4>
+                                <hr>
+                                <div class="row">
+                                    {% for item in field_full.items %}
+                                        <div class="col-lg-4 col-md-6 col-sm-12">
+                                            <h6 style="padding-bottom: 4px">
+                                                <b>{{ item.field.verbose_name }}:</b> {{ item.data }}
+                                            </h6>
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        {% else %}
+                            <div class="col-lg-4 col-md-6 col-sm-12">
+                                <h6 style="padding-bottom: 4px">
+                                    <b>{{ field_full.field.verbose_name }}:</b> {{ field_full.data }}
+                                </h6>
+                            </div>
+                        {% endif %}
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <div class="modal fade" id="modal-default" style="z-index: 4000">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                            <span aria-hidden="true">&times;</span></button>
+                        {#                    <h4 class="modal-title">Default مدال</h4>#}
+                    </div>
+                    <div class="modal-body">
+                        <p>آیا از حذف مطمئن هستید؟</p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-default pull-left" data-dismiss="modal">
+                            انصراف
+                        </button>
+                        <a style="text-decoration:none;display: block;margin-right: 2px"
+                           class="btn btn-danger"
+                           href="{{ item_id }}/delete">
+                            حذف
+                        </a>
+                    </div>
+                </div>
+                <!-- /.modal-content -->
+            </div>
+            <!-- /.modal-dialog -->
+        </div>
+    </div>
+
+{% endblock page_content %}

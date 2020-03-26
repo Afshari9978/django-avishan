@@ -3,6 +3,7 @@ import inspect
 import json
 from typing import List, get_type_hints, Type, Callable, Optional
 
+from django.core.handlers.wsgi import WSGIRequest
 from django.db.models import QuerySet
 from django.http import JsonResponse
 from django.views import View
@@ -37,6 +38,7 @@ class AvishanView(View):
     def setup(self, request, *args, **kwargs):
         super().setup(request, *args, **kwargs)
         self.response: dict = current_request['response']
+        self.request: WSGIRequest
         self.class_attributes_type = get_type_hints(self.__class__)
 
         for kwarg_key, kwarg_value in kwargs.items():
@@ -95,7 +97,7 @@ class AvishanView(View):
 
         try:
             if self.authenticate and not self.is_authenticated():
-                raise AuthException(AuthException.ACCESS_DENIED)
+                raise AuthException(AuthException.TOKEN_NOT_FOUND)
             self.current_request['view_start_time'] = datetime.datetime.now()
             result = super().dispatch(request, *args, **kwargs)
             self.current_request['view_end_time'] = datetime.datetime.now()
@@ -153,15 +155,27 @@ class AvishanApiView(AvishanView):
 
 class AvishanTemplateView(AvishanView):
     is_api = False
-    template_address: str = None
+    template_file_address: str = None
+    template_url: str = None
+    context: dict = {}
 
     def setup(self, request, *args, **kwargs):
         super().setup(request, *args, **kwargs)
         self.context = {
-            'current_request': self.current_request
+            **self.context,
+            **{
+                'CURRENT_REQUEST': self.current_request,
+                'AVISHAN_CONFIG': get_avishan_config(),
+                'self': self
+            }
         }
 
     def dispatch(self, request, *args, **kwargs):
+        self.parse_request_post_to_data()
+
+        return super().dispatch(request, *args, **kwargs)
+
+    def parse_request_post_to_data(self):
         if self.current_request['request'].method in ['POST', 'PUT']:
             try:
                 if len(self.current_request['request'].body) > 0:
@@ -174,7 +188,9 @@ class AvishanTemplateView(AvishanView):
             except:
                 self.current_request['request'].data = {}
 
-        return super().dispatch(request, *args, **kwargs)
+    def render(self):
+        from django.shortcuts import render as django_render
+        return django_render(self.request, self.template_file_address, self.context)
 
 
 class AvishanModelApiView(AvishanApiView):
@@ -370,7 +386,7 @@ class AvishanModelApiView(AvishanApiView):
         model_plural_name = kwargs.get('model_plural_name', None)
         model_item_id = kwargs.get('model_item_id', None)
         model_function_name = kwargs.get('model_function_name', None)
-        self.model = AvishanModel.get_model_by_plural_name(model_plural_name)
+        self.model = AvishanModel.get_model_by_plural_snake_case_name(model_plural_name)
         if not self.model:
             raise ErrorMessageException('Entered model name not found')
 

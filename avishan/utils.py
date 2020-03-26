@@ -378,3 +378,13 @@ def find_file(name: str, parent_directory_path: str) -> List[str]:
         if name in files:
             result.append(os.path.join(root, name))
     return result
+
+
+def all_subclasses(parent_class):
+    return list(set(parent_class.__subclasses__()).union(
+        [s for c in parent_class.__subclasses__() for s in all_subclasses(c)]))
+
+
+def parse_url(url: str):
+    from urllib.parse import urlparse
+    return urlparse(url)

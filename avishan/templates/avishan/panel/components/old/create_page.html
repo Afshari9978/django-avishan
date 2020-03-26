@@ -1,0 +1,41 @@
+{% extends "avishan/panel/pages/panel_page.html" %}
+{% load static %}
+{% block page_content %}
+    {#    <div class="card">#}
+    <div class="col-md-6">
+        <!-- general form elements -->
+        <div class="card card-primary">
+            <div class="card-header">
+                <h3 class="card-title">ایجاد</h3>
+                {#                <div class="input-group input-group-sm" style="width: 80px;">#}
+                <div class="card-tools">
+                    <a type="button" class="btn btn-block btn-default" style="color: black"
+                       href="{{ head_url }}">بازگشت</a>
+                </div>
+                {#            </div>#}
+            </div>
+
+            <!-- /.card-header -->
+            <!-- form start -->
+            {% include "avishan/panel/components/old/form.html" with form=form %}
+        </div>
+
+    </div>
+    {#        <div class="card-header">#}
+    {#            <h3 class="card-title" style="color: white">داده ها</h3>#}
+    {##}
+    {#            <div class="card-tools">#}
+    {#                <div class="input-group input-group-sm" style="width: 80px;">#}
+    {#                    <a type="button" class="btn btn-block btn-default"#}
+    {#                       href="{{ head_url }}">بازگشت</a>#}
+    {#                </div>#}
+    {#            </div>#}
+    {##}
+    {##}
+    {#        </div>#}
+    <!-- /.card-header -->
+
+
+    <!-- /.card-body -->
+    {#    </div>#}
+{% endblock page_content %}

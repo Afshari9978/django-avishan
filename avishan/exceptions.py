@@ -1,4 +1,4 @@
-from typing import Optional, Union
+from typing import Optional, Union, List
 
 from . import current_request
 from .misc import status
@@ -81,6 +81,7 @@ class AuthException(AvishanException):
     def __init__(self, error_kind: tuple = NOT_DEFINED):
         from .misc.translation import AvishanTranslatable
         status_code = status.HTTP_403_FORBIDDEN
+        self.error_kind = error_kind
         if error_kind[0] == AuthException.HTTP_METHOD_NOT_ALLOWED[0]:
             status_code = status.HTTP_405_METHOD_NOT_ALLOWED
         super().__init__(status_code=status_code)
@@ -88,6 +89,20 @@ class AuthException(AvishanException):
             EN='Authentication Exception',
             FA='خطای احراز هویت'
         )))
+
+    @classmethod
+    def get_login_required_errors(cls) -> List[tuple]:
+        return [
+            cls.ACCOUNT_NOT_FOUND,
+            cls.ACCOUNT_NOT_ACTIVE,
+            cls.GROUP_ACCOUNT_NOT_ACTIVE,
+            cls.TOKEN_NOT_FOUND,
+            cls.TOKEN_EXPIRED,
+            cls.ERROR_IN_TOKEN,
+            cls.INCORRECT_PASSWORD,
+            cls.DEACTIVATED_TOKEN,
+            cls.MULTIPLE_CONNECTED_ACCOUNTS
+        ]
 
 
 class ErrorMessageException(AvishanException):

@@ -3,6 +3,7 @@ from inspect import Parameter
 from typing import List, Type, Union, Tuple, Dict
 
 import requests
+from django.core.files.uploadedfile import InMemoryUploadedFile
 from django.db.models import NOT_PROVIDED
 
 from avishan import current_request
@@ -17,6 +18,7 @@ from avishan.misc.bch_datetime import BchDatetime
 from django.db import models
 
 
+# todo error redirects should be 302 instead of 301.
 # todo related name on abstracts
 class AvishanModel(models.Model):
     # todo 0.2.1: use manager or simply create functions here?
@@ -79,10 +81,11 @@ class AvishanModel(models.Model):
         if avishan_to_dict:
             return [item.to_dict() for item in cls.filter(**kwargs)]
 
-        for item in current_request['request'].GET.keys():
-            if item.startswith('filter_'):
-                field = cls.get_field(item[7:])
-                kwargs[field.name] = field.related_model.get(id=current_request['request'].GET[item])
+        if current_request != {}:
+            for item in current_request['request'].GET.keys():
+                if item.startswith('filter_'):
+                    field = cls.get_field(item[7:])
+                    kwargs[field.name] = field.related_model.get(id=current_request['request'].GET[item])
 
         if len(kwargs.items()) > 0:
             return cls.objects.filter(**kwargs)
@@ -337,19 +340,7 @@ class AvishanModel(models.Model):
                 del kwargs[key]
 
         for key, value in kwargs.items():
-
-            if key.endswith("_id"):
-                output[key[:-3]] = {'id': int(value)}
-            elif key.endswith('_ids'):
-                # todo 0.2.0: check it
-                output[key[:-4]] = []
-                for related_id in value:
-                    output[key[:-4]].append({'id': int(related_id)})
-            elif key.endswith('_d'):
-                date_parts = value.split('-')
-                output[key[:-2]] = BchDatetime(date_parts[2], date_parts[1], date_parts[0]).to_date()
-            else:
-                output[key] = value
+            output[key] = value
 
         return output
 
@@ -400,7 +391,7 @@ class AvishanModel(models.Model):
         return None
 
     @staticmethod
-    def get_model_by_plural_name(name: str) -> Optional[Type['AvishanModel']]:
+    def get_model_by_plural_snake_case_name(name: str) -> Optional[Type['AvishanModel']]:
         for model in AvishanModel.get_non_abstract_models():
             if model.class_plural_snake_case_name() == name:
                 return model
@@ -632,16 +623,10 @@ class UserGroup(AvishanModel):
     token_valid_seconds = models.BigIntegerField(default=30 * 60, blank=True)
 
     """Check if this group users can access to their specific space in this ways"""
-    authenticate_with_email_password = models.BooleanField(default=False)
-    authenticate_with_phone_password = models.BooleanField(default=False)
-    authenticate_with_phone_otp = models.BooleanField(default=False)
 
     private_fields = [
         token_valid_seconds,
-        'id',
-        authenticate_with_email_password,
-        authenticate_with_phone_password,
-        authenticate_with_phone_otp
+        'id'
     ]
 
     def add_user_to_user_group(self, base_user: BaseUser) -> 'UserUserGroup':
@@ -1329,6 +1314,8 @@ class OtpAuthentication(AuthenticationType):
 class PhoneOtpAuthenticate(OtpAuthentication):
     phone = models.ForeignKey(Phone, on_delete=models.CASCADE, related_name='otp_authenticates')
 
+    django_admin_list_display = ['user_user_group', 'phone', 'code']
+
     @classmethod
     def key_field(cls) -> Union[models.Field, models.ForeignKey]:
         return cls.get_field('phone')
@@ -1344,6 +1331,9 @@ class PhoneOtpAuthenticate(OtpAuthentication):
 
 class VisitorKey(AuthenticationType):
     key = models.CharField(max_length=255, unique=True)
+
+    django_admin_list_display = key,
+    django_admin_search_fields = key,
 
     @classmethod
     def key_field(cls) -> models.Field:
@@ -1389,6 +1379,9 @@ class VisitorKey(AuthenticationType):
         found_object._login()
         return found_object
 
+    def __str__(self):
+        return self.key
+
 
 class Image(AvishanModel):
     file = models.ImageField(blank=True, null=True)
@@ -1426,10 +1419,9 @@ class Image(AvishanModel):
         }
 
     @classmethod
-    def image_from_multipart_form_data_request(cls, name: str = 'file') -> 'Image':
+    def image_from_in_memory_upload(cls, file: InMemoryUploadedFile) -> 'Image':
         from avishan.exceptions import ErrorMessageException
-        media = current_request['request'].FILES.get(name)
-        if media is None:
+        if file is None:
             raise ErrorMessageException(AvishanTranslatable(
                 EN='File not found',
                 FA='فایل ارسال نشده است'
@@ -1438,10 +1430,14 @@ class Image(AvishanModel):
         created = Image.create(
             base_user=current_request['base_user']
         )
-        created.file.save("uploaded_images/" + media.name, media, save=True)
+        created.file.save("uploaded_images/" + file.name, file, save=True)
         created.save()
 
         return created
+
+    @classmethod
+    def image_from_multipart_form_data_request(cls, name: str = 'file') -> 'Image':
+        return cls.image_from_in_memory_upload(file=current_request['request'].FILES.get(name))
 
 
 class File(AvishanModel):
