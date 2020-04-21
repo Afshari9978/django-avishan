@@ -18,6 +18,8 @@ from avishan.misc.translation import AvishanTranslatable
 from avishan.models import AvishanModel, RequestTrack
 
 
+# todo fix cors motherfucker
+# todo doc
 class AvishanView(View):
     authenticate: bool = True
     track_it: bool = False
@@ -448,3 +450,12 @@ class AvishanModelApiView(AvishanApiView):
 
     def delete(self, request, *args, **kwargs):
         self.response[self.model.class_snake_case_name()] = self.model_item.remove()
+
+
+class PasswordHash(AvishanApiView):
+    authenticate = False
+
+    def get(self, request, *args, **kwargs):
+        import bcrypt
+        current_request['response']['hashed'] = bcrypt.hashpw(kwargs['password'].encode('utf8'), bcrypt.gensalt()).decode('utf8')
+        return JsonResponse(current_request['response'])

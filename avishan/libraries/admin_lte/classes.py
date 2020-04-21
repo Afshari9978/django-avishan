@@ -211,6 +211,13 @@ class Col(DivComponent):
         self._added_classes = data
 
 
+class CardTab(DivComponent):
+    def __init__(self, title: str, body: DivComponent, **kwargs):
+        super().__init__(element_kind='card_tab', **kwargs)
+        self.title = title
+        self.body = body
+
+
 class CardHeader(DivComponent):
 
     def __init__(self,
@@ -239,11 +246,16 @@ class Card(DivComponent):
         self.body = body
         self.footer = footer
         self.body_added_classes = body_added_classes
+        self.tabs: List[CardTab] = []
 
     def add_item(self, item: 'DivComponent'):
         if not self.body:
             self.body = DivComponent()
         self.body.items.append(item)
+        return self
+
+    def add_tab(self, tab: CardTab):
+        self.tabs.append(tab)
         return self
 
 
@@ -524,3 +536,93 @@ class UnorderedListItem:
     def __init__(self, data: str, link: str = None):
         self.data = data
         self.link = link
+
+
+class LineChartJs(DivComponent):
+    class LineData:
+        def __init__(self, title: str, color: str = "#007bff", data_list: list = None):
+            if data_list is None:
+                data_list = []
+            self.color = color
+            self.title = title
+            self.data_list = data_list
+
+    def __init__(self, name: str, labels: List[str] = None, settings: List[str] = (), **kwargs):
+        super().__init__(element_kind='line_chart_js', **kwargs)
+        if labels is None:
+            labels = []
+        self.labels = labels
+        self.name = name
+        self.settings = settings
+
+    def add_item(self, item: Union[LineData, DivComponent]):
+        return super().add_item(item)
+
+
+class BarChartJs(DivComponent):
+    class BarData:
+        def __init__(self, title: str, color: str = "#007bff", data_list: list = None):
+            if data_list is None:
+                data_list = []
+            self.color = color
+            self.title = title
+            self.data_list = data_list
+
+    def __init__(self, name: str, labels: List[str] = None, **kwargs):
+        super().__init__(element_kind='line_chart_js', **kwargs)
+        if labels is None:
+            labels = []
+        self.labels = labels
+        self.name = name
+
+    def add_item(self, item: Union[BarData, DivComponent]):
+        return super().add_item(item)
+
+
+class TimelineItem:
+    def __init__(self,
+                 time: str = "",
+                 title: str = "",
+                 body_text: str = "",
+                 buttons: List[Button] = (),
+                 fa_icon: str = "fa-info"
+                 ):
+        self.time = time
+        self.title = title
+        self.body_text = body_text
+        self.buttons = buttons
+        self.fa_icon = fa_icon
+
+
+class TimelineSection:
+    def __init__(self, title: str, items: List[TimelineItem] = None):
+        if items is None:
+            items = []
+        self.title = title
+        self.items = items
+
+
+class Timeline(DivComponent):
+    def __init__(self, sections: List[TimelineSection] = (), **kwargs):
+        super().__init__(element_kind='timeline', **kwargs)
+        self.sections = sections
+
+
+class DashboardItem:
+    def __init__(self, item, row: int = 0, order: int = 0, col: Col = Col(6)):
+        self.order = order
+        self.item = item
+        self.row = row
+        self.col = col
+
+
+class InfoBox(DivComponent):
+    def __init__(self,
+                 title: str,
+                 value: str,
+                 fa_icon: str,
+                 **kwargs):
+        super().__init__(element_kind='info_box', **kwargs)
+        self.title = title
+        self.value = value
+        self.fa_icon = fa_icon

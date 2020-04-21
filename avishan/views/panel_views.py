@@ -136,8 +136,14 @@ class AvishanPanelPage(AvishanPanelWrapperView):
         super().__init__(*args, **kwargs)
         self.clean_class()
 
-        self.sidebar = Sidebar()
-        for sub_class in all_subclasses(AvishanModelPanelEnabled):
+        self.sidebar = Sidebar().add_item(
+            SidebarItem(
+                text='داشبورد',
+                link=f'/{get_avishan_config().PANEL_ROOT}',
+                icon='fa-dashboard'
+            )
+        )
+        for sub_class in sorted(all_subclasses(AvishanModelPanelEnabled), key=lambda x: x.sidebar_order):
             if sub_class._meta.abstract or not sub_class.sidebar_visible:
                 continue
             sub_class: Union[AvishanModel, AvishanModelPanelEnabled]
@@ -159,6 +165,39 @@ class AvishanPanelPage(AvishanPanelWrapperView):
 
     def get(self, request, *args, **kwargs):
         pass
+
+
+class AvishanPanelDashboardPage(AvishanPanelPage):
+    template_url = f'/{get_avishan_config().PANEL_ROOT}'
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.dashboard_items: List[DashboardItem] = []
+        self.page_header_text = 'داشبورد'
+        for model in all_subclasses(AvishanModelPanelEnabled):
+            model: AvishanModelPanelEnabled
+            self.dashboard_items.extend(model.panel_dashboard_items())
+
+    def rows(self) -> List[Row]:
+        rows = {}
+        created = []
+        for item in sorted(self.dashboard_items, key=lambda x: x.row):
+            if item.row not in rows.keys():
+                rows[item.row] = []
+            rows[item.row].append(item)
+        for row_key in sorted(rows.keys()):
+            row = Row()
+            for item in sorted(rows[row_key], key=lambda x: x.order):
+                item: DashboardItem
+                row.add_item(item.col.add_item(
+                    item.item
+                ))
+            created.append(row)
+        return created
+
+    def get(self, request, *args, **kwargs):
+        self.contents.extend(self.rows())
+        return super().get(request, *args, **kwargs)
 
 
 class AvishanPanelModelPage(AvishanPanelPage):

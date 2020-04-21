@@ -8,17 +8,15 @@
         {% include 'avishan/panel/components/aside.html' with sidebar=self.sidebar %}
 
         <div class="content-wrapper">
-            {% if self.page_header_text %}
-                <div class="content-header">
-                    <div class="container-fluid">
-                        <div class="row mb-2">
-                            <div class="col-sm-12">
-                                <h1 class="m-0 text-dark">{{ self.page_header_text }}</h1>
-                            </div>
+            <div class="content-header">
+                <div class="container-fluid">
+                    <div class="row mb-2">
+                        <div class="col-sm-12">
+                            <h1 class="m-0 text-dark">{{ self.page_header_text }}</h1>
                         </div>
                     </div>
                 </div>
-            {% endif %}
+            </div>
 
             {% if self.contents|length or messages|length %}
                 {#                todo check if have message show it#}

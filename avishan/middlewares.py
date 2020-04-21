@@ -7,7 +7,6 @@ from django.http import JsonResponse
 
 from avishan.configure import get_avishan_config
 from avishan.exceptions import AvishanException, save_traceback
-from avishan.libraries.openapi3.classes import OpenApi
 
 
 class Wrapper:
@@ -16,7 +15,6 @@ class Wrapper:
     def __init__(self, get_response):
         self.get_response = get_response
         get_avishan_config().check()
-
 
     def __call__(self, request: WSGIRequest):
         from avishan.utils import discard_monitor, find_token, decode_token, add_token_to_response, find_and_check_user
@@ -108,6 +106,7 @@ class Wrapper:
 
     @staticmethod
     def initialize_request_storage(current_request):
+        from avishan.models import RequestTrack
         current_request.clear()
         current_request['request'] = None
         current_request['response'] = {}
@@ -134,12 +133,11 @@ class Wrapper:
         current_request['exception'] = None
         current_request['traceback'] = None
         current_request['language'] = None
-        current_request['request_track_object'] = None
+        current_request['request_track_object'] = RequestTrack()
         current_request['context'] = {}
         current_request['messages'] = {
             'debug': [], 'info': [], 'success': [], 'warning': [], 'error': []
         }
-        # todo ye check
 
     @staticmethod
     def fill_messages_framework(current_request):
@@ -156,7 +154,7 @@ class Wrapper:
 
     @staticmethod
     def save_request_track(current_request):
-        from avishan.models import RequestTrackMessage, RequestTrackException, RequestTrack
+        from avishan.models import RequestTrackException
         current_request['end_time'] = datetime.datetime.now()
 
         try:
@@ -176,9 +174,6 @@ class Wrapper:
         if current_request['authentication_object']:
             authentication_type_class_title = current_request['authentication_object'].__class__.__name__
             authentication_type_object_id = current_request['authentication_object'].id
-
-        if current_request['is_tracked'] is False:
-            current_request['request_track_object'] = RequestTrack.objects.create()
 
         try:
             created = current_request['request_track_object'].update(
@@ -202,15 +197,7 @@ class Wrapper:
                 authentication_type_class_title=authentication_type_class_title,
                 authentication_type_object_id=authentication_type_object_id
             )
-            for type in ['debug', 'info', 'success', 'warning', 'error']:
-                for message_item in current_request['messages'][type]:
-                    RequestTrackMessage.objects.create(
-                        request_track=created,
-                        type=type,
-                        title=message_item['title'] if 'title' in message_item.keys() else "NOT_AVAILABLE",
-                        body=message_item['body'] if 'body' in message_item.keys() else "NOT_AVAILABLE",
-                        code=message_item['code'] if 'code' in message_item.keys() else "NOT_AVAILABLE"
-                    )
+
             if current_request['exception'] is not None:
                 RequestTrackException.objects.create(
                     request_track=created,

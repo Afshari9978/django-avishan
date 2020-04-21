@@ -213,7 +213,7 @@ class BchDatetime(object):
         """
         formats: 
         %Y: YYYY year
-        ٪y: YY short year
+        %y: YY short year
         %m: MM month
         %d: DD day
         %A: persian weekday دوشنبه

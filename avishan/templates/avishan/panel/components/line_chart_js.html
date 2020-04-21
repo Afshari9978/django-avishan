@@ -1,0 +1,79 @@
+{% load static %}
+{% if line_chart_js.settings|length > 0 %}
+    <div>
+        <form>
+            {% for item in line_chart_js.settings %}
+                <input class="btn btn-default" value="{{ item }}" name="{{ line_chart_js.name }}" type="submit">
+            {% endfor %}
+        </form>
+    </div>
+{% endif %}
+<div class="position-relative mb-4">
+    <canvas id="line-chart-js-{{ line_chart_js.name }}" height="200"></canvas>
+    <!-- jQuery -->
+    <script src="{% static "plugins/jquery/jquery.min.js" %}"></script>
+    <!-- jQuery UI 1.11.4 -->
+    <script src="{% static "plugins/jquery/jquery-ui.min.js" %}"></script>
+    <script src="{% static "plugins/chart.js/Chart.min.js" %}"></script>
+    <script>
+
+        var ticksStyle = {
+            fontColor: '#495057',
+            fontStyle: 'bold'
+        };
+        var $visitorsChart = $('#line-chart-js-{{ line_chart_js.name }}');
+        var visitorsChart = new Chart($visitorsChart, {
+            data: {
+                labels: {{ line_chart_js.labels|safe }},
+                datasets: [
+                    {% for item in line_chart_js.items %}
+                        {
+                            type: 'line',
+                            label: "{{ item.title }}",
+                            data: {{ item.data_list|safe }},
+                            backgroundColor: 'transparent',
+                            borderColor: '{{ item.color }}',
+                            pointBorderColor: '{{ item.color }}',
+                            pointBackgroundColor: '{{ item.color }}',
+                            fill: false,
+                        },
+                    {% endfor %}
+                ]
+            },
+            options: {
+                maintainAspectRatio: false,
+                tooltips: {
+                    mode: 'index',
+                    intersect: true
+                },
+                hover: {
+                    mode: 'index',
+                    intersect: true
+                },
+                legend: {
+                    display: true
+                },
+                scales: {
+                    yAxes: [{
+                        gridLines: {
+                            display: true,
+                            lineWidth: '4px',
+                            color: 'rgba(0, 0, 0, .2)',
+                            zeroLineColor: 'transparent'
+                        },
+                        ticks: $.extend({
+                            {#beginAtZero: true,#}
+                        }, ticksStyle)
+                    }],
+                    xAxes: [{
+                        display: true,
+                        gridLines: {
+                            display: false
+                        },
+                        ticks: ticksStyle
+                    }]
+                }
+            }
+        })
+    </script>
+</div>

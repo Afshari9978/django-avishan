@@ -20,6 +20,7 @@ from django.db import models
 
 # todo error redirects should be 302 instead of 301.
 # todo related name on abstracts
+# todo app name needed for models
 class AvishanModel(models.Model):
     # todo 0.2.1: use manager or simply create functions here?
     # todo 0.2.0 relation on_delete will call our remove() ?
@@ -477,6 +478,8 @@ class AvishanModel(models.Model):
         :param field: target field
         :return: after cast data
         """
+        if data is None:
+            return None
         if isinstance(field, (models.CharField, models.TextField)):
             cast_class = str
         elif isinstance(field, (models.IntegerField, models.AutoField)):
@@ -1373,7 +1376,7 @@ class VisitorKey(AuthenticationType):
                     "user_user_group__user_group": user_group
                 }
             )
-        except (cls.DoesNotExist, cls.key_field().related_model.DoesNotExist):
+        except cls.DoesNotExist:
             raise AuthException(AuthException.ACCOUNT_NOT_FOUND)
 
         found_object._login()
@@ -1520,17 +1523,6 @@ class RequestTrackExecInfo(AvishanModel):
         return self.title
 
 
-class RequestTrackMessage(AvishanModel):
-    request_track = models.ForeignKey(RequestTrack, on_delete=models.CASCADE, related_name='messages')
-    type = models.CharField(max_length=255)
-    title = models.TextField(null=True, blank=True)
-    body = models.TextField(null=True, blank=True)
-    code = models.CharField(max_length=255, null=True, blank=True)
-
-    def __str__(self):
-        return self.title
-
-
 class RequestTrackException(AvishanModel):
     request_track = models.OneToOneField(RequestTrack, on_delete=models.CASCADE, related_name='exception')
     class_title = models.CharField(max_length=255, null=True, blank=True)
@@ -1569,3 +1561,42 @@ class TranslatableChar(AvishanModel):
             return self.__getattribute__(current_request['language'].lower())
         except:
             return self.__getattribute__(get_avishan_config().LANGUAGE.lower())
+
+
+class Activity(AvishanModel):
+    title = models.CharField(max_length=255)
+    user_user_group = models.ForeignKey(UserUserGroup, on_delete=models.CASCADE)
+    request_track = models.ForeignKey(RequestTrack, on_delete=models.SET_NULL, null=True, blank=True)
+    date_created = models.DateTimeField(auto_now_add=True)
+    object_class = models.CharField(max_length=255, blank=True, null=True)
+    object_id = models.BigIntegerField(default=None, null=True, blank=True)
+    data = models.TextField(blank=True, null=True)
+
+    django_admin_list_display = [user_user_group, title, data, object_class, object_id, date_created]
+
+    @classmethod
+    def create(cls,
+               title: str,
+               object_class: str = None,
+               object_id: int = None,
+               data: str = None
+               ):
+        request_track = current_request['request_track_object']
+        user_user_group = current_request['user_user_group']
+        if not request_track and not user_user_group:
+            return
+        return super().create(
+            title=title,
+            user_user_group=user_user_group if user_user_group else request_track.user_user_group,
+            request_track=request_track,
+            object_class=object_class,
+            object_id=object_id,
+            data=data
+        )
+
+    @classmethod
+    def class_plural_snake_case_name(cls) -> str:
+        return 'activities'
+
+    def __str__(self):
+        return self.title

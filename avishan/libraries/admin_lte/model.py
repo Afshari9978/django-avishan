@@ -22,6 +22,10 @@ class AvishanModelPanelEnabled:
     sidebar_order: int = -1
 
     @classmethod
+    def panel_dashboard_items(cls) -> List[DashboardItem]:
+        return []
+
+    @classmethod
     def call_panel_model_function(cls: AvishanModel, model_function_name: str):
         try:
             return getattr(cls, 'panel_' + model_function_name)()
@@ -200,14 +204,7 @@ class AvishanModelPanelEnabled:
         self.panel_view.page_header_text = f'جزئیات {self.panel_name()}'
         self.panel_view.contents.append(
             Row().add_item(
-                Col(extra_large=6, large=6, medium=12).add_item(
-                    Card(
-                        header=CardHeader(
-                            buttons=self.panel_detail_buttons()
-                        ),
-                        body=DataList().add_items(self.panel_detail_items()),
-                    )
-                )
+                Col(extra_large=6, large=6, medium=12).add_item(self.panel_detail_main_card())
             )
         )
         # todo: inja accardeon bezaram related haro neshoon bedim
@@ -241,8 +238,11 @@ class AvishanModelPanelEnabled:
     def panel_list_items(cls) -> List[TableItem]:
         items = []
         for item in cls.panel_list_items_filter():
-            items.append(TableItem(data_dict=item.__dict__))
+            items.append(TableItem(data_dict=item.panel_item_data_dict()))
         return items
+
+    def panel_item_data_dict(self) -> dict:
+        return self.__dict__
 
     @classmethod
     def panel_list_items_filter(cls: AvishanModel) -> QuerySet:
@@ -374,6 +374,23 @@ class AvishanModelPanelEnabled:
     @classmethod
     def panel_detail_keys(cls: Union[AvishanModel, 'AvishanModelPanelEnabled']):
         return [field.name for field in cls.get_fields()]
+
+    def panel_detail_main_card(self) -> Card:
+        card = Card(
+            header=CardHeader(
+                buttons=self.panel_detail_buttons()
+            )
+        )
+        if len(self.panel_detail_main_card_items()) == 1:
+            card.body = self.panel_detail_main_card_items()[0]
+        else:
+            for tab in self.panel_detail_main_card_items():
+                tab: CardTab
+                card.add_tab(tab)
+        return card
+
+    def panel_detail_main_card_items(self) -> Union[List[DivComponent]]:
+        return [DataList().add_items(self.panel_detail_items())]
 
     @classmethod
     def panel_edit_model_enable(cls) -> bool:
