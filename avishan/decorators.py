@@ -93,7 +93,7 @@ class AvishanView:
         return True
 
 
-class AvishanApiView(AvishanView):
+class AvishanApiDecorator(AvishanView):
 
     def __init__(self, methods=('GET',), authenticate: bool = True, track_it: bool = False):
         super().__init__(is_api=True, methods=methods, authenticate=authenticate, track_it=track_it)
@@ -118,7 +118,7 @@ class AvishanApiView(AvishanView):
         pass
 
 
-class AvishanTemplateView(AvishanView):
+class AvishanTemplateDecorator(AvishanView):
     def __init__(self, methods=('GET',), authenticate: bool = True, track_it: bool = False):
         super().__init__(is_api=False, methods=methods, authenticate=authenticate, track_it=track_it)
 

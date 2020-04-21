@@ -1,0 +1,18 @@
+<form action="{{ form.action_url }}" method="{{ form.method }}" id="{{ form.name }}"
+        {% autoescape off %}
+            {{ form.encode }}
+        {% endautoescape %}
+>
+    {% csrf_token %}
+    {% for form_element in form.items %}
+        <div class="form-group {{ form_element.margin }} {{ form_element.padding }} {{ form_element.added_classes }}">
+            <label for="{{ form_element.name }}">{{ form_element.label }}</label>
+            {% with element_address='avishan/panel/components/'|add:form_element.type|add:'.html' %}
+                {% include element_address %}
+            {% endwith %}
+        </div>
+    {% endfor %}
+    <div class="text-center">
+        {% include 'avishan/panel/components/button.html' with button=form.button disabled=form.disabled %}
+    </div>
+</form>

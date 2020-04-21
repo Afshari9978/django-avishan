@@ -1,0 +1,11 @@
+<ul>
+    {% for item in unordered_list.items %}
+        {% if item.link %}
+            <a href="{{ item.link }}">
+        {% endif %}
+    <li>{{ item.data }}</li>
+    {% if item.link %}
+        </a>
+    {% endif %}
+    {% endfor %}
+</ul>

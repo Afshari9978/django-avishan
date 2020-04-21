@@ -1,0 +1,32 @@
+<li class="nav-item
+{% if sidebar_item.children|length > 0 %}
+ has-treeview
+{% endif %}
+{% if sidebar_item.active %}
+ menu-open
+{% endif %}
+">
+    <a href="{{ sidebar_item.link }}"
+       class="nav-link
+{% if sidebar_item.active %}
+ active
+{% endif %}
+">
+        <i class="nav-icon fa {{ sidebar_item.icon }}"></i>
+        <p>
+            {{ sidebar_item.text }}
+            {% if sidebar_item.badge %}
+                <span class="right badge {{ sidebar_item.badge.span_class }}">{{ sidebar_item.badge.text }}</span>
+            {% endif %}
+        </p>
+    </a>
+    {% if sidebar_item.children|length > 0 %}
+        <ul class="nav nav-treeview">
+            {% for child in sidebar_item.children %}
+                {% with template_address='avishan/panel/components/sidebar/sidebar_item.html' %}
+                    {% include template_address with sidebar_item=child %}
+                {% endwith %}
+            {% endfor %}
+        </ul>
+    {% endif %}
+</li>

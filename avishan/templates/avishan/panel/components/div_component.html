@@ -1,0 +1,19 @@
+{% if div_component.element_kind == 'card' %}
+    {% include 'avishan/panel/components/card.html' with card=div_component %}
+{% elif div_component.element_kind == 'pagination' %}
+    {% include 'avishan/panel/components/pagination.html' with pagination=div_component %}
+{% elif div_component.element_kind == 'form' %}
+    {% include 'avishan/panel/components/form.html' with form=div_component %}
+{% elif div_component.element_kind == 'table' %}
+    {% include 'avishan/panel/components/table.html' with table=div_component %}
+{% elif div_component.element_kind == 'data_list' %}
+    {% include 'avishan/panel/components/data_list.html' with data_list=div_component %}
+{% elif div_component.element_kind == 'unordered_list' %}
+    {% include 'avishan/panel/components/unordered_list.html' with unordered_list=div_component %}
+{% elif div_component.element_kind == 'raw' %}
+    {% autoescape off %}
+        {{ div_component.raw }}
+    {% endautoescape %}
+{% else %}
+    {% include 'avishan/panel/components/div.html' %}
+{% endif %}

@@ -1,0 +1,85 @@
+{% load avishan_tags %}
+<div class="card-body table-responsive p-0">
+    <table class="table table-hover">
+        <tr>
+            {% if model.class_name == 'Announcement' %}
+                <th>نوع ملک</th>
+                <th>قیمت</th>
+                <th>متراژ</th>
+                <th>آدرس</th>
+                <th>مالک</th>
+                <th>تلفن مالک</th>
+            {% endif %}
+            {% for item in data_list.headers %}
+                <th>{{ item.verbose_name }}</th>
+            {% endfor %}
+        </tr>
+        {% for item in data_list.raw %}
+            <tr>
+                {% if model.class_name == 'Announcement' %}
+                    <td>
+                        <a style="color:inherit;  text-decoration: none;" href="{{ head_url }}/{{ item.id }}">
+                            <div>
+                                {{ item.object.on_list_button_type }}
+                            </div>
+                        </a>
+                    </td>
+                    <td>
+                        <a style="color:inherit;  text-decoration: none;" href="{{ head_url }}/{{ item.id }}">
+                            <div>
+                                {{ item.object.on_list_button_sell_type }}
+                            </div>
+                        </a>
+                    </td>
+                    <td>
+                        <a style="color:inherit;  text-decoration: none;" href="{{ head_url }}/{{ item.id }}">
+                            <div>
+                                {{ item.object.on_list_button_metrage }}
+                            </div>
+                        </a>
+                    </td>
+                    <td>
+                        <a style="color:inherit;  text-decoration: none;" href="{{ head_url }}/{{ item.id }}">
+                            <div>
+                                {{ item.object.on_list_button_address }}
+                            </div>
+                        </a>
+                    </td>
+                    <td>
+                        <a style="color:inherit;  text-decoration: none;" href="{{ head_url }}/{{ item.id }}">
+                            <div>
+                                {{ item.object.on_list_button_seller_name }}
+                            </div>
+                        </a>
+                    </td>
+                    <td>
+                        <a style="color:inherit;  text-decoration: none;" href="{{ head_url }}/{{ item.id }}">
+                            <div>
+                                {{ item.object.on_list_button_seller_number }}
+                            </div>
+                        </a>
+                    </td>
+                {% endif %}
+                {% for data in item.data %}
+                    <td>
+                        <a style="color:inherit;  text-decoration: none;" href="{{ head_url }}/{{ item.id }}">
+                            <div>
+                                {{ data }}
+                            </div>
+                        </a>
+                    </td>
+                {% endfor %}
+            </tr>
+        {% endfor %}
+    </table>
+</div>
+{% comment %}<div class="card-footer clearfix">
+    <ul class="pagination pagination-sm m-0 float-right">
+        <li class="page-item"><a class="page-link" href="#">&laquo;</a></li>
+        <li class="page-item"><a class="page-link" href="#">1</a></li>
+        <li class="page-item"><a class="page-link" href="#">2</a></li>
+        <li class="page-item"><a class="page-link" href="#">3</a></li>
+        <li class="page-item"><a class="page-link" href="#">&raquo;</a></li>
+    </ul>
+</div>{% endcomment %}
+{#todo pagination#}

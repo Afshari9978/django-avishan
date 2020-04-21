@@ -1,0 +1,16 @@
+server {
+    listen 80;
+    server_name <<server_domain_or_IP>>;
+
+    location = /favicon.ico { access_log off; log_not_found off; }
+    location /static/ {
+        root <</home/sammy/myproject>>;
+    }
+    location /media/ {
+        root <</home/sammy/myproject>>;
+    }
+    location / {
+        include proxy_params;
+        proxy_pass http://unix:<</home/sammy/myproject>>/gunicorn.sock;
+    }
+}

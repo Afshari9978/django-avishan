@@ -1,0 +1,13 @@
+<div class="custom-file">
+    <input
+            type="file"
+            class="custom-file-input"
+            id="{{ form_element.name }}"
+            name="{{ form_element.name }}"
+            {% if form_element.disabled %}
+            disabled
+            {% endif %}
+    >
+    <label class="custom-file-label" for="{{ form_element.name }}">انتخاب
+            فایل</label>
+</div>

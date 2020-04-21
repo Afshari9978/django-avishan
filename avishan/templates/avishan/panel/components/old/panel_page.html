@@ -1,0 +1,180 @@
+{% extends "avishan/panel/base.html" %}
+{% load static %}
+{% block body_start %}
+    <div class="wrapper">
+    
+        <!-- Navbar -->
+        <nav class="main-header navbar navbar-expand bg-green navbar-light">
+            <!-- Left navbar links -->
+            <ul class="navbar-nav">
+                <li class="nav-item">
+                    <a class="nav-link" data-widget="pushmenu" href="#"><i class="fa fa-bars" style="color: white"></i></a>
+                </li>
+            </ul>
+        </nav>
+        <!-- /.navbar -->
+
+        <!-- Main Sidebar Container -->
+        <aside class="main-sidebar sidebar-dark-primary elevation-4">
+            <!-- Brand Logo -->
+            <a href="" class="brand-link">
+                <img
+                        src="{% static "dist/img/AdminLTELogo.png" %}"
+                        alt="AdminLTE Logo"
+                        class="brand-image img-circle elevation-3"
+                        style="opacity: .9; background-color: white; padding: 2px"
+                >
+                <span class="brand-text font-weight-light">پنل مدیریت</span>
+            </a>
+
+            <!-- Sidebar -->
+            <div class="sidebar" style="direction: ltr">
+                <div style="direction: rtl">
+                    <div class="user-panel mt-3 pb-3 mb-3 d-flex">
+                        <div class="image">
+                            <img src="{% static "dist/img/account.svg" %}"
+                                 class="img-circle elevation-2" alt="User Image">
+                        </div>
+                        <div class="info">
+                            <a href="" class="d-block">{{ current_request.base_user }}</a>
+                        </div>
+                    </div>
+
+                    <!-- Sidebar Menu -->
+                    <nav class="mt-2">
+
+                        <ul class="nav nav-pills nav-sidebar flex-column" data-widget="treeview" role="menu"
+                            data-accordion="false">
+                            {% for item in sidebar_items %}
+                                <li class="nav-item">
+                                    <a href="{{ item.link }}" class="nav-link">
+                                        <i class="nav-icon fa {{ item.icon }}"></i>
+                                        <p>
+                                            {{ item.title }}
+                                        </p>
+                                    </a>
+                                </li>
+                            {% endfor %}
+                            {#                        <hr>#}
+                            {#                        <li class="nav-item">#}
+                            {#                            <a href="/panel/logout" class="nav-link">#}
+                            {#                                <i class="nav-icon fa fa-sign-out"></i>#}
+                            {#                                        <p>#}
+                            {#                                            خروج#}
+                            {#                                        </p>#}
+                            {#                            </a>#}
+                            {#                        </li>#}
+                        </ul>
+                    </nav>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Content Wrapper. Contains page content -->
+        <div class="content-wrapper">
+            <!-- Content Header (Page header) -->
+            <div class="content-header">
+                <div class="container-fluid">
+                    <div class="row mb-2">
+                        <div class="col-sm-12">
+                            <h1 class="m-0 text-dark">{{ page_header }}</h1>
+                        </div><!-- /.col -->
+                    </div><!-- /.row -->
+                </div><!-- /.container-fluid -->
+            </div>
+            <!-- /.content-header -->
+
+            <!-- Main content -->
+            <section class="content">
+                <div class="container-fluid">
+                    <div class="row">
+                        <div class="col-12">
+                            {% block messages_stage %}
+                                {% include "avishan/panel/components/messages_list.html" %}
+                            {% endblock messages_stage %}
+
+                            {% block page_content %}
+                                {#                        todo inja ye chizi bashe#}
+                            {% endblock page_content %}
+                        </div>
+                    </div>
+                </div><!-- /.container-fluid -->
+            </section>
+            <!-- /.content -->
+        </div>
+        <!-- Control Sidebar -->
+        <aside class="control-sidebar control-sidebar-dark">
+            <!-- Control sidebar content goes here -->
+        </aside>
+        <!-- /.control-sidebar -->
+    </div>
+{% endblock body_start %}
+
+{% block body_scripts %}
+    {{ block.super }}
+    <!-- Select2 -->
+    <script src="{% static "plugins/select2/select2.full.min.js" %}"></script>
+    <script>
+        $(function () {
+
+            var enToFaDigits = function (input) {
+                if (input === undefined)
+                    return;
+                var returnModel = "", symbolMap = {
+                    '1': '۱',
+                    '2': '۲',
+                    '3': '۳',
+                    '4': '۴',
+                    '5': '۵',
+                    '6': '۶',
+                    '7': '۷',
+                    '8': '۸',
+                    '9': '۹',
+                    '0': '۰'
+                };
+                input = input.toString();
+                for (var i = 0; i < input.length; i++)
+                    if (symbolMap[input[i]])
+                        returnModel += symbolMap[input[i]];
+                    else
+                        returnModel += input[i];
+                return returnModel;
+            };
+
+            //Initialize Select2 Elements
+            function matchCustom(params, data) {
+                // If there are no search terms, return all of the data
+                if ($.trim(params.term) === '') {
+                    return data;
+                }
+
+                // Do not display the item if there is no 'text' property
+                if (typeof data.text === 'undefined') {
+                    return null;
+                }
+
+                // `params.term` should be the term that is used for searching
+                // `data.text` is the text that is displayed for the data object
+                if (data.text.indexOf(params.term) > -1 || data.text.indexOf(enToFaDigits(params.term)) > -1) {
+                    console.log(params.term, data.text);
+                    {#modifiedData.text += ' (matched)';#}
+
+                    // You can return modified objects from here
+                    // This includes matching the `children` how you want in nested data sets
+                    return $.extend({}, data, true);
+                }
+
+                // Return `null` if the term should not be displayed
+                return null;
+            }
+
+            $('.select2').select2({
+                matcher: matchCustom
+            });
+        })
+    </script>
+{% endblock body_scripts %}
+{% block head_tail %}
+    <!-- Select2 -->
+    <link rel="stylesheet" href="{% static "plugins/select2/select2.min.css" %}">
+{% endblock head_tail %}

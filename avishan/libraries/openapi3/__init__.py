@@ -1,6 +1,6 @@
 import inspect
 from inspect import Parameter, _empty
-from typing import Type, List
+from typing import Type, List, Tuple, Dict
 
 from django.db import models
 
@@ -9,6 +9,7 @@ import stringcase
 
 
 def request_common_parameters() -> List[dict]:
+    # done
     return [{
         "name": 'lang',
         "in": 'query',
@@ -203,15 +204,17 @@ def get_item_delete_request(model: Type[AvishanModel]) -> dict:
     }
 
 
+def get_functions_properties(function) -> Dict[str, Parameter]:
+    return dict(inspect.signature(function).parameters.items())
+
+
 def get_model_create_schema(model: Type[AvishanModel]) -> dict:
-    import inspect
     data = {
         "type": "object",
         "properties": {}
     }
     create_function = getattr(model, 'create')
-    create_signature = inspect.signature(create_function)
-    for name, param in create_signature.parameters.items():
+    for name, param in get_functions_properties(create_function):
         if name == 'kwargs':
             return {}
         data['properties'][name] = get_input_object(param)

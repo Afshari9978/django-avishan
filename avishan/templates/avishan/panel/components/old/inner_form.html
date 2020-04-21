@@ -1,0 +1,109 @@
+{% load static %}
+{% for form_item in form.items %}
+    {% if form_item.type == 'text' %}
+        <div class="form-group">
+            <label for="{{ form_item.name }}">{{ form_item.title }}</label>
+            {% if form_item.specific_type == 'textarea' %}
+                <textarea class="form-control" rows="3" id="{{ form_item.name }}"
+                          name="{{ form_item.name }}">{{ form_item.value|default_if_none:"" }}</textarea>
+            {% elif form_item.specific_type == 'float' %}
+                <input type="number" class="form-control" id="{{ form_item.name }}" step="0.01"
+                       name="{{ form_item.name }}" value="{{ form_item.value|default_if_none:"" }}">
+            {% else %}
+                <input type="{{ form_item.specific_type }}" class="form-control" id="{{ form_item.name }}"
+                       name="{{ form_item.name }}" value="{{ form_item.value|default_if_none:"" }}">
+            {% endif %}
+        </div>
+    {% elif form_item.type == 'title' %}
+        {% if forloop.counter0 != 0 %}
+
+            <h4 style="color: white">w</h4>
+        {% endif %}
+        <h4>{{ form_item.title }}</h4>
+        <hr>
+    {% elif form_item.type == 'choice' %}
+        <div class="form-group">
+            <label for="{{ form_item.name }}">{{ form_item.title }}</label>
+            <select class="form-control" id="{{ form_item.name }}" name="{{ form_item.name }}"
+                    style="width: 100%;">
+                {% for value in form_item.values %}
+                    {% if value.0 == form_item.value.0 %}
+                        <option value="{{ value.0 }}" selected="selected">{{ value.1 }}</option>
+                    {% else %}
+                        <option value="{{ value.0 }}">{{ value.1 }}</option>
+                    {% endif %}
+                {% endfor %}
+            </select>
+        </div>
+
+    {% elif form_item.type == 'choice-search' %}
+        <div class="form-group">
+            {#            todo fa/en age search shod shomare javab bede#}
+            <label for="{{ form_item.name }}">{{ form_item.title }}</label>
+            <select class="form-control select2" id="{{ form_item.name }}" name="{{ form_item.name }}"
+                    style="width: 100%;">
+                {#            todo if none item added, disable its selection#}
+                {% for value in form_item.values %}
+                    <option value="{{ value.0 }}">{{ value.1 }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+    {% elif form_item.type == 'hidden' %}
+        <div class="form-group">
+            <input type="hidden" id="{{ form_item.name }}" name="{{ form_item.name }}" value="{{ form_item.value }}">
+        </div>
+    {% elif form_item.type == 'many' %}
+        <div class="col-md-12" style="margin-top: 25px">
+            <div class="card card-primary">
+                <div class="card-header" style="background-color: deepskyblue">
+                    <h3 class="card-title" style="color: black">{{ form_item.title }}</h3>
+                    {#                <div class="input-group input-group-sm" style="width: 80px;">#}
+
+                    <div class="card-tools">
+                        <a type="button" class="btn btn-block btn-default" style="color: black"
+                           href="{{ head_url }}">افزودن</a>
+                    </div>
+                    {#            </div>#}
+                </div>
+                <div class="card-body">
+                    {% with "avishan/panel/components/inner_form.html" as recursive %}
+                        {% include recursive with form=form_item.form %}
+                    {% endwith %}
+                </div>
+
+                <!-- /.card-header -->
+                <!-- form start -->
+            </div>
+
+        </div>
+    {% elif form_item.type == 'one' %}
+        <div class="col-md-12" style="margin-top: 25px">
+            <div class="card card-primary">
+                <div class="card-header" style="background-color: deepskyblue">
+                    <h3 class="card-title" style="color: black">{{ form_item.title }}</h3>
+                    {#                <div class="input-group input-group-sm" style="width: 80px;">#}
+                    {#            </div>#}
+                </div>
+                <div class="card-body">
+                    {% with "avishan/panel/components/inner_form.html" as recursive %}
+                        {% include recursive with form=form_item.form %}
+                    {% endwith %}
+                </div>
+
+                <!-- /.card-header -->
+                <!-- form start -->
+            </div>
+        </div>
+    {% elif form_item.type == 'send-file' %}
+        <div class="form-group">
+            <div class="btn btn-default btn-file">
+                <i class="fa fa-paperclip"></i>{{ form_item.title }}
+                <input type="file" name="{{ form_item.name }}" onchange="this.form.submit();">
+            </div>
+        </div>
+
+    {% endif %}
+
+
+{% endfor %}

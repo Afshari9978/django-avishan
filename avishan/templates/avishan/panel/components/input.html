@@ -1,0 +1,27 @@
+{% load static %}
+<input type="{{ form_element.input_type }}"
+       class="form-control"
+       placeholder="{{ form_element.place_holder }}"
+       id="{{ form_element.name }}"
+       name="{{ form_element.name }}"
+       value="{{ form_element.value }}"
+        {% if form_element.disabled %}
+       disabled
+        {% endif %}
+>
+<!-- iCheck -->
+<link rel="stylesheet" href="{% static "plugins/iCheck/flat/blue.css" %}">
+<!-- jQuery -->
+<script src="{% static "plugins/jquery/jquery.min.js" %}"></script>
+<!-- iCheck -->
+<script src="{% static "plugins/iCheck/icheck.min.js" %}"></script>
+<script>
+
+    $(function () {
+        $(#{{ form_element.name }}).iCheck({
+            checkboxClass: 'icheckbox_square-blue',
+            radioClass: 'iradio_square-blue',
+            increaseArea: '15%' // optional
+        })
+    })
+</script>

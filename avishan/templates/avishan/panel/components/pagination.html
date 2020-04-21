@@ -1,0 +1,27 @@
+<ul class="pagination ">
+    {% for item in pagination.create_items %}
+        <li class="page-item
+        {% if item.disabled %}
+         disabled
+        {% endif %}
+        {% if item.current %}
+         active
+        {% endif %}
+">
+            {% if item.disabled or item.current %}
+                <span class="page-link">
+            {% else %}
+                <a href="{{ item.url }}" class="page-link">
+            {% endif %}
+            {{ item.text }}
+            {% if item.disabled %}
+                </span>
+            {% elif item.current %}
+                <span class="sr-only">(current)</span>
+                </span>
+            {% else %}
+                </a>
+            {% endif %}
+        </li>
+    {% endfor %}
+</ul>

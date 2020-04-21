@@ -1,0 +1,11 @@
+<td style="padding: 0; padding-left: 0">
+    <a style="color:inherit;  text-decoration: none;"
+       {% if table_item.table.link_head_key %}
+       href="{{ table_item.link }}"
+       {% endif %}
+    >
+        <div style="padding: 12px">
+            {{ data }}
+        </div>
+    </a>
+</td>

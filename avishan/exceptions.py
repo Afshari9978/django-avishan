@@ -1,9 +1,20 @@
-from typing import Optional, Union
+from typing import Optional, Union, List
 
 from . import current_request
 from .misc import status
 from .misc.translation import AvishanTranslatable
 
+"""
+try:
+    b = json.dumps(a, default=lambda o: o.__dict__, indent=2)
+except Exception as e:
+    c = 1
+current_request['locals'] = json.dumps(exc_value.__traceback__.tb_frame.f_locals, default=lambda o: o.__dict__,
+                                       indent=2)                                      
+"""
+
+
+# todo save locals too
 
 class AvishanException(Exception):
     def __init__(
@@ -42,7 +53,7 @@ class AuthException(AvishanException):
     TOKEN_NOT_FOUND = 4, AvishanTranslatable(EN='Token not found', FA='توکن پیدا نشد')
     TOKEN_EXPIRED = 5, AvishanTranslatable(EN='Token timed out', FA='زمان استفاده از توکن تمام شده است')
     ERROR_IN_TOKEN = 6, AvishanTranslatable(EN='Error in token', FA='خطا در توکن')
-    ACCESS_DENIED = 7, AvishanTranslatable(EN='Access Denied', FA='دسترسی نامجاز')
+    ACCESS_DENIED = 7, AvishanTranslatable(EN='Access Denied', FA='دسترسی غیرمجاز')
     HTTP_METHOD_NOT_ALLOWED = 8, AvishanTranslatable(EN='HTTP method not allowed in this url')
     INCORRECT_PASSWORD = 9, AvishanTranslatable(EN='Incorrect Password', FA='رمز اشتباه است')
     DUPLICATE_AUTHENTICATION_IDENTIFIER = 10, AvishanTranslatable(
@@ -62,16 +73,36 @@ class AuthException(AvishanException):
         FA='چند حساب با این شناسه پیدا شد، گروه کاربری را در پارامتر url مشخص کنید'
     )
 
+    METHOD_NOT_DIRECT_CALLABLE = 14, AvishanTranslatable(
+        EN='Method is not callable direct to model',
+        FA='تابع به طور مستقیم قابل صدا زدن نیست'
+    )
+
     def __init__(self, error_kind: tuple = NOT_DEFINED):
         from .misc.translation import AvishanTranslatable
         status_code = status.HTTP_403_FORBIDDEN
+        self.error_kind = error_kind
         if error_kind[0] == AuthException.HTTP_METHOD_NOT_ALLOWED[0]:
             status_code = status.HTTP_405_METHOD_NOT_ALLOWED
         super().__init__(status_code=status_code)
-        add_error_message_to_response(code=error_kind[0], body=str(error_kind[1]), title=AvishanTranslatable(
+        add_error_message_to_response(code=error_kind[0], body=str(error_kind[1]), title=str(AvishanTranslatable(
             EN='Authentication Exception',
             FA='خطای احراز هویت'
-        ).__str__())
+        )))
+
+    @classmethod
+    def get_login_required_errors(cls) -> List[tuple]:
+        return [
+            cls.ACCOUNT_NOT_FOUND,
+            cls.ACCOUNT_NOT_ACTIVE,
+            cls.GROUP_ACCOUNT_NOT_ACTIVE,
+            cls.TOKEN_NOT_FOUND,
+            cls.TOKEN_EXPIRED,
+            cls.ERROR_IN_TOKEN,
+            cls.INCORRECT_PASSWORD,
+            cls.DEACTIVATED_TOKEN,
+            cls.MULTIPLE_CONNECTED_ACCOUNTS
+        ]
 
 
 class ErrorMessageException(AvishanException):
@@ -79,14 +110,18 @@ class ErrorMessageException(AvishanException):
                  status_code: int = status.HTTP_400_BAD_REQUEST):
         super().__init__(status_code=status_code)
         message = str(message)
+        # add_error_message_to_response(
+        #     body=message if message else AvishanTranslatable(
+        #         EN='Error details not provided',
+        #         FA='توضیحات خطا ارائه نشده').__str__(),
+        #     title=AvishanTranslatable(
+        #         EN='Error',
+        #         FA='خطا'
+        #     ).__str__()
+        # )
         add_error_message_to_response(
-            body=message if message else AvishanTranslatable(
-                EN='Error details not provided',
-                FA='توضیحات خطا ارائه نشده').__str__(),
-            title=AvishanTranslatable(
-                EN='Error',
-                FA='خطا'
-            ).__str__()
+            body=message if message else 'Error details not provided',
+            title='Error'
         )
 
 

@@ -1,0 +1,15 @@
+{% extends "avishan/panel/base.html" %}
+{% load static %}
+{% load avishan_tags %}
+{% block body_class %}hold-transition login-page{% endblock body_class %}
+{% block body_start %}
+    <div class="login-box">
+        <div class="card">
+            <div class="card-body login-card-body">
+                <h3 class="login-box-msg mb-3">{{ AVISHAN_CONFIG.PANEL_TITLE }}</h3>
+                {% include "avishan/panel/components/messages_list.html" %}
+                {% include "avishan/panel/components/form.html" with form=self.form %}
+            </div>
+        </div>
+    </div>
+{% endblock body_start %}

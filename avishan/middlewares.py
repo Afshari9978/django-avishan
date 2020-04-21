@@ -5,13 +5,9 @@ from django.contrib import messages
 from django.core.handlers.wsgi import WSGIRequest
 from django.http import JsonResponse
 
+from avishan.configure import get_avishan_config
 from avishan.exceptions import AvishanException, save_traceback
-from avishan.libraries.dbml import create_dbml_file
-
-try:
-    from avishan_admin.avishan_config import AvishanConfig as PanelAvishanConfig
-except ImportError:
-    pass
+from avishan.libraries.openapi3.classes import OpenApi
 
 
 class Wrapper:
@@ -19,14 +15,8 @@ class Wrapper:
 
     def __init__(self, get_response):
         self.get_response = get_response
+        get_avishan_config().check()
 
-        """
-        Run avishan_config files, 'check' method. And also creates config file if not found
-        """
-        from avishan.models import AvishanModel
-        AvishanModel.run_apps_check()
-
-        create_dbml_file('static/api/models.dbml')
 
     def __call__(self, request: WSGIRequest):
         from avishan.utils import discard_monitor, find_token, decode_token, add_token_to_response, find_and_check_user
@@ -36,6 +26,7 @@ class Wrapper:
 
         self.initialize_request_storage(current_request)
         current_request['request'] = request
+        current_request['language'] = request.GET.get('language', current_request['language'])
 
         """Checks for avoid-touch requests"""
         if discard_monitor(current_request['request'].get_full_path()):
@@ -59,6 +50,9 @@ class Wrapper:
         except Exception as e:
             save_traceback()
             AvishanException(e)
+
+        if current_request['language'] is None:
+            current_request['language'] = get_avishan_config().LANGUAGE
 
         try:
             """
@@ -89,6 +83,7 @@ class Wrapper:
                 current_request['response']['messages'] = current_request['messages']
             else:
                 self.fill_messages_framework(current_request)
+                # todo fix problem on template: not showing thrown exception message
 
         add_token_to_response(response)
         status_code = current_request['status_code']
@@ -96,6 +91,8 @@ class Wrapper:
         json_safe = not current_request['json_unsafe']
         if current_request['is_api']:
             response = current_request['response'].copy()
+        # else:
+        #     messages.warning(current_request['request'], 'ای بابا')
 
         if current_request['is_tracked'] or current_request['exception'] is not None:
             self.save_request_track(current_request)
@@ -136,7 +133,7 @@ class Wrapper:
         current_request['status_code'] = 200
         current_request['exception'] = None
         current_request['traceback'] = None
-        current_request['lang'] = None
+        current_request['language'] = None
         current_request['request_track_object'] = None
         current_request['context'] = {}
         current_request['messages'] = {
@@ -159,24 +156,30 @@ class Wrapper:
 
     @staticmethod
     def save_request_track(current_request):
-        from avishan.models import RequestTrackMessage, RequestTrackException
+        from avishan.models import RequestTrackMessage, RequestTrackException, RequestTrack
         current_request['end_time'] = datetime.datetime.now()
 
         try:
-            request_data = str(current_request['request'].data)
+            request_data = json.dumps(current_request['request'].data, indent=2)
         except:
             request_data = "NOT_AVAILABLE"
 
         request_headers = ""
         for key, value in current_request['request'].META.items():
             if key.startswith('HTTP_'):
-                request_headers += f'({key[5:]}: {value}),\n'
+                request_headers += f'{key[5:]}={value}\n'
+        for key in current_request['request'].FILES.keys():
+            request_headers += f'FILE({key})\n'
 
         authentication_type_class_title = "NOT_AVAILABLE"
         authentication_type_object_id = 0
         if current_request['authentication_object']:
             authentication_type_class_title = current_request['authentication_object'].__class__.__name__
             authentication_type_object_id = current_request['authentication_object'].id
+
+        if current_request['is_tracked'] is False:
+            current_request['request_track_object'] = RequestTrack.objects.create()
+
         try:
             created = current_request['request_track_object'].update(
                 view_name=current_request['view_name'],
@@ -216,4 +219,4 @@ class Wrapper:
                     traceback=current_request['traceback']
                 )
         except Exception as e:
-            print(e)
+            print('save_request_track_error:'.upper(), e)

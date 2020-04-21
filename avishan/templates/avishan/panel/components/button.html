@@ -1,0 +1,19 @@
+{% if button.type == 'submit' %}
+    <button
+{% else %}
+    <a href="{{ button.link }}"
+{% endif %}
+{% if button.type %}
+       type="{{ button.type }}"
+{% endif %}
+       class="btn {{ button.added_classes }}
+    {% if disabled %}
+    disabled
+    {% endif %}
+"
+>{{ button.text }}
+    {% if button.type == 'submit' %}
+        </button>
+    {% else %}
+        </a>
+    {% endif %}

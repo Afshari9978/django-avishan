@@ -1,0 +1,14 @@
+<table class="table table-hover table-bordered">
+    <tr>
+        {% for head in table.heads %}
+            {% include 'avishan/panel/components/table_head.html' with table_head=head %}
+        {% endfor %}
+    </tr>
+    {% for item in table.items %}
+        <tr>
+            {% for data in item.raw_data %}
+                {% include 'avishan/panel/components/table_item.html' with table_item=item %}
+            {% endfor %}
+        </tr>
+    {% endfor %}
+</table>
