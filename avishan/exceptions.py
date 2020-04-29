@@ -162,6 +162,8 @@ def add_warning_message_to_response(body: str = None, title: str = None):
 
 
 def add_error_message_to_response(body: str = None, title: str = None, code=None):
+    if 'messages' not in current_request.keys():
+        return
     error = {}
     if body is not None:
         error['body'] = body
@@ -173,7 +175,10 @@ def add_error_message_to_response(body: str = None, title: str = None, code=None
 
 
 def save_traceback():
-    if current_request['traceback'] is not None:
+    try:
+        if current_request['traceback'] is not None:
+            return
+    except KeyError:
         return
     import sys, traceback
     exc_type, exc_value, exc_tb = sys.exc_info()

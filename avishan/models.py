@@ -82,7 +82,7 @@ class AvishanModel(models.Model):
         if avishan_to_dict:
             return [item.to_dict() for item in cls.filter(**kwargs)]
 
-        if current_request != {}:
+        if 'request' in current_request.keys():
             for item in current_request['request'].GET.keys():
                 if item.startswith('filter_'):
                     field = cls.get_field(item[7:])
@@ -1246,7 +1246,6 @@ class OtpAuthentication(AuthenticationType):
 
     def verify_account(self) -> Union['OtpAuthentication', 'PhoneOtpAuthenticate']:
         self.send_otp_code()
-
         return self
 
     @classmethod
@@ -1272,7 +1271,10 @@ class OtpAuthentication(AuthenticationType):
         return item, created
 
     def send_otp_code(self):
-        raise NotImplementedError()
+        self.code = self.create_otp_code()
+        self.date_sent = BchDatetime().to_datetime()
+        self.tried_codes = ""
+        self.save()
 
     @classmethod
     def find(cls, key: str, user_group: UserGroup = None) -> List['PhoneOtpAuthenticate']:
@@ -1320,12 +1322,15 @@ class PhoneOtpAuthenticate(OtpAuthentication):
     django_admin_list_display = ['user_user_group', 'phone', 'code']
 
     @classmethod
+    def create(cls, phone: Phone, user_user_group: UserUserGroup) -> 'PhoneOtpAuthenticate':
+        return super().create(phone=phone, user_user_group=user_user_group)
+
+    @classmethod
     def key_field(cls) -> Union[models.Field, models.ForeignKey]:
         return cls.get_field('phone')
 
     def send_otp_code(self):
-        self.code = self.create_otp_code()
-        self.date_sent = BchDatetime().to_datetime()
+        super().send_otp_code()
         self.phone.send_verification_sms(self.code)
         self.save()
 
