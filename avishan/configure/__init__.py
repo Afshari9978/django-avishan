@@ -81,6 +81,8 @@ class AvishanConfigFather:
     PHONE_VERIFICATION_VALID_SECONDS = 200
     PHONE_VERIFICATION_TRIES_COUNT = 1
     PHONE_VERIFICATION_CODE_LENGTH = 4
+    FAKER_LOCALE: str = 'fa_IR'
+    FAKER_SEED: int = None
 
     # visitor token
     VISITOR_KEY_LENGTH = 40
@@ -114,6 +116,9 @@ class AvishanConfigFather:
     MAILGUN_API_KEY: str = None  # none if not using it
     MAILGUN_SENDER_ADDRESS: str = None
     MAILGUN_SENDER_NAME: str = None
+
+    ## neshan
+    NESHAN_API_KEY: str = None
 
     @classmethod
     def check(cls):

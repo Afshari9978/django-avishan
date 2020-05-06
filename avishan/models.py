@@ -8,6 +8,7 @@ from django.db.models import NOT_PROVIDED
 
 from avishan import current_request
 from avishan.configure import get_avishan_config, AvishanConfigFather
+from avishan.libraries.faker import AvishanFaker
 from avishan.misc import status
 from avishan.misc.translation import AvishanTranslatable
 
@@ -21,7 +22,7 @@ from django.db import models
 # todo error redirects should be 302 instead of 301.
 # todo related name on abstracts
 # todo app name needed for models
-class AvishanModel(models.Model):
+class AvishanModel(models.Model, AvishanFaker):
     # todo 0.2.1: use manager or simply create functions here?
     # todo 0.2.0 relation on_delete will call our remove() ?
     class Meta:
