@@ -869,8 +869,8 @@ class EmailVerification(AvishanModel):
     def create_verification_code() -> str:
         import random
         return str(random.randint(
-            10 ** (get_avishan_config().PHONE_VERIFICATION_CODE_LENGTH - 1),
-            10 ** get_avishan_config().PHONE_VERIFICATION_CODE_LENGTH - 1)
+            10 ** (get_avishan_config().POA_VERIFICATION_CODE_LENGTH - 1),
+            10 ** get_avishan_config().POA_VERIFICATION_CODE_LENGTH - 1)
         )
 
 
@@ -975,8 +975,10 @@ class PhoneVerification(AvishanModel):
 
         if hasattr(phone, 'verification'):
             previous = phone.verification
-            if (BchDatetime() - BchDatetime(
-                    previous.verification_date)).total_seconds() < get_avishan_config().PHONE_VERIFICATION_GAP_SECONDS:
+
+            if (
+                    datetime.datetime.now() - previous.verification_date).total_seconds() < \
+                    get_avishan_config().PHONE_VERIFICATION_GAP_SECONDS:
                 raise ErrorMessageException(AvishanTranslatable(
                     EN='Verification Code sent recently, Please try again later',
                     FA='برای ارسال مجدد کد، کمی صبر کنید'
@@ -994,7 +996,7 @@ class PhoneVerification(AvishanModel):
                 EN=f'Phone Verification not found for phone {phone}'
             ))
         if (BchDatetime() - BchDatetime(
-                item.verification_date)).total_seconds() > get_avishan_config().PHONE_VERIFICATION_VALID_SECONDS:
+                item.verification_date)).total_seconds() > get_avishan_config().POA_VERIFICATION_VALID_SECONDS:
             item.remove()
             raise ErrorMessageException(AvishanTranslatable(
                 EN='Code Expired, Request new one'
@@ -1017,8 +1019,8 @@ class PhoneVerification(AvishanModel):
     def create_verification_code() -> str:
         import random
         return str(random.randint(
-            10 ** (get_avishan_config().PHONE_VERIFICATION_CODE_LENGTH - 1),
-            10 ** get_avishan_config().PHONE_VERIFICATION_CODE_LENGTH - 1)
+            10 ** (get_avishan_config().POA_VERIFICATION_CODE_LENGTH - 1),
+            10 ** get_avishan_config().POA_VERIFICATION_CODE_LENGTH - 1)
         )
 
 
@@ -1180,8 +1182,8 @@ class PhonePasswordAuthenticate(KeyValueAuthentication):
     django_admin_list_display = ['user_user_group', phone]
 
     @classmethod
-    def key_field(self) -> Union[models.ForeignKey, models.Field]:
-        return self.get_field('phone')
+    def key_field(cls) -> Union[models.ForeignKey, models.Field]:
+        return cls.get_field('phone')
 
 
 class OtpAuthentication(AuthenticationType):
@@ -1198,8 +1200,8 @@ class OtpAuthentication(AuthenticationType):
 
     @staticmethod
     def create_otp_code() -> str:
-        return str(random.randint(10 ** (get_avishan_config().PHONE_VERIFICATION_CODE_LENGTH - 1),
-                                  10 ** get_avishan_config().PHONE_VERIFICATION_CODE_LENGTH - 1))
+        return str(random.randint(10 ** (get_avishan_config().POA_VERIFICATION_CODE_LENGTH - 1),
+                                  10 ** get_avishan_config().POA_VERIFICATION_CODE_LENGTH - 1))
 
     def check_verification_code(self, entered_code: str) -> bool:
         from avishan.exceptions import ErrorMessageException
@@ -1209,7 +1211,7 @@ class OtpAuthentication(AuthenticationType):
                 FA='برای این حساب کدی پیدا نشد'
             ))
         if (BchDatetime() - BchDatetime(
-                self.date_sent)).total_seconds() > get_avishan_config().PHONE_VERIFICATION_VALID_SECONDS:
+                self.date_sent)).total_seconds() > get_avishan_config().POA_VERIFICATION_VALID_SECONDS:
             self.code = None
             self.save()
             raise ErrorMessageException(AvishanTranslatable(

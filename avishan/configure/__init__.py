@@ -77,17 +77,23 @@ class AvishanConfigFather:
     EMAIL_VERIFICATION_CODE_LENGTH = 6
     SMS_SIGN_IN_TEMPLATE = 'signin'
     SMS_SIGN_UP_TEMPLATE = 'signup'
-    PHONE_VERIFICATION_GAP_SECONDS = 10
-    PHONE_VERIFICATION_VALID_SECONDS = 200
-    PHONE_VERIFICATION_TRIES_COUNT = 1
-    PHONE_VERIFICATION_CODE_LENGTH = 4
+
+    # POA
+    POA_VERIFICATION_CODE_LENGTH = 4
+    POA_VERIFICATION_VALID_SECONDS = 10 * 60
+
+    # PhoneVerification
+    PHONE_VERIFICATION_GAP_SECONDS = 90
+    PHONE_VERIFICATION_TRIES_COUNT = 3
+
+    # Faker
     FAKER_LOCALE: str = 'fa_IR'
     FAKER_SEED: int = None
 
-    # visitor token
+    # VisitorToken
     VISITOR_KEY_LENGTH = 40
 
-    # panel
+    # Panel
     PANEL_ROOT = 'panel'
     PANEL_TITLE = 'پنل مدیریت'
     PANEL_ENABLE_LOG: bool = False  # todo
@@ -103,21 +109,19 @@ class AvishanConfigFather:
         "required": False,
     }]
 
-    # sms
-    ## kavenegar
+    # Kavenegar
     KAVENEGAR_API_TOKEN: str = None
 
-    # email
-    ## django
+    # Django Email
     EMAIL_SENDER_ADDRESS: str = None  # none if not using it
 
-    ## mailgun
+    # Mailgun
     MAILGUN_DOMAIN_NAME: str = None
     MAILGUN_API_KEY: str = None  # none if not using it
     MAILGUN_SENDER_ADDRESS: str = None
     MAILGUN_SENDER_NAME: str = None
 
-    ## neshan
+    # Neshan
     NESHAN_API_KEY: str = None
 
     @classmethod

@@ -32,5 +32,5 @@ class AvishanTranslatable:
             if self.__dict__[lang.upper()] is not None:
                 return self.__dict__[lang.upper()]
             raise ValueError
-        except Exception as e:
+        except:
             raise ErrorMessageException('Not translated string')

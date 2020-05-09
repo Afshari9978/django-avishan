@@ -1,5 +1,5 @@
 import inspect
-from inspect import Parameter, _empty
+from inspect import Parameter
 from typing import Type, List, Tuple, Dict
 
 from django.db import models

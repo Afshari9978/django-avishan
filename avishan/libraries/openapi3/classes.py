@@ -1,4 +1,4 @@
-from typing import List, Union, Type, Optional, Tuple
+import typing
 
 from django.db import models
 
@@ -10,7 +10,7 @@ from avishan.models import AvishanModel
 
 
 class ApiDocumentation:
-    paths: List['Path'] = []
+    paths: typing.List['Path'] = []
 
     def get_or_create_path(self, url: str) -> 'Path':
         for path in self.paths:
@@ -20,7 +20,8 @@ class ApiDocumentation:
 
 
 # todo example for data
-def type_map(input: Union[str, type, models.Field], name: str = None) -> Tuple[Union[str, 'Schema'], Optional[str]]:
+def type_map(input: typing.Union[str, type, models.Field], name: str = None, model=None) -> typing.Tuple[
+    typing.Union[str, 'Schema'], typing.Optional[str]]:
     if isinstance(input, str):
         return input, None
     if isinstance(input, Schema):
@@ -41,6 +42,8 @@ def type_map(input: Union[str, type, models.Field], name: str = None) -> Tuple[U
         if isinstance(input, models.TimeField):
             return "string", 'full-time'
         if isinstance(input, (models.OneToOneField, models.ForeignKey)):
+            if input.model.__name__ is model.model.__name__:
+                return model, None
             return Schema.create_from_model(input.related_model), None
         if isinstance(input, models.FileField):
             return "string", None
@@ -56,24 +59,31 @@ def type_map(input: Union[str, type, models.Field], name: str = None) -> Tuple[U
             return 'number', 'float'
         raise NotImplementedError(name)
 
+    # Optional[int] -> Union[int, None]
+    # noinspection PyUnresolvedReferences
+    if isinstance(input, typing._Union) and len(input.__args__) == 2:
+        # noinspection PyUnresolvedReferences
+        return type_map(input.__args__[0], name=name)
+
     raise NotImplementedError(name)
 
 
 class SchemaProperty:
-    def __init__(self, name: str, type: Union[str, type, models.Field, 'Schema'], required: bool = False,
-                 raw: bool = False):
+    def __init__(self, name: str, type: typing.Union[str, type, models.Field, 'Schema'], required: bool = False,
+                 raw: bool = False, model=None):
         self.name = name
-        self.type, self.format = type_map(type, name)
+        self.type, self.format = type_map(type, name, model=model)
         self.required = required
-        self.field: Optional[models.Field] = None
+        self.field: typing.Optional[models.Field] = None
         self.raw = raw
 
     @classmethod
-    def create_from_model_field(cls, field: models.Field) -> 'SchemaProperty':
+    def create_from_model_field(cls, field: models.Field, model=None) -> 'SchemaProperty':
         schema_property = SchemaProperty(
             name=field.name,
             type=field,
-            required=AvishanModel.is_field_required(field)
+            required=AvishanModel.is_field_required(field),
+            model=model
         )
         schema_property.field = field
         return schema_property
@@ -94,27 +104,34 @@ class SchemaProperty:
 
 
 class Schema:
-    def __init__(self, name: str, type: str = 'object', properties: List[SchemaProperty] = (), items: 'Schema' = None,
+    created = {}
+
+    def __init__(self, name: str, type: str = 'object', properties: typing.List[SchemaProperty] = (),
+                 items: 'Schema' = None,
                  raw: bool = False):
         self.name = name
         self.type = type
         self.properties = properties
-        self.items: Optional[Schema] = items
-        self.model: Optional[AvishanModel] = None
+        self.items: typing.Optional[Schema] = items
+        self.model: typing.Optional[AvishanModel] = None
         self.raw = raw
         if self.raw:
             for prop in self.properties:
                 prop.raw = True
 
     @classmethod
-    def create_from_model(cls, model: Type[AvishanModel]):
-        schema = Schema(name=model.class_name(), type="object", properties=cls.create_model_properties(model))
-        schema.model = model
+    def create_from_model(cls, model: typing.Type[AvishanModel]):
+        if model not in cls.created.keys():
+            schema = Schema(name=model.class_name(), type="object")
+            schema.model = model
+            schema.properties = schema.create_model_properties(model)
+            cls.created[model] = schema
+        else:
+            schema = cls.created[model]
         return schema
 
-    @classmethod
-    def create_model_properties(cls, model: Type[AvishanModel]) -> List[SchemaProperty]:
-        return [SchemaProperty.create_from_model_field(field) for field in model.get_fields()]
+    def create_model_properties(self, model: typing.Type[AvishanModel]) -> typing.List[SchemaProperty]:
+        return [SchemaProperty.create_from_model_field(field, model=self) for field in model.get_fields()]
 
     @classmethod
     def create_from_function(cls, name: str, function):
@@ -125,6 +142,7 @@ class Schema:
             value: InspectParameter
             if key in ['self', 'cls', 'kwargs']:
                 continue
+            # noinspection PyUnresolvedReferences
             if type(value.annotation) is inspect._empty:
                 raise ValueError(f'Method ({function}) parameter ({key}) type not defined')
             if inspect.isclass(value.annotation) and issubclass(value.annotation, AvishanModel):
@@ -167,7 +185,7 @@ class Schema:
             'items': self.items.export_reference()
         }
 
-    def export_required_json(self) -> List[str]:
+    def export_required_json(self) -> typing.List[str]:
         return [item.name for item in self.properties if item.required]
 
     def export_properties_json(self) -> dict:
@@ -188,7 +206,7 @@ class Schema:
         )
 
     @classmethod
-    def raw_schema_from_dict(cls, data: dict) -> Union['Schema', 'SchemaProperty']:
+    def raw_schema_from_dict(cls, data: dict) -> typing.Union['Schema', 'SchemaProperty']:
         import inspect
 
         name = list(data.keys())[0]
@@ -256,7 +274,7 @@ class Schema:
 
 
 class Component:
-    def __init__(self, schemas: List[Schema]):
+    def __init__(self, schemas: typing.List[Schema]):
         self.schemas = schemas
 
     def export_json(self):
@@ -310,7 +328,7 @@ class Parameter:
 
 
 class PathRequest:
-    def __init__(self, required: bool = True, contents: List[Content] = ()):
+    def __init__(self, required: bool = True, contents: typing.List[Content] = ()):
         self.required = required
         self.contents = contents
 
@@ -329,7 +347,7 @@ class PathRequest:
 
 
 class PathResponse:
-    def __init__(self, status_code: int, contents: List[Content], description: str = None):
+    def __init__(self, status_code: int, contents: typing.List[Content], description: str = None):
         self.status_code = status_code
         self.contents = contents
         self.description = description
@@ -349,7 +367,7 @@ class PathResponse:
 
 
 class PathResponseGroup:
-    def __init__(self, responses: List[PathResponse]):
+    def __init__(self, responses: typing.List[PathResponse]):
         self.responses = responses
 
     def export_json(self) -> dict:
@@ -366,7 +384,7 @@ class PathMethod:
     method = None
 
     def __init__(self, summary: str = None, description: str = None, request: PathRequest = None,
-                 responses: PathResponseGroup = None, tags: List[str] = ()):
+                 responses: PathResponseGroup = None, tags: typing.List[str] = ()):
         self.request = request
         if responses is not None and len(responses.responses) == 0:
             self.responses = None
@@ -402,7 +420,7 @@ class PathGetMethod(PathMethod):
     method = 'get'
 
     def __init__(self, summary: str = None, description: str = None,
-                 responses: PathResponseGroup = None, tags: List[str] = ()):
+                 responses: PathResponseGroup = None, tags: typing.List[str] = ()):
         super().__init__(summary, description, None, responses, tags)
 
 
@@ -418,12 +436,12 @@ class PathDeleteMethod(PathMethod):
     method = 'delete'
 
     def __init__(self, summary: str = None, description: str = None,
-                 responses: PathResponseGroup = None, tags: List[str] = ()):
+                 responses: PathResponseGroup = None, tags: typing.List[str] = ()):
         super().__init__(summary, description, None, responses, tags)
 
 
 class Path:
-    def __init__(self, url: str, methods: List[PathMethod] = (), description: str = "", parameters: list = None):
+    def __init__(self, url: str, methods: typing.List[PathMethod] = (), description: str = "", parameters: list = None):
         self.methods = methods
         self.url = url
         self.description = description
@@ -444,50 +462,43 @@ class Path:
 
 class OpenApi:
     def __init__(self, api_version: str, api_title: str, open_api_version: str = "3.0.0", api_description: str = None,
-                 servers: Tuple[str] = ()):
+                 servers: typing.Tuple[str] = ()):
         self.api_version = api_version
         self.api_title = api_title
         self.api_description = api_description
         self.servers = servers
         self.open_api_version = open_api_version
-        self.models: List[Type[AvishanModel]] = []
+        self.models: typing.List[typing.Type[AvishanModel]] = []
         self.schemas = self.create_schemas_from_models()
         self.paths = self.create_paths_from_views()
 
         # todo security
 
     @staticmethod
-    def request_common_url_parameters() -> List[dict]:
+    def request_common_url_parameters() -> typing.List[dict]:
         # todo load from dict
         return get_avishan_config().REQUEST_COMMON_URL_PARAMETERS
 
-    def create_schemas_from_models(self) -> List['Schema']:
+    def create_schemas_from_models(self) -> typing.List['Schema']:
         def all_subclasses(cls):
             return set(cls.__subclasses__()).union(
                 [s for c in cls.__subclasses__() for s in all_subclasses(c)])
 
         schemas = []
-        for model in all_subclasses(AvishanModel):
-            model: Type[AvishanModel]
+        for model in sorted(all_subclasses(AvishanModel), key=lambda x: x.class_name()):
+            model: typing.Type[AvishanModel]
             self.models.append(model)
             schemas.append(Schema.create_from_model(model))
         return schemas
 
     @staticmethod
-    def create_paths_from_views() -> List['Path']:
-        from avishan.views.class_based import AvishanView
+    def create_paths_from_views() -> typing.List['Path']:
+        from avishan.views.class_based import AvishanModelApiView
 
-        def all_subclasses(cls):
-            return set(cls.__subclasses__()).union(
-                [s for c in cls.__subclasses__() for s in all_subclasses(c)])
-
-        data = []
-        for view in all_subclasses(AvishanView):
-            view: AvishanView
-            doc = view.documentation()
-            if doc is not None:
-                data.extend(doc.paths)
-        return data
+        if AvishanModelApiView.documentation():
+            return AvishanModelApiView.documentation().paths
+        else:
+            return []
 
     def export_schemas_json(self) -> dict:
         data = {}
