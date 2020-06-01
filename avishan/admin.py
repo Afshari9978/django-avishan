@@ -29,7 +29,6 @@ for model in AvishanModel.get_non_abstract_models():
             model_admin_dict['readonly_fields'].append(field.name)
     if model.django_admin_date_hierarchy:
         model_admin_dict['date_hierarchy'] = model.django_admin_date_hierarchy
-    # todo 0.2.2 type check for fields entered here
     if len(model.django_admin_list_display) > 0:
         model_admin_dict['list_display'] = maker(model.django_admin_list_display)
     model_admin = type(model.class_snake_case_name() + "_admin", (admin.ModelAdmin,), model_admin_dict)

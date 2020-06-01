@@ -66,7 +66,10 @@ class AvishanConfigFather:
 
     MONITORED_APPS_NAMES: List[str] = []
     NOT_MONITORED_STARTS: List[str] = ['/admin', '/static', '/media', '/favicon.ico']
+    IGNORE_TRACKING_STARTS: List[str] = []
     AVISHAN_URLS_START = 'api/av1'
+    IMAGE_URL_PREFIX = ''
+    FILE_URL_PREFIX = ''
     JWT_KEY: str = None
     USE_JALALI_DATETIME: bool = False
     LANGUAGE = LANGUAGES.EN
@@ -89,6 +92,9 @@ class AvishanConfigFather:
     # Faker
     FAKER_LOCALE: str = 'fa_IR'
     FAKER_SEED: int = None
+
+    #  Firebase
+    FIREBASE_SERVER_TOKEN: Union[str, dict] = ''
 
     # VisitorToken
     VISITOR_KEY_LENGTH = 40
@@ -123,6 +129,10 @@ class AvishanConfigFather:
 
     # Neshan
     NESHAN_API_KEY: str = None
+
+    # Chayi
+    CHAYI_PROJECT_PACKAGE: str = None
+    CHAYI_MODEL_FILE_IMPORTS: str = None
 
     @classmethod
     def check(cls):

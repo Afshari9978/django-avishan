@@ -4,6 +4,7 @@ import json
 from typing import List, get_type_hints, Type, Callable, Optional
 
 from django.core.handlers.wsgi import WSGIRequest
+from django.db import models
 from django.db.models import QuerySet
 from django.http import JsonResponse
 from django.views import View
@@ -436,11 +437,11 @@ class AvishanModelApiView(AvishanApiView):
 
     def post(self, request, *args, **kwargs):
         if self.model_function is None:
-            self.response[self.model.class_snake_case_name()] = self.model.create(
-                **request.data[self.model.class_snake_case_name()]
-            ).to_dict()
+            data = request.data[self.model.class_snake_case_name()]
+            self.response[self.model.class_snake_case_name()] = self.model.create(**data).to_dict()
         else:
-            self.parse_returned_data(self.model_function(**self.request.data))
+            data = request.data
+            self.parse_returned_data(self.model_function(**data))
 
     def put(self, request, *args, **kwargs):
 
@@ -457,5 +458,6 @@ class PasswordHash(AvishanApiView):
 
     def get(self, request, *args, **kwargs):
         import bcrypt
-        current_request['response']['hashed'] = bcrypt.hashpw(kwargs['password'].encode('utf8'), bcrypt.gensalt()).decode('utf8')
+        current_request['response']['hashed'] = bcrypt.hashpw(kwargs['password'].encode('utf8'),
+                                                              bcrypt.gensalt()).decode('utf8')
         return JsonResponse(current_request['response'])

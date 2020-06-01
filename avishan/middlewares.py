@@ -1,5 +1,6 @@
 import datetime
 import json
+import sys
 
 from django.contrib import messages
 from django.core.handlers.wsgi import WSGIRequest
@@ -155,12 +156,25 @@ class Wrapper:
     @staticmethod
     def save_request_track(current_request):
         from avishan.models import RequestTrackException
+        for ignore in get_avishan_config().IGNORE_TRACKING_STARTS:
+            if current_request['request'].get_full_path().startswith(ignore) and \
+                    current_request['request_track_object']:
+                current_request['request_track_object'].delete()
+                return
         current_request['end_time'] = datetime.datetime.now()
+
+        authentication_type_class_title = "NOT_AVAILABLE"
+        authentication_type_object_id = 0
+        if current_request['authentication_object']:
+            authentication_type_class_title = current_request['authentication_object'].__class__.__name__
+            authentication_type_object_id = current_request['authentication_object'].id
 
         try:
             request_data = json.dumps(current_request['request'].data, indent=2)
+            request_data_size = sys.getsizeof(json.dumps(current_request['request'].data))
         except:
             request_data = "NOT_AVAILABLE"
+            request_data_size = -1
 
         request_headers = ""
         for key, value in current_request['request'].META.items():
@@ -168,12 +182,6 @@ class Wrapper:
                 request_headers += f'{key[5:]}={value}\n'
         for key in current_request['request'].FILES.keys():
             request_headers += f'FILE({key})\n'
-
-        authentication_type_class_title = "NOT_AVAILABLE"
-        authentication_type_object_id = 0
-        if current_request['authentication_object']:
-            authentication_type_class_title = current_request['authentication_object'].__class__.__name__
-            authentication_type_object_id = current_request['authentication_object'].id
 
         try:
             created = current_request['request_track_object'].update(
@@ -186,8 +194,10 @@ class Wrapper:
                 add_token=current_request['add_token'],
                 user_user_group=current_request['user_user_group'],
                 request_data=request_data,
+                request_data_size=request_data_size,
                 request_headers=request_headers,
                 response_data=json.dumps(current_request['response'], indent=2),
+                response_data_size=sys.getsizeof(json.dumps(current_request['response'])),
                 start_time=current_request['start_time'],
                 end_time=current_request['end_time'],
                 total_execution_milliseconds=int((current_request['end_time'] - current_request[

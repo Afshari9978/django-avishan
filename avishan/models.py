@@ -3,6 +3,7 @@ from inspect import Parameter
 from typing import List, Type, Union, Tuple, Dict
 
 import requests
+import stringcase
 from django.core.files.uploadedfile import InMemoryUploadedFile
 from django.db.models import NOT_PROVIDED
 
@@ -34,6 +35,8 @@ class AvishanModel(models.Model, AvishanFaker):
     Models default settings
     """
     private_fields: List[Union[models.Field, str]] = []
+    export_ignore: bool = False  # todo check
+    to_dict_added_fields: List[Tuple[str, Type[type]]] = []
 
     """
     Django admin default values. Set this for all inherited models
@@ -118,6 +121,7 @@ class AvishanModel(models.Model, AvishanFaker):
 
     def update(self, **kwargs):
 
+        # todo deeply check unchanged
         unchanged_list = []
         for key, value in kwargs.items():
             if value == self.UNCHANGED:
@@ -125,8 +129,7 @@ class AvishanModel(models.Model, AvishanFaker):
         for key in unchanged_list:
             del kwargs[key]
 
-        base_kwargs, many_to_many_kwargs, _ = self.__class__._clean_model_data_kwargs(**kwargs)
-        # todo 0.2.3: check for change. if not changed, dont update
+        base_kwargs, many_to_many_kwargs, _ = self.__class__._clean_model_data_kwargs(on_update=True, **kwargs)
         for key, value in base_kwargs.items():
             # todo 0.2.3 check value types
             self.__setattr__(key, value)
@@ -237,7 +240,7 @@ class AvishanModel(models.Model, AvishanFaker):
         return dicted
 
     @classmethod
-    def _clean_model_data_kwargs(cls, on_update: bool = False, **kwargs):
+    def _clean_model_data_kwargs(cls, force_write_on: List[str] = (), on_update: bool = False, **kwargs):
         from avishan.exceptions import ErrorMessageException
         base_kwargs = {}
         many_to_many_kwargs = {}
@@ -247,7 +250,7 @@ class AvishanModel(models.Model, AvishanFaker):
 
         for field in cls.get_full_fields():
             """Check exists"""
-            if cls.is_field_readonly(field):
+            if field.name not in force_write_on and cls.is_field_readonly(field):
                 continue
 
             if cls.is_field_required(field) and not on_update and field.name not in kwargs.keys():
@@ -351,14 +354,16 @@ class AvishanModel(models.Model, AvishanFaker):
         return cls.__name__
 
     @classmethod
+    def class_plural_name(cls) -> str:
+        return cls.class_name() + "s"
+
+    @classmethod
     def class_snake_case_name(cls) -> str:
-        import re
-        s1 = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', cls.class_name())
-        return re.sub('([a-z0-9])([A-Z])', r'\1_\2', s1).lower()
+        return stringcase.snakecase(cls.class_name())
 
     @classmethod
     def class_plural_snake_case_name(cls) -> str:
-        return cls.class_snake_case_name() + "s"
+        return stringcase.snakecase(cls.class_plural_name())
 
     @classmethod
     def app_name(cls) -> str:
@@ -509,9 +514,7 @@ class AvishanModel(models.Model, AvishanFaker):
         elif isinstance(field, models.ForeignKey):
             cast_class = field.related_model
         else:
-            raise NotImplementedError(AvishanTranslatable(
-                EN='cast_field_data not defined cast type',
-            ))
+            return data
 
         if cast_class is None:
             return data
@@ -534,6 +537,8 @@ class AvishanModel(models.Model, AvishanFaker):
 
     @classmethod
     def __get_object_from_dict(cls, input_dict: dict) -> 'AvishanModel':
+        if 'id' in input_dict.keys():
+            return cls.get(id=input_dict['id'])
         return cls.get(**input_dict)
 
     # todo 0.2.2: check None amount for choice added fields
@@ -579,6 +584,10 @@ class AvishanModel(models.Model, AvishanFaker):
         return set(cls.__subclasses__()).union(
             [s for c in cls.__subclasses__() for s in AvishanModel.all_subclasses(c)])
 
+    @classmethod
+    def chayi_ignore_serialize_field(cls, field: models.Field) -> bool:
+        return cls.is_field_readonly(field)
+
 
 class BaseUser(AvishanModel):
     """
@@ -596,17 +605,16 @@ class BaseUser(AvishanModel):
 
     private_fields = [date_created, 'id']
 
-    def add_to_user_group(self, user_group: 'UserGroup') -> 'UserUserGroup':
-        return user_group.add_user_to_user_group(self)
-
     @classmethod
-    def create(cls, is_active: bool = True):
+    def create(cls) -> 'BaseUser':
         return super().create(
-            is_active=is_active,
             language=get_avishan_config().NEW_USERS_LANGUAGE
             if get_avishan_config().NEW_USERS_LANGUAGE is not None
             else get_avishan_config().LANGUAGE
         )
+
+    def add_to_user_group(self, user_group: 'UserGroup') -> 'UserUserGroup':
+        return user_group.add_user_to_user_group(self)
 
     def __str__(self):
         if hasattr(self, 'user'):
@@ -632,6 +640,11 @@ class UserGroup(AvishanModel):
         token_valid_seconds,
         'id'
     ]
+    django_admin_list_display = [title, token_valid_seconds]
+
+    @classmethod
+    def create(cls, title: str, token_valid_seconds: int) -> 'UserGroup':
+        return super().create(title=title, token_valid_seconds=token_valid_seconds)
 
     def add_user_to_user_group(self, base_user: BaseUser) -> 'UserUserGroup':
         """
@@ -677,6 +690,12 @@ class UserUserGroup(AvishanModel):
     """
     is_active = models.BooleanField(default=True, blank=True)
 
+    @classmethod
+    def create(cls, user_group: UserGroup, base_user: BaseUser = None) -> 'UserUserGroup':
+        if base_user is None:
+            base_user = BaseUser.create()
+        return super().create(user_group=user_group, base_user=base_user)
+
     @property
     def last_used(self) -> Optional[datetime.datetime]:
         """
@@ -707,12 +726,6 @@ class UserUserGroup(AvishanModel):
             return None
         return max(dates)
 
-    @classmethod
-    def create(cls, user_group: UserGroup, base_user: BaseUser = None):
-        if base_user is None:
-            base_user = BaseUser.create()
-        return super().create(user_group=user_group, base_user=base_user)
-
     def __str__(self):
         return f'{self.base_user} - {self.user_group}'
 
@@ -725,11 +738,15 @@ class Email(AvishanModel):
     def direct_non_authenticated_callable_methods(cls) -> List[str]:
         return super().direct_non_authenticated_callable_methods() + ['start_verification', 'check_verification']
 
+    @classmethod
+    def create(cls, address: str) -> 'Email':
+        return super().create(address=cls.validate_signature(address))
+
     def start_verification(self):
         self.send_verification_email(EmailVerification.create_verification(self).verification_code)
         return self
 
-    def check_verification(self, code):
+    def check_verification(self, code: str):
         if EmailVerification.check_email(self, code):
             self.date_verified = datetime.datetime.now()
             self.save()
@@ -797,10 +814,6 @@ class Email(AvishanModel):
             kwargs['address'] = cls.validate_signature(address)
         return super().get(avishan_to_dict, avishan_raise_400, **kwargs)
 
-    @classmethod
-    def create(cls, address: str = None) -> 'Email':
-        return super().create(address=cls.validate_signature(address))
-
     def update(self, address: str = None) -> 'Email':
         return super().update(address=self.validate_signature(address))
 
@@ -821,6 +834,7 @@ class EmailVerification(AvishanModel):
     tried_codes = models.TextField(blank=True, default="")
 
     private_fields = [verification_code, verification_date, tried_codes]
+    export_ignore = True
 
     @staticmethod
     def create_verification(email: Email) -> 'EmailVerification':
@@ -882,6 +896,10 @@ class Phone(AvishanModel):
     def direct_non_authenticated_callable_methods(cls) -> List[str]:
         return super().direct_non_authenticated_callable_methods() + ['start_verification', 'check_verification']
 
+    @classmethod
+    def create(cls, number: str) -> 'Phone':
+        return super().create(number=cls.validate_signature(number))
+
     @staticmethod
     def send_bulk_sms():
         pass  # todo
@@ -898,13 +916,17 @@ class Phone(AvishanModel):
     def send_template_sms(self, template_name, **kwargs):
         url = "https://api.kavenegar.com/v1/" + get_avishan_config().KAVENEGAR_API_TOKEN + "/verify/lookup.json"
         querystring = {**{"receptor": self.number, "template": template_name}, **kwargs}
-        requests.request("GET", url, data="", headers={}, params=querystring)
+
+        try:
+            response = requests.request("GET", url, data="", headers={}, params=querystring)
+        except Exception as e:
+            print(e, response)
 
     def start_verification(self):
         self.send_verification_sms(PhoneVerification.create_verification(self).verification_code)
         return self
 
-    def check_verification(self, code):
+    def check_verification(self, code: str):
         if PhoneVerification.check_phone(self, code):
             self.date_verified = datetime.datetime.now()
             self.save()
@@ -944,10 +966,6 @@ class Phone(AvishanModel):
             kwargs['number'] = cls.validate_signature(number)
         return super().get(avishan_to_dict, avishan_raise_400, **kwargs)
 
-    @classmethod
-    def create(cls, number: str = None) -> 'Phone':
-        return super().create(number=cls.validate_signature(number))
-
     def update(self, number: str = None) -> 'Phone':
         return super().update(number=self.validate_signature(number))
 
@@ -968,6 +986,10 @@ class PhoneVerification(AvishanModel):
     tried_codes = models.TextField(blank=True, default="")
 
     private_fields = [verification_code, verification_date, tried_codes]
+
+    @classmethod
+    def create(cls, phone: Phone, verification_code: str) -> 'PhoneVerification':
+        return super().create(phone=phone, verification_code=verification_code)
 
     @staticmethod
     def create_verification(phone: Phone) -> 'PhoneVerification':
@@ -1030,6 +1052,8 @@ class AuthenticationType(AvishanModel):
     last_used = models.DateTimeField(default=None, blank=True, null=True)
     last_login = models.DateTimeField(default=None, blank=True, null=True)
     last_logout = models.DateTimeField(default=None, blank=True, null=True)
+
+    export_ignore = True
 
     class Meta:
         abstract = True
@@ -1173,6 +1197,10 @@ class EmailPasswordAuthenticate(KeyValueAuthentication):
     django_admin_list_display = [email, 'user_user_group', 'last_used', 'last_login', 'last_logout']
 
     @classmethod
+    def create(cls, email: Email, password: str) -> 'EmailPasswordAuthenticate':
+        return super().create(email)
+
+    @classmethod
     def key_field(cls) -> Union[models.ForeignKey, models.Field]:
         return cls.get_field('email')
 
@@ -1193,6 +1221,24 @@ class OtpAuthentication(AuthenticationType):
 
     class Meta:
         abstract = True
+
+    @classmethod
+    def create_new(cls, user_user_group: UserUserGroup, key: str) -> 'OtpAuthentication':
+        from avishan.exceptions import AuthException
+        try:
+            key_item = cls.key_field().related_model.get(key)
+        except cls.key_field().related_model.DoesNotExist:
+            key_item = cls.key_field().related_model.create(key)
+        try:
+            cls.objects.get(**{cls.key_field().name: key_item, 'user_user_group': user_user_group})
+            raise AuthException(AuthException.DUPLICATE_AUTHENTICATION_IDENTIFIER)
+        except cls.DoesNotExist:
+            if hasattr(user_user_group, cls.key_field().name + 'otpauthenticate'):
+                raise AuthException(AuthException.DUPLICATE_AUTHENTICATION_TYPE)
+        return cls.objects.create(**{
+            'user_user_group': user_user_group,
+            cls.key_field().name: key_item
+        })
 
     @classmethod
     def key_field(cls) -> models.ForeignKey:
@@ -1228,24 +1274,6 @@ class OtpAuthentication(AuthenticationType):
         self.tried_codes = ""
         self.save()
         return True
-
-    @classmethod
-    def create_new(cls, user_user_group: UserUserGroup, key: str) -> 'PhoneOtpAuthenticate':
-        from avishan.exceptions import AuthException
-        try:
-            key_item = cls.key_field().related_model.get(key)
-        except cls.key_field().related_model.DoesNotExist:
-            key_item = cls.key_field().related_model.create(key)
-        try:
-            cls.objects.get(**{cls.key_field().name: key_item, 'user_user_group': user_user_group})
-            raise AuthException(AuthException.DUPLICATE_AUTHENTICATION_IDENTIFIER)
-        except cls.DoesNotExist:
-            if hasattr(user_user_group, cls.key_field().name + 'otpauthenticate'):
-                raise AuthException(AuthException.DUPLICATE_AUTHENTICATION_TYPE)
-        return cls.objects.create(**{
-            'user_user_group': user_user_group,
-            cls.key_field().name: key_item
-        })
 
     def verify_account(self) -> Union['OtpAuthentication', 'PhoneOtpAuthenticate']:
         self.send_otp_code()
@@ -1347,6 +1375,10 @@ class VisitorKey(AuthenticationType):
     django_admin_search_fields = key,
 
     @classmethod
+    def create(cls, key: str) -> 'VisitorKey':
+        return super().create(key=key)
+
+    @classmethod
     def key_field(cls) -> models.Field:
         return cls.get_field('key')
 
@@ -1399,8 +1431,13 @@ class Image(AvishanModel):
     base_user = models.ForeignKey(BaseUser, on_delete=models.SET_NULL, null=True, blank=True)
     date_created = models.DateTimeField(auto_now_add=True)
 
+    export_ignore = True
+
     def __str__(self):
-        return self.file.url
+        try:
+            return self.file.url
+        except ValueError:
+            return super().__str__()
 
     @classmethod
     def direct_callable_methods(cls) -> List[str]:
@@ -1426,7 +1463,7 @@ class Image(AvishanModel):
     def to_dict(self, exclude_list: List[Union[models.Field, str]] = ()) -> dict:
         return {
             'id': self.id,
-            'file': self.file.url
+            'file': get_avishan_config().IMAGE_URL_PREFIX + self.file.url
         }
 
     @classmethod
@@ -1456,10 +1493,12 @@ class File(AvishanModel):
     base_user = models.ForeignKey(BaseUser, on_delete=models.SET_NULL, null=True, blank=True)
     date_created = models.DateTimeField(auto_now_add=True)
 
+    export_ignore = True
+
     def to_dict(self, exclude_list: List[Union[models.Field, str]] = ()) -> dict:
         return {
             'id': self.id,
-            'file': self.file.url
+            'file': get_avishan_config().FILE_URL_PREFIX + self.file.url
         }
 
 
@@ -1474,8 +1513,10 @@ class RequestTrack(AvishanModel):
     add_token = models.BooleanField(null=True, blank=True)
     user_user_group = models.ForeignKey(UserUserGroup, on_delete=models.SET_NULL, null=True, blank=True)
     request_data = models.TextField(null=True, blank=True)
+    request_data_size = models.BigIntegerField(default=None, null=True, blank=True)
     request_headers = models.TextField(null=True, blank=True)
     response_data = models.TextField(null=True, blank=True)
+    response_data_size = models.BigIntegerField(default=None, null=True, blank=True)
     start_time = models.DateTimeField(blank=True, null=True)
     end_time = models.DateTimeField(blank=True, null=True)
     total_execution_milliseconds = models.BigIntegerField(null=True, blank=True)
@@ -1485,8 +1526,11 @@ class RequestTrack(AvishanModel):
 
     django_admin_search_fields = [url]
 
-    django_admin_list_display = [view_name, method, status_code, user_user_group, start_time,
-                                 total_execution_milliseconds, url]
+    django_admin_list_display = [url, status_code, user_user_group, start_time,
+                                 total_execution_milliseconds, view_execution_milliseconds]
+    django_admin_list_filter = ['url']
+
+    export_ignore = True
 
     def __str__(self):
         return self.view_name
@@ -1519,6 +1563,14 @@ class RequestTrackExecInfo(AvishanModel):
     django_admin_list_max_show_all = 500
     django_admin_search_fields = (title,)
 
+    export_ignore = True
+
+    @classmethod
+    def create(cls, request_track: RequestTrack, title: str, start_time: datetime.datetime,
+               end_time: datetime.datetime, milliseconds: float) -> 'RequestTrackExecInfo':
+        return super().create(request_track=request_track, title=title, start_time=start_time, end_time=end_time,
+                              milliseconds=milliseconds)
+
     @classmethod
     def create_dict(cls, title: str, from_title: str = 'begin'):
         current_request['request_track_exec'].append({
@@ -1539,13 +1591,27 @@ class RequestTrackException(AvishanModel):
 
     django_admin_list_display = [request_track, class_title, args]
 
+    export_ignore = True
+
+    @classmethod
+    def create(cls, request_track: RequestTrack, class_title: str, args: str,
+               traceback: str) -> 'RequestTrackException':
+        return super().create(
+            request_track=request_track,
+            class_title=class_title,
+            args=args,
+            traceback=traceback
+        )
+
 
 class TranslatableChar(AvishanModel):
     en = models.CharField(max_length=255, blank=True, null=True, default=None)
     fa = models.CharField(max_length=255, blank=True, null=True, default=None)
 
+    export_ignore = True
+
     @classmethod
-    def create(cls, en: str = None, fa: str = None, auto: str = None):
+    def create(cls, en: str = None, fa: str = None, auto: str = None) -> 'TranslatableChar':
         if en is not None:
             en = str(en)
             if len(en) == 0:
@@ -1582,13 +1648,15 @@ class Activity(AvishanModel):
 
     django_admin_list_display = [user_user_group, title, data, object_class, object_id, date_created]
 
+    export_ignore = True
+
     @classmethod
     def create(cls,
                title: str,
                object_class: str = None,
                object_id: int = None,
                data: str = None
-               ):
+               ) -> 'Activity':
         request_track = current_request['request_track_object']
         user_user_group = current_request['user_user_group']
         if not request_track and not user_user_group:
@@ -1603,8 +1671,8 @@ class Activity(AvishanModel):
         )
 
     @classmethod
-    def class_plural_snake_case_name(cls) -> str:
-        return 'activities'
+    def class_plural_name(cls) -> str:
+        return 'Activities'
 
     def __str__(self):
         return self.title
