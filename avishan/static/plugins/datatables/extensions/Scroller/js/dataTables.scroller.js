@@ -191,7 +191,7 @@ var Scroller = function ( oDTSettings, oOpts ) {
 		loaderVisible: false
 	};
 
-	// @todo The defaults should extend a `c` property and the internal settings
+	// @ The defaults should extend a `c` property and the internal settings
 	// only held in the `s` property. At the moment they are mixed
 	this.s = $.extend( this.s, Scroller.oDefaults, oOpts );
 

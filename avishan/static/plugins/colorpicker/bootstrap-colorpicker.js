@@ -6,7 +6,7 @@
  * Licensed under the Apache License v2.0
  * http://www.apache.org/licenses/LICENSE-2.0.txt
  *
- * @todo Update DOCS
+ * @ Update DOCS
  */
 (function($) {
     'use strict';

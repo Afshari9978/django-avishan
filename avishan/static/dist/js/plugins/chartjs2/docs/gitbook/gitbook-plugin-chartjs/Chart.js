@@ -4065,7 +4065,7 @@ module.exports = function(Chart) {
 
 				scales[scale.id] = scale;
 
-				// TODO(SB): I think we should be able to remove this custom case (options.scale)
+				// (SB): I think we should be able to remove this custom case (options.scale)
 				// and consider it as a regular scale part of the "scales"" map only! This would
 				// make the logic easier and remove some useless? custom code.
 				if (item.isDefault) {
@@ -4188,7 +4188,7 @@ module.exports = function(Chart) {
 			 * Provided for backward compatibility, use `afterLayout` instead.
 			 * @method IPlugin#afterScaleUpdate
 			 * @deprecated since version 2.5.0
-			 * @todo remove at version 3
+			 * @ remove at version 3
 			 */
 			plugins.notify(me, 'afterScaleUpdate');
 			plugins.notify(me, 'afterLayout');
@@ -7546,7 +7546,7 @@ module.exports = function(Chart) {
 	 * Provided for backward compatibility, use Chart.plugins instead
 	 * @namespace Chart.pluginService
 	 * @deprecated since version 2.1.5
-	 * @todo remove at version 3
+	 * @ remove at version 3
 	 * @private
 	 */
 	Chart.pluginService = Chart.plugins;
@@ -7556,7 +7556,7 @@ module.exports = function(Chart) {
 	 * effect, instead simply create/register plugins via plain JavaScript objects.
 	 * @interface Chart.PluginBase
 	 * @deprecated since version 2.5.0
-	 * @todo remove at version 3
+	 * @ remove at version 3
 	 * @private
 	 */
 	Chart.PluginBase = helpers.inherits({});
@@ -7887,7 +7887,7 @@ module.exports = function(Chart) {
 					var cosRotation = Math.cos(angleRadians);
 					var sinRotation = Math.sin(angleRadians);
 
-					// TODO - improve this calculation
+					//  - improve this calculation
 					var labelHeight = (sinRotation * largestTextWidth)
 						+ (tickFont.size * tallestLabelHeightInLines)
 						+ (lineSpace * tallestLabelHeightInLines);
@@ -10566,7 +10566,7 @@ module.exports = function(Chart) {
 'use strict';
 
 // By default, select the browser (DOM) platform.
-// @TODO Make possible to select another platform at build time.
+// @ Make possible to select another platform at build time.
 var implementation = require(41);
 
 module.exports = function(Chart) {
@@ -11237,7 +11237,7 @@ module.exports = function(Chart) {
 			var tickOpts = opts.ticks;
 
 			if (me.isHorizontal()) {
-				range = helpers.log10(me.end) - helpers.log10(start); // todo: if start === 0
+				range = helpers.log10(me.end) - helpers.log10(start); // : if start === 0
 				if (newVal === 0) {
 					pixel = me.left;
 				} else {
@@ -11281,7 +11281,7 @@ module.exports = function(Chart) {
 			if (me.isHorizontal()) {
 				innerDimension = me.width;
 				value = me.start * Math.pow(10, (pixel - me.left) * range / innerDimension);
-			} else {  // todo: if start === 0
+			} else {  // : if start === 0
 				innerDimension = me.height;
 				value = Math.pow(10, (me.bottom - pixel) * range / innerDimension) / me.start;
 			}

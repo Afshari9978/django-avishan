@@ -133,7 +133,7 @@ Responsive.prototype = {
 		} );
 
 		// Determine which columns are already hidden, and should therefore
-		// remain hidden. todo - should this be done? See thread 22677
+		// remain hidden.  - should this be done? See thread 22677
 		//
 		// this.s.alwaysHidden = dt.columns(':hidden').indexes();
 

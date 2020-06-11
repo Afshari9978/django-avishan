@@ -30,7 +30,7 @@
 	};
 
 	// DOM implementation
-	// @TODO move it in Chart.js: src/core/core.platform.js
+	// @ move it in Chart.js: src/core/core.platform.js
 	Chart.platform = helpers.extend(Chart.platform || {}, {
 		defer: function(fn, delay, scope) {
 			var callback = function() {

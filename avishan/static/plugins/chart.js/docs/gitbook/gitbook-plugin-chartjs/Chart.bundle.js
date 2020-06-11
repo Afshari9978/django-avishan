@@ -2578,7 +2578,7 @@ function localeMonthsParse (monthName, format, strict) {
         this._shortMonthsParse = [];
     }
 
-    // TODO: add sorting
+    // : add sorting
     // Sorting makes sure if one month (or abbr) is a prefix of another
     // see sorting in computeMonthsParse
     for (i = 0; i < 12; i++) {
@@ -2618,7 +2618,7 @@ function setMonth (mom, value) {
             value = toInt(value);
         } else {
             value = mom.localeData().monthsParse(value);
-            // TODO: Another silent failure?
+            // : Another silent failure?
             if (!isNumber(value)) {
                 return mom;
             }
@@ -3469,7 +3469,7 @@ function chooseLocale(names) {
 
 function loadLocale(name) {
     var oldLocale = null;
-    // TODO: Find a better way to register and load all the locales in Node
+    // : Find a better way to register and load all the locales in Node
     if (!locales[name] && (typeof module !== 'undefined') &&
             module && module.exports) {
         try {
@@ -3847,7 +3847,7 @@ function dayOfYearFromWeekInfo(config) {
         dow = 1;
         doy = 4;
 
-        // TODO: We need to take the current isoWeekYear, but that depends on
+        // : We need to take the current isoWeekYear, but that depends on
         // how we interpret now (local, utc, fixed offset). So create
         // a now version of current config (take local/utc/offset flags, and
         // create now).
@@ -3901,7 +3901,7 @@ hooks.ISO_8601 = function () {};
 
 // date from string and format string
 function configFromStringAndFormat(config) {
-    // TODO: Move this to another part of the creation flow to prevent circular deps
+    // : Move this to another part of the creation flow to prevent circular deps
     if (config._f === hooks.ISO_8601) {
         configFromISO(config);
         return;
@@ -4193,7 +4193,7 @@ function pickBy(fn, moments) {
     return res;
 }
 
-// TODO: Use [].sort instead?
+// : Use [].sort instead?
 function min () {
     var args = [].slice.call(arguments, 0);
 
@@ -4589,7 +4589,7 @@ function momentsDifference(base, other) {
     return res;
 }
 
-// TODO: remove 'name' arg after deprecation is removed
+// : remove 'name' arg after deprecation is removed
 function createAdder(direction, name) {
     return function (val, period) {
         var dur, tmp;
@@ -5694,7 +5694,7 @@ function as (units) {
     }
 }
 
-// TODO: Use this.as('ms')?
+// : Use this.as('ms')?
 function valueOf$1 () {
     return (
         this._milliseconds +
@@ -8366,7 +8366,7 @@ module.exports = function(Chart) {
 
 				scales[scale.id] = scale;
 
-				// TODO(SB): I think we should be able to remove this custom case (options.scale)
+				// (SB): I think we should be able to remove this custom case (options.scale)
 				// and consider it as a regular scale part of the "scales"" map only! This would
 				// make the logic easier and remove some useless? custom code.
 				if (item.isDefault) {
@@ -8489,7 +8489,7 @@ module.exports = function(Chart) {
 			 * Provided for backward compatibility, use `afterLayout` instead.
 			 * @method IPlugin#afterScaleUpdate
 			 * @deprecated since version 2.5.0
-			 * @todo remove at version 3
+			 * @ remove at version 3
 			 */
 			plugins.notify(me, 'afterScaleUpdate');
 			plugins.notify(me, 'afterLayout');
@@ -11847,7 +11847,7 @@ module.exports = function(Chart) {
 	 * Provided for backward compatibility, use Chart.plugins instead
 	 * @namespace Chart.pluginService
 	 * @deprecated since version 2.1.5
-	 * @todo remove at version 3
+	 * @ remove at version 3
 	 * @private
 	 */
 	Chart.pluginService = Chart.plugins;
@@ -11857,7 +11857,7 @@ module.exports = function(Chart) {
 	 * effect, instead simply create/register plugins via plain JavaScript objects.
 	 * @interface Chart.PluginBase
 	 * @deprecated since version 2.5.0
-	 * @todo remove at version 3
+	 * @ remove at version 3
 	 * @private
 	 */
 	Chart.PluginBase = helpers.inherits({});
@@ -12188,7 +12188,7 @@ module.exports = function(Chart) {
 					var cosRotation = Math.cos(angleRadians);
 					var sinRotation = Math.sin(angleRadians);
 
-					// TODO - improve this calculation
+					//  - improve this calculation
 					var labelHeight = (sinRotation * largestTextWidth)
 						+ (tickFont.size * tallestLabelHeightInLines)
 						+ (lineSpace * tallestLabelHeightInLines);
@@ -14867,7 +14867,7 @@ module.exports = function(Chart) {
 'use strict';
 
 // By default, select the browser (DOM) platform.
-// @TODO Make possible to select another platform at build time.
+// @ Make possible to select another platform at build time.
 var implementation = require(41);
 
 module.exports = function(Chart) {
@@ -15538,7 +15538,7 @@ module.exports = function(Chart) {
 			var tickOpts = opts.ticks;
 
 			if (me.isHorizontal()) {
-				range = helpers.log10(me.end) - helpers.log10(start); // todo: if start === 0
+				range = helpers.log10(me.end) - helpers.log10(start); // : if start === 0
 				if (newVal === 0) {
 					pixel = me.left;
 				} else {
@@ -15582,7 +15582,7 @@ module.exports = function(Chart) {
 			if (me.isHorizontal()) {
 				innerDimension = me.width;
 				value = me.start * Math.pow(10, (pixel - me.left) * range / innerDimension);
-			} else {  // todo: if start === 0
+			} else {  // : if start === 0
 				innerDimension = me.height;
 				value = Math.pow(10, (me.bottom - pixel) * range / innerDimension) / me.start;
 			}
