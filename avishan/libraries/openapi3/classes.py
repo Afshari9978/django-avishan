@@ -1,3 +1,4 @@
+import datetime
 import typing
 
 from django.db import models
@@ -42,7 +43,7 @@ def type_map(input: typing.Union[str, type, models.Field], name: str = None, mod
         if isinstance(input, models.TimeField):
             return "string", 'full-time'
         if isinstance(input, (models.OneToOneField, models.ForeignKey)):
-            if input.model.__name__ is model.model.__name__:
+            if input.related_model.__name__ is model.model.__name__:
                 return model, None
             return Schema.create_from_model(input.related_model), None
         if isinstance(input, models.FileField):
@@ -57,6 +58,12 @@ def type_map(input: typing.Union[str, type, models.Field], name: str = None, mod
             return 'number', 'int64'
         if input is float:
             return 'number', 'float'
+        if input is datetime.datetime:
+            return "string", "date-time"
+        if input is datetime.date:
+            return "string", "full-date"
+        if input is datetime.time:
+            return "string", "full-time"
         raise NotImplementedError(name)
 
     # Optional[int] -> Union[int, None]
