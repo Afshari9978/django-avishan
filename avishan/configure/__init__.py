@@ -10,6 +10,7 @@ class AvishanConfigure:
 
     @staticmethod
     def command_line_checkup(management_command):
+        # todo
         # AvishanConfigure.check_for_config_file(management_command)
         AvishanConfigure.check_django_settings(management_command)
 
@@ -68,8 +69,6 @@ class AvishanConfigFather:
     NOT_MONITORED_STARTS: List[str] = ['/admin', '/static', '/media', '/favicon.ico']
     IGNORE_TRACKING_STARTS: List[str] = []
     AVISHAN_URLS_START = 'api/av1'
-    IMAGE_URL_PREFIX = ''
-    FILE_URL_PREFIX = ''
     JWT_KEY: str = None
     USE_JALALI_DATETIME: bool = False
     LANGUAGE = LANGUAGES.EN
@@ -88,6 +87,7 @@ class AvishanConfigFather:
     # PhoneVerification
     PHONE_VERIFICATION_GAP_SECONDS = 90
     PHONE_VERIFICATION_TRIES_COUNT = 3
+    PHONE_MINIMUM_LENGTH = 10
 
     # Faker
     FAKER_LOCALE: str = 'fa_IR'
@@ -135,7 +135,17 @@ class AvishanConfigFather:
     CHAYI_MODEL_FILE_IMPORTS: str = None
 
     @classmethod
-    def check(cls):
+    def on_startup(cls):
+        """
+        This method will be called anytime server starts. But just the method from get_avishan_config() result.
+        """
+        pass
+
+    @classmethod
+    def on_request(cls):
+        """
+        This method called for any request, just before Avishan middleware starts calling get_response()
+        """
         pass
 
     @classmethod
@@ -151,6 +161,31 @@ class AvishanConfigFather:
                 'token_valid_seconds': token_valid_seconds,
             }
         )
+
+    @classmethod
+    def get_country_mobile_numbers_data(cls) -> List[dict]:
+        return [
+            {
+                'name': 'Iran',
+                'dialing_code': '98',
+                'mobile_number_length': 10,
+                'mobile_providers': {
+                    'mtn': ['901', '902', '903', '904', '905', '930', '933', '935', '936', '937', '938', '939'],
+                    'mci': ['91', '990', '991', '992', '993', '994'],
+                    'rightel': ['920', '921', '922'],
+                    'mtce': ['931'],
+                    'taliya': ['932'],
+                    'kish-tci': ['934'],
+                    'aptel': ['99910', '99911', '99913'],
+                    'azartel': ['99914'],
+                    'samantel': ['99999', '99998', '99997', '99996'],
+                    'lotustel': ['9990'],
+                    'shatel': ['99810', '99811', '99812', '99814'],
+                    'ariantel': ['9998'],
+                    'anarestan': ['9944']
+                }
+            }
+        ]
 
 
 def get_avishan_config() -> Union[Type[AvishanConfigFather]]:

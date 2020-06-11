@@ -1,4 +1,5 @@
 import random
+import re
 from inspect import Parameter
 from typing import List, Type, Union, Tuple, Dict
 
@@ -580,9 +581,9 @@ class AvishanModel(models.Model, AvishanFaker):
         return 0
 
     @staticmethod
-    def all_subclasses(cls):
-        return set(cls.__subclasses__()).union(
-            [s for c in cls.__subclasses__() for s in AvishanModel.all_subclasses(c)])
+    def all_subclasses(parent_class):
+        return set(parent_class.__subclasses__()).union(
+            [s for c in parent_class.__subclasses__() for s in AvishanModel.all_subclasses(c)])
 
     @classmethod
     def chayi_ignore_serialize_field(cls, field: models.Field) -> bool:
@@ -896,10 +897,6 @@ class Phone(AvishanModel):
     def direct_non_authenticated_callable_methods(cls) -> List[str]:
         return super().direct_non_authenticated_callable_methods() + ['start_verification', 'check_verification']
 
-    @classmethod
-    def create(cls, number: str) -> 'Phone':
-        return super().create(number=cls.validate_signature(number))
-
     @staticmethod
     def send_bulk_sms():
         pass  # todo
@@ -941,16 +938,40 @@ class Phone(AvishanModel):
         return self.number
 
     @staticmethod
-    def validate_signature(phone: str) -> str:
-        from .utils import en_numbers
-        phone = en_numbers(phone)
-        phone = phone.replace(" ", "")
-        phone = phone.replace("-", "")
+    def validate_signature(phone: str, country_data: dict = None) -> str:
+        """
+        https://en.wikipedia.org/wiki/List_of_mobile_telephone_prefixes_by_country
+        # each telecom numbers
 
-        if phone.startswith("+"):
-            phone = "00" + phone[1:]
+        minimum number of digits for a mobile number is 4 [Country:Saint Helena]
+        Max digits for a mobile number is 13 [Country: Austria]
+        \+(9[976]\d|8[987530]\d|6[987]\d|5[90]\d|42\d|3[875]\d|
+        2[98654321]\d|9[8543210]|8[6421]|6[6543210]|5[87654321]|
+        4[987654310]|3[9643210]|2[70]|7|1)\d{1,14}$
+        """
+        if country_data is None:
+            country_data = get_avishan_config().get_country_mobile_numbers_data()[0]
 
-        return phone
+        # remove all non-numbers characters
+        result = ''.join(re.findall('[0-9]', phone))
+        # now match with validation regex
+        # todo check for 09 programmatically
+        result = re.sub(f'({country_data["dialing_code"]}|00{country_data["dialing_code"]})?(0)?([0-9]*)', r'\3',
+                        result)
+        if len(result) < 10:
+            raise ValueError(f'Smaller Number Extracted: {result}')
+        elif len(result) != 10:
+            raise ValueError(f'Bigger Number Extracted: {result}')
+
+        temp = (some for some in country_data['mobile_providers'].values())
+        prefixes = []
+        for item in temp:
+            prefixes += item
+
+        if not result.startswith(tuple(prefixes)):
+            raise ValueError('Invalid Prefix')
+
+        return f"00{country_data['dialing_code']}" + result
 
     @staticmethod
     def get_or_create_phone(phone_number: str) -> 'Phone':
@@ -966,8 +987,10 @@ class Phone(AvishanModel):
             kwargs['number'] = cls.validate_signature(number)
         return super().get(avishan_to_dict, avishan_raise_400, **kwargs)
 
-    def update(self, number: str = None) -> 'Phone':
-        return super().update(number=self.validate_signature(number))
+    def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
+        if self.number:
+            self.number = Phone.validate_signature(self.number)
+        super().save(force_insert, force_update, using, update_fields)
 
     @classmethod
     def filter(cls, avishan_to_dict: bool = False, **kwargs):
@@ -1463,7 +1486,7 @@ class Image(AvishanModel):
     def to_dict(self, exclude_list: List[Union[models.Field, str]] = ()) -> dict:
         return {
             'id': self.id,
-            'file': get_avishan_config().IMAGE_URL_PREFIX + self.file.url
+            'file': self.file.url
         }
 
     @classmethod
@@ -1498,7 +1521,7 @@ class File(AvishanModel):
     def to_dict(self, exclude_list: List[Union[models.Field, str]] = ()) -> dict:
         return {
             'id': self.id,
-            'file': get_avishan_config().FILE_URL_PREFIX + self.file.url
+            'file': self.file.url
         }
 
 
@@ -1562,6 +1585,7 @@ class RequestTrackExecInfo(AvishanModel):
     django_admin_list_filter = (request_track, title)
     django_admin_list_max_show_all = 500
     django_admin_search_fields = (title,)
+    django_admin_raw_id_fields = [request_track]
 
     export_ignore = True
 
@@ -1590,6 +1614,7 @@ class RequestTrackException(AvishanModel):
     traceback = models.TextField(null=True, blank=True)
 
     django_admin_list_display = [request_track, class_title, args]
+    django_admin_raw_id_fields = [request_track]
 
     export_ignore = True
 

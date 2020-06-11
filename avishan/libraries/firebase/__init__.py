@@ -44,10 +44,9 @@ def send_firebase_data_and_notification(
         body: str,
         data: str,
         to_key: str,
-        server_key: str = FIREBASE_SERVER_TOKEN):
-    return post(
-        url='https://fcm.googleapis.com/fcm/send',
-        json={
+        server_key: str = FIREBASE_SERVER_TOKEN,
+        print_data: bool = False):
+    data = {
             "notification": {
                 "title": title,
                 "body": body
@@ -57,7 +56,12 @@ def send_firebase_data_and_notification(
             "android": {
                 "priority": "high"
             },
-        },
+        }
+    if print_data:
+        print(data)
+    return post(
+        url='https://fcm.googleapis.com/fcm/send',
+        json=data,
         headers={
             'Authorization': f'key={server_key}'}
 

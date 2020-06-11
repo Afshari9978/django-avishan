@@ -15,7 +15,7 @@ class Wrapper:
 
     def __init__(self, get_response):
         self.get_response = get_response
-        get_avishan_config().check()
+        get_avishan_config().on_startup()
 
     def __call__(self, request: WSGIRequest):
         from avishan.utils import discard_monitor, find_token, decode_token, add_token_to_response, find_and_check_user
@@ -53,14 +53,7 @@ class Wrapper:
         if current_request['language'] is None:
             current_request['language'] = get_avishan_config().LANGUAGE
 
-        try:
-            """
-            If avishan_admin installed and check method found, run it.
-            """
-            from avishan_admin.avishan_config import check_request
-            check_request()
-        except ImportError:
-            pass
+        get_avishan_config().on_request()
 
         # todo 0.2.2 check for 'avishan_' in request bodies
         """Send request object to the next layer and wait for response"""
