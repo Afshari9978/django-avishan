@@ -104,6 +104,10 @@ class AvishanModel(models.Model, AvishanFaker):
 
     @classmethod
     def create(cls, **kwargs):
+        """
+        Backend create method for inserting object to database
+        """
+
         create_kwargs, many_to_many_objects, after_creation = cls._clean_model_data_kwargs(**kwargs)
         created = cls.objects.create(**create_kwargs)
 

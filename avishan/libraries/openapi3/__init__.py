@@ -9,7 +9,6 @@ import stringcase
 
 
 def request_common_parameters() -> List[dict]:
-    # done
     return [{
         "name": 'lang',
         "in": 'query',
@@ -18,13 +17,11 @@ def request_common_parameters() -> List[dict]:
     }]
 
 
-def create_openapi_object(title: str, api_version: str) -> dict:
+def create_openapi_object(title: str, api_version: str, servers: List[dict] = None) -> dict:
     data = {
         'openapi': "3.0.0",
-        'info': {
-            'version': api_version,
-            'title': title
-        },
+        'info': get_info_object(api_version, title),
+        'servers': servers,
         'components': {
             'schemas': {}
         },
@@ -34,6 +31,14 @@ def create_openapi_object(title: str, api_version: str) -> dict:
         data['components']['schemas'][model.class_name()] = (get_model_object(model))
         data['paths'] = {**data['paths'], **get_model_paths(model)}
     return data
+
+
+def get_info_object(api_version: str, title: str):
+    # todo
+    return {
+        'version': api_version,
+        'title': title
+    }
 
 
 def get_model_paths(model: Type[AvishanModel]) -> dict:

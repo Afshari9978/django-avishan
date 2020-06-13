@@ -34,7 +34,6 @@ class AvishanViewDecorator:
                 """
                 If user not provided, return with error.
                 """
-                # todo 0.2.4: if api-type request but token in session instead of header
                 self.before_request()
 
                 if self.authenticate and not self.is_authenticated():
