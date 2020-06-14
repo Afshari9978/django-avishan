@@ -1610,7 +1610,7 @@ class RequestTrack(AvishanModel):
         return self.view_execution_milliseconds
 
     def time(self):
-        return self.start_time.strftime("%d/%m/%y %H:%I:%M:%S.%f")
+        return self.start_time.strftime("%d/%m/%y %H:%M:%S.%f")
 
     def __str__(self):
         return self.view_name
