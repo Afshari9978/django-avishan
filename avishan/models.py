@@ -602,13 +602,12 @@ class BaseUser(AvishanModel):
     """Only active users can use system. This field checks on every request"""
     is_active = models.BooleanField(default=True, blank=True)
     language = models.CharField(max_length=255, default=AvishanConfigFather.LANGUAGES.EN)
-
-    """
-    The first time user attracted with system. This will set on the first models.authentication.BaseUser model creation.
-    """
     date_created = models.DateTimeField(auto_now_add=True)
 
     private_fields = [date_created, 'id']
+
+    django_admin_list_display = ['id', is_active, language, date_created]
+    django_admin_list_filter = [language, is_active]
 
     @classmethod
     def create(cls) -> 'BaseUser':
@@ -636,10 +635,7 @@ class UserGroup(AvishanModel):
 
     """Unique titles for groups. examples: Customer, User, Driver, Admin, Supervisor"""
     title = models.CharField(max_length=255, unique=True)
-
     token_valid_seconds = models.BigIntegerField(default=30 * 60, blank=True)
-
-    """Check if this group users can access to their specific space in this ways"""
 
     private_fields = [
         token_valid_seconds,
@@ -685,15 +681,16 @@ class UserUserGroup(AvishanModel):
     # todo 0.2.1: raise appropriate exception for exceeding unique rule here.
     base_user = models.ForeignKey(BaseUser, on_delete=models.CASCADE, related_name='user_user_groups')
     user_group = models.ForeignKey(UserGroup, on_delete=models.CASCADE, related_name='user_user_groups')
-
-    """Date this link created between user and user group"""
     date_created = models.DateTimeField(auto_now_add=True)
-
     """
     Each token have address to models.authentication.UserUserGroup object. If this fields become false, user cannot use 
     system with this role. "is_active" field on models.authentication.BaseUser will not override on this field. 
     """
     is_active = models.BooleanField(default=True, blank=True)
+
+    django_admin_list_display = [base_user, user_group, date_created]
+    django_admin_list_filter = [user_group]
+    django_admin_raw_id_fields = [base_user]
 
     @classmethod
     def create(cls, user_group: UserGroup, base_user: BaseUser = None) -> 'UserUserGroup':
@@ -738,6 +735,9 @@ class UserUserGroup(AvishanModel):
 class Email(AvishanModel):
     address = models.CharField(max_length=255, unique=True)
     date_verified = models.DateTimeField(default=None, null=True, blank=True)
+
+    django_admin_list_display = [address, date_verified]
+    django_admin_search_fields = [address]
 
     @classmethod
     def direct_non_authenticated_callable_methods(cls) -> List[str]:
@@ -841,6 +841,10 @@ class EmailVerification(AvishanModel):
     private_fields = [verification_code, verification_date, tried_codes]
     export_ignore = True
 
+    django_admin_list_display = [email, verification_code, verification_date]
+    django_admin_raw_id_fields = [email]
+    django_admin_search_fields = [email]
+
     @staticmethod
     def create_verification(email: Email) -> 'EmailVerification':
         from avishan.exceptions import ErrorMessageException
@@ -896,6 +900,9 @@ class EmailVerification(AvishanModel):
 class Phone(AvishanModel):
     number = models.CharField(max_length=255, unique=True)
     date_verified = models.DateTimeField(default=None, null=True, blank=True)
+
+    django_admin_list_display = [number, date_verified]
+    django_admin_search_fields = [number]
 
     @classmethod
     def direct_non_authenticated_callable_methods(cls) -> List[str]:
@@ -1014,6 +1021,10 @@ class PhoneVerification(AvishanModel):
 
     private_fields = [verification_code, verification_date, tried_codes]
 
+    django_admin_raw_id_fields = [phone]
+    django_admin_list_display = [phone, verification_code, verification_date]
+    django_admin_search_fields = [phone]
+
     @classmethod
     def create(cls, phone: Phone, verification_code: str) -> 'PhoneVerification':
         return super().create(phone=phone, verification_code=verification_code)
@@ -1082,6 +1093,11 @@ class AuthenticationType(AvishanModel):
 
     export_ignore = True
 
+    django_admin_raw_id_fields = [user_user_group]
+    django_admin_list_display = ['identifier', user_user_group, last_used, last_login, last_logout]
+    django_admin_list_filter = [user_user_group]
+    django_admin_search_fields = ['identifier']
+
     class Meta:
         abstract = True
 
@@ -1101,6 +1117,14 @@ class AuthenticationType(AvishanModel):
 
     @classmethod
     def key_field(cls) -> models.ForeignKey:
+        raise NotImplementedError()
+
+    def identifier(self):
+        """
+        Identifier field like email address, phone number and etc.
+        :return: identifier amount
+        :rtype: str
+        """
         raise NotImplementedError()
 
 
@@ -1218,10 +1242,12 @@ class KeyValueAuthentication(AuthenticationType):
             return []
         return founds
 
+    def identifier(self):
+        raise NotImplementedError()
+
 
 class EmailPasswordAuthenticate(KeyValueAuthentication):
     email = models.ForeignKey(Email, on_delete=models.CASCADE, related_name='password_authenticates')
-    django_admin_list_display = [email, 'user_user_group', 'last_used', 'last_login', 'last_logout']
 
     @classmethod
     def create(cls, email: Email, password: str) -> 'EmailPasswordAuthenticate':
@@ -1231,14 +1257,19 @@ class EmailPasswordAuthenticate(KeyValueAuthentication):
     def key_field(cls) -> Union[models.ForeignKey, models.Field]:
         return cls.get_field('email')
 
+    def identifier(self):
+        return self.email
+
 
 class PhonePasswordAuthenticate(KeyValueAuthentication):
     phone = models.ForeignKey(Phone, on_delete=models.CASCADE, related_name='password_authenticates')
-    django_admin_list_display = ['user_user_group', phone]
 
     @classmethod
     def key_field(cls) -> Union[models.ForeignKey, models.Field]:
         return cls.get_field('phone')
+
+    def identifier(self):
+        return self.phone
 
 
 class OtpAuthentication(AuthenticationType):
@@ -1248,6 +1279,8 @@ class OtpAuthentication(AuthenticationType):
 
     class Meta:
         abstract = True
+
+    # todo clean this shit functions
 
     @classmethod
     def create_new(cls, user_user_group: UserUserGroup, key: str) -> 'OtpAuthentication':
@@ -1373,11 +1406,12 @@ class OtpAuthentication(AuthenticationType):
             Union['OtpAuthentication', 'PhoneOtpAuthenticate']:
         return cls.check_authentication(key, code, user_group)[0]
 
+    def identifier(self):
+        raise NotImplementedError()
+
 
 class PhoneOtpAuthenticate(OtpAuthentication):
     phone = models.ForeignKey(Phone, on_delete=models.CASCADE, related_name='otp_authenticates')
-
-    django_admin_list_display = ['user_user_group', 'phone', 'code']
 
     @classmethod
     def create(cls, phone: Phone, user_user_group: UserUserGroup) -> 'PhoneOtpAuthenticate':
@@ -1391,6 +1425,9 @@ class PhoneOtpAuthenticate(OtpAuthentication):
         super().send_otp_code()
         self.phone.send_verification_sms(self.code)
         self.save()
+
+    def identifier(self):
+        return self.phone
 
 
 # todo email otp authenticate
@@ -1449,6 +1486,9 @@ class VisitorKey(AuthenticationType):
         found_object._login()
         return found_object
 
+    def identifier(self):
+        return self.key
+
     def __str__(self):
         return self.key
 
@@ -1459,6 +1499,9 @@ class Image(AvishanModel):
     date_created = models.DateTimeField(auto_now_add=True)
 
     export_ignore = True
+
+    django_admin_list_display = [file, base_user, date_created]
+    django_admin_raw_id_fields = [base_user]
 
     def __str__(self):
         try:
@@ -1522,6 +1565,9 @@ class File(AvishanModel):
 
     export_ignore = True
 
+    django_admin_list_display = [file, base_user, date_created]
+    django_admin_raw_id_fields = [base_user]
+
     def to_dict(self, exclude_list: List[Union[models.Field, str]] = ()) -> dict:
         return {
             'id': self.id,
@@ -1552,63 +1598,22 @@ class RequestTrack(AvishanModel):
     authentication_type_object_id = models.IntegerField(blank=True, null=True)
 
     django_admin_search_fields = [url]
-
-    django_admin_list_display = [url, status_code, user_user_group, start_time,
-                                 total_execution_milliseconds, view_execution_milliseconds]
+    django_admin_list_display = [url, status_code, user_user_group, 'time', 'total_exec', 'view_exec']
     django_admin_list_filter = ['url']
 
     export_ignore = True
 
+    def total_exec(self):
+        return self.total_execution_milliseconds
+
+    def view_exec(self):
+        return self.view_execution_milliseconds
+
+    def time(self):
+        return self.start_time.strftime("%d/%m/%y %H:%I:%M:%S.%f")
+
     def __str__(self):
         return self.view_name
-
-    def create_exec_infos(self, data: list):
-        dates = {}
-        for part in data:
-            dates[part['title']] = part['now']
-        for part in data:
-            if part['title'] == 'begin':
-                continue
-            RequestTrackExecInfo.create(
-                request_track=self,
-                title=part['title'],
-                start_time=dates[part['from_title']],
-                end_time=part['now'],
-                milliseconds=(part['now'] - dates[part['from_title']]).total_seconds() * 1000
-            )
-
-
-class RequestTrackExecInfo(AvishanModel):
-    request_track = models.ForeignKey(RequestTrack, on_delete=models.CASCADE, related_name='exec_infos')
-    title = models.CharField(max_length=255)
-    start_time = models.DateTimeField(blank=True, null=True)
-    end_time = models.DateTimeField(blank=True, null=True)
-    milliseconds = models.FloatField(default=None, null=True, blank=True)
-
-    django_admin_list_display = (request_track, title, start_time, milliseconds)
-    django_admin_list_filter = (request_track, title)
-    django_admin_list_max_show_all = 500
-    django_admin_search_fields = (title,)
-    django_admin_raw_id_fields = [request_track]
-
-    export_ignore = True
-
-    @classmethod
-    def create(cls, request_track: RequestTrack, title: str, start_time: datetime.datetime,
-               end_time: datetime.datetime, milliseconds: float) -> 'RequestTrackExecInfo':
-        return super().create(request_track=request_track, title=title, start_time=start_time, end_time=end_time,
-                              milliseconds=milliseconds)
-
-    @classmethod
-    def create_dict(cls, title: str, from_title: str = 'begin'):
-        current_request['request_track_exec'].append({
-            'title': title,
-            'from_title': from_title,
-            'now': datetime.datetime.now()
-        })
-
-    def __str__(self):
-        return self.title
 
 
 class RequestTrackException(AvishanModel):
@@ -1638,6 +1643,8 @@ class TranslatableChar(AvishanModel):
     fa = models.CharField(max_length=255, blank=True, null=True, default=None)
 
     export_ignore = True
+
+    django_admin_list_display = [en, fa]
 
     @classmethod
     def create(cls, en: str = None, fa: str = None, auto: str = None) -> 'TranslatableChar':
@@ -1676,6 +1683,7 @@ class Activity(AvishanModel):
     data = models.TextField(blank=True, null=True)
 
     django_admin_list_display = [user_user_group, title, data, object_class, object_id, date_created]
+    django_admin_raw_id_fields = [user_user_group, request_track]
 
     export_ignore = True
 

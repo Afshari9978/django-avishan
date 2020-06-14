@@ -105,9 +105,6 @@ class AvishanView(View):
             result = super().dispatch(request, *args, **kwargs)
             self.current_request['view_end_time'] = datetime.datetime.now()
 
-            if self.track_it:
-                self.current_request['request_track_object'].create_exec_infos(
-                    self.current_request['request_track_exec'])
         except AvishanException as e:
             raise e
         except Exception as e:

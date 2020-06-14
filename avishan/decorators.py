@@ -49,9 +49,6 @@ class AvishanViewDecorator:
                 result = view_function(*args, **kwargs)
                 current_request['view_end_time'] = datetime.datetime.now()
 
-                if self.track_it:
-                    current_request['request_track_object'].create_exec_infos(current_request['request_track_exec'])
-
                 self.before_response()
 
                 self.after_response()
