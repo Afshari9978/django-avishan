@@ -17,12 +17,12 @@ class Wrapper:
         self.get_response = get_response
         get_avishan_config().on_startup()
 
-        data = []
-        from avishan.models import AvishanModel
-        from avishan.descriptor import DjangoModel
-        for model in AvishanModel.all_subclasses(AvishanModel):
-            a = DjangoModel(target=model)
-            data.append(a)
+        # data = []
+        # from avishan.models import AvishanModel
+        # from avishan.descriptor import DjangoModel
+        # for model in AvishanModel.all_subclasses(AvishanModel):
+        #     a = DjangoModel(target=model)
+        #     data.append(a)
 
     def __call__(self, request: WSGIRequest):
         from avishan.utils import discard_monitor, find_token, decode_token, add_token_to_response, find_and_check_user
