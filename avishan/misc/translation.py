@@ -17,20 +17,14 @@ class AvishanTranslatable:
 
     def __str__(self):
         from avishan import current_request
-        from avishan.exceptions import ErrorMessageException
-        if 'language' not in current_request.keys():
-            try:
-                return list(self.__dict__.values())[0]
-            except IndexError:
-                return 'Not translated string'
 
+        if current_request['language'] is None:
+            lang = get_avishan_config().LANGUAGE
+        else:
+            lang = current_request['language']
+        if self.__dict__[lang.upper()] is not None:
+            return self.__dict__[lang.upper()]
         try:
-            if current_request['language'] is None:
-                lang = get_avishan_config().LANGUAGE
-            else:
-                lang = current_request['language']
-            if self.__dict__[lang.upper()] is not None:
-                return self.__dict__[lang.upper()]
-            raise ValueError
-        except:
-            raise ErrorMessageException('Not translated string')
+            return list(self.__dict__.values())[0]
+        except IndexError:
+            return 'NOT_TRANSLATED_STRING'
