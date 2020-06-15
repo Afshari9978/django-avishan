@@ -18,7 +18,8 @@ class ChayiWriter:
     def __init__(self):
         self.packs = []
         for item in get_avishan_config().CHAYI_PROJECT_PACKAGE:
-            self.packs.append([item[0], f'package {item[1]}.models;\n\n'])
+            self.packs.append([item[0], f'package {item[1]}.models;\n\n'
+                                        f'import {item[1]}.constants.Constants;\n'])
 
         self.files = {}
         self.tab_size = 0
@@ -391,7 +392,7 @@ public class Image {
         return id;
     }
     public String getFile() {
-        return file;
+        return Constants.ZIMA_URL_BASE + file;
     }
     
 }"""
@@ -411,7 +412,7 @@ public class File {
     }
     
     public String getFile() {
-        return file;
+        return Constants.ZIMA_URL_BASE + file;
     }
 
 }"""
