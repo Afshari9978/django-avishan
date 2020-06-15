@@ -17,3 +17,14 @@ def avishan_chayi_create(request):
     from avishan.libraries.chayi import ChayiWriter
     ChayiWriter()
     return JsonResponse({'state': 'created'})
+
+
+@AvishanApiViewDecorator(authenticate=False)
+def avishan_test(request):
+    data = []
+    from avishan.models import AvishanModel
+    from avishan.descriptor import DjangoModel
+    for model in sorted(AvishanModel.all_subclasses(AvishanModel), key=lambda x: x.class_name()):
+        a = DjangoModel(target=model)
+        data.append(a)
+    return JsonResponse({})

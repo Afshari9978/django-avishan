@@ -3,6 +3,7 @@ import datetime
 from enum import Enum, auto
 from typing import List, Callable, Type
 
+import docstring_parser
 from django.db import models
 
 
@@ -13,6 +14,7 @@ class Model:
         self.name = name
         self.attributes: List[Attribute] = []
         self.methods: List[Method] = []
+        self.doc = docstring_parser.parse(target.__doc__)
 
     @classmethod
     def sub_classes(cls) -> List[object]:
@@ -69,9 +71,9 @@ class Function:
     def __init__(self, target):
         self.target = target
         self.name = target.__name__
-        self.description = target.__doc__.strip() if target.__doc__ else None
-        self.inputs: List[FunctionAttribute] = self.extract_inputs()
-        self.outputs: FunctionAttribute = self.extract_outputs()
+        # self.inputs: List[FunctionAttribute] = self.extract_inputs()
+        # self.outputs: FunctionAttribute = self.extract_outputs()
+        self.doc = docstring_parser.parse(target.__doc__)
 
     def extract_inputs(self) -> List['FunctionAttribute']:
         """
@@ -143,6 +145,7 @@ class Attribute:
         If representation type is OBJECT or ARRAY it can be defined.
         """
         self.representation_type_of = representation_type_of
+        self.doc = None
 
     @staticmethod
     def type_finder(entry) -> 'Attribute.TYPE':
@@ -153,6 +156,11 @@ class Attribute:
         for target, pool in Attribute._TYPE_POOL.items():
             for swimmer in pool:
                 if isinstance(entry, swimmer):
+                    return target
+
+        for target, pool in Attribute._TYPE_POOL.items():
+            for swimmer in pool:
+                if issubclass(entry, swimmer):
                     return target
         raise NotImplementedError()
 

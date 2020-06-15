@@ -908,6 +908,10 @@ class Phone(AvishanModel):
     def direct_non_authenticated_callable_methods(cls) -> List[str]:
         return super().direct_non_authenticated_callable_methods() + ['start_verification', 'check_verification']
 
+    @classmethod
+    def create(cls, number: str):
+        return super().create(number=number)
+
     @staticmethod
     def send_bulk_sms():
         pass  # todo
@@ -1610,6 +1614,8 @@ class RequestTrack(AvishanModel):
         return self.view_execution_milliseconds
 
     def time(self):
+        if not self.start_time:
+            return self.start_time
         return self.start_time.strftime("%d/%m/%y %H:%M:%S.%f")
 
     def __str__(self):
@@ -1694,6 +1700,15 @@ class Activity(AvishanModel):
                object_id: int = None,
                data: str = None
                ) -> 'Activity':
+        """Creates object of :class:`Activity`
+
+        :param str title: activity showing title
+        :param str object_class: name of target class, defaults to None
+        :param int object_id: target object, defaults to None
+        :param str data: notes about activity, defaults to None
+        :return: created activity
+        :rtype: Activity
+        """
         request_track = current_request['request_track_object']
         user_user_group = current_request['user_user_group']
         if not request_track and not user_user_group:

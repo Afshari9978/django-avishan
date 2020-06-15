@@ -65,7 +65,7 @@ class ChayiWriter:
                     file = ZipInfo(key)
                     zip_archive.writestr(file, pack[1] + value)
 
-            with open(f'static/chayi_models_{pack[0]}.zip', 'wb') as f:
+            with open(f'static/chayi_models_{pack[0]}.zip', 'wb+') as f:
                 # noinspection PyTypeChecker
                 f.write(archive.getbuffer())
 
