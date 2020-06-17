@@ -27,7 +27,12 @@ class AvishanException(Exception):
             if isinstance(wrap_exception, KeyError):
                 body = f'field {wrap_exception.args[0]} not found in data and its required'
             else:
-                body = str(wrap_exception.args[0]) if len(wrap_exception.args) == 1 else str(wrap_exception.args)
+                if len(wrap_exception.args) == 0:
+                    body = wrap_exception.__class__.__name__
+                elif len(wrap_exception.args) == 1:
+                    body = str(wrap_exception.args[0])
+                else:
+                    body = str(wrap_exception.args)[1:-1]
             current_request['exception'] = wrap_exception
             current_request['status_code'] = status.HTTP_418_IM_TEAPOT
             add_error_message_to_response(

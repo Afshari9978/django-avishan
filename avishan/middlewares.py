@@ -1,6 +1,7 @@
 import datetime
 import json
 import sys
+from typing import Type
 
 from django.contrib import messages
 from django.core.handlers.wsgi import WSGIRequest
@@ -16,13 +17,6 @@ class Wrapper:
     def __init__(self, get_response):
         self.get_response = get_response
         get_avishan_config().on_startup()
-
-        # data = []
-        # from avishan.models import AvishanModel
-        # from avishan.descriptor import DjangoModel
-        # for model in sorted(AvishanModel.all_subclasses(AvishanModel), key=lambda x: x.class_name()):
-        #     a = DjangoModel(target=model)
-        #     data.append(a)
 
     def __call__(self, request: WSGIRequest):
         from avishan.utils import discard_monitor, find_token, decode_token, add_token_to_response, find_and_check_user

@@ -28,3 +28,6 @@ class AvishanTranslatable:
             return list(self.__dict__.values())[0]
         except IndexError:
             return 'NOT_TRANSLATED_STRING'
+
+    def __repr__(self):
+        return str(self)

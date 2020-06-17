@@ -1,42 +1,4 @@
-from django.http import JsonResponse
-from django.shortcuts import render
-
-from avishan.decorators import AvishanTemplateViewDecorator, AvishanApiViewDecorator
-
-
-@AvishanTemplateViewDecorator(authenticate=False)
-def avishan_doc(request):
-    import json
-    from avishan.libraries.openapi3.classes import OpenApi
-    return render(request, 'avishan/swagger.html',
-                  context={'data': json.dumps(OpenApi('0.0.0', 'Documentation').export_json())})
-
-
-@AvishanApiViewDecorator(authenticate=False)
-def avishan_chayi_create(request):
-    from avishan.libraries.chayi import ChayiWriter
-    ChayiWriter()
-    return JsonResponse({'state': 'created'})
-
-
-@AvishanTemplateViewDecorator(authenticate=False)
-def avishan_test(request):
-    data = []
-    from avishan.libraries.openapi3 import create_openapi_object
-    from avishan.libraries.openapi3.classes import OpenApi
-    # open_api = OpenApi(
-    #
-    # )
-    from avishan.models import AvishanModel
-    from avishan.descriptor import DjangoModel
-    for model in sorted(AvishanModel.all_subclasses(AvishanModel), key=lambda x: x.class_name()):
-        if model._meta.abstract:
-            continue
-        a = DjangoModel(target=model)
-
-        data.append(a)
-
-    text = """openapi: 3.0.1
+openapi: 3.0.1
 info:
   title: Swagger Petstore
   description: 'This is a sample server Petstore server.  You can find out more about     Swagger
@@ -764,8 +726,3 @@ components:
       type: apiKey
       name: api_key
       in: header
-    """
-    text_file = open('static/openapi.yaml', 'w+')
-    text_file.write(text)
-    text_file.close()
-    return render(request, 'avishan/redoc.html')

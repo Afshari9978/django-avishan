@@ -1,30 +1,29 @@
 import inspect
 import datetime
 from enum import Enum, auto
-from typing import List, Callable, Type
+from typing import List, Callable, Type, Union, Optional, Tuple
 
 import docstring_parser
 from django.db import models
+from djmoney.models.fields import MoneyField
+from docstring_parser import Docstring, DocstringMeta, DocstringParam
+
+from avishan.models import AvishanModel
 
 
 class Model:
 
-    def __init__(self, target: object, name: str):
+    def __init__(self, target: Type[Union[AvishanModel, models.Model, object]], name: str):
         self.target = target
         self.name = name
-        self.attributes: List[Attribute] = []
-        self.methods: List[Method] = []
-        self.doc = docstring_parser.parse(target.__doc__)
+        self.long_description = None
+        self.short_description = None
+        self._doc = docstring_parser.parse(target.__doc__)
+        self.load_from_doc()
 
-    @classmethod
-    def sub_classes(cls) -> List[object]:
-        # todo
-        raise NotImplementedError()
-
-    @classmethod
-    def super_classes(cls) -> List[object]:
-        # todo
-        raise NotImplementedError()
+    def load_from_doc(self):
+        self.short_description = self._doc.short_description
+        self.long_description = self._doc.long_description
 
     def __str__(self):
         return self.name
@@ -35,22 +34,25 @@ class DjangoModel(Model):
     Model descriptor for django models. Not only AvishanModel inherited ones.
     """
 
-    def __init__(self, target: models.Model):
+    def __init__(self, target: Type[models.Model]):
         super().__init__(
             target=target,
             name=target._meta.object_name
         )
-        self.attributes: List[DjangoFieldAttribute] = self.extract_attributes()
-        self.methods = self.extract_methods()
+        if issubclass(self.target, AvishanModel):
+            self.attributes = self.extract_attributes()
+            self.methods = self.extract_methods()
 
     def extract_attributes(self) -> List['DjangoFieldAttribute']:
         """
         Extracts fields from model and create DjangoFieldAttribute from them.
         """
 
-        # noinspection PyUnresolvedReferences
-        items = sorted([DjangoFieldAttribute(target=field) for field in
-                        list(self.target._meta.fields + self.target._meta.many_to_many)], key=lambda x: x.name)
+        items = sorted(
+            [DjangoFieldAttribute(target=self.target.get_field(field_name)) for field_name in
+             self.target.openapi_documented_fields()],
+            key=lambda x: x.name
+        )
 
         for i, item in enumerate(items):
             if item.name == 'id':
@@ -63,44 +65,124 @@ class DjangoModel(Model):
         """
         Extracts methods from model and create Method from them.
         """
-        a = [Method(target=getattr(self.target, name)) for name in ['create', 'get', 'update', 'delete']]
-        return a
+        data = []
+        for method_data in self.target.openapi_documented_methods():
+            method_name = None
+            url = ''
+            method = None
+            if len(method_data) == 1:
+                method_name = method_data[0]
+            elif len(method_data) == 2:
+                method_name = method_data[0]
+                url = method_data[1]
+            elif len(method_data) == 3:
+                method_name = method_data[0]
+                url = method_data[1]
+                method = getattr(ApiMethod.Method, method_data[2].upper())
+
+            if hasattr(self.target, f'_{method_name}_documentation_params'):
+                getattr(self.target, method_name).__func__.__doc__ = \
+                    getattr(self.target, f'_{method_name}_documentation_raw')() \
+                    % getattr(self.target, f'_{method_name}_documentation_params')()
+
+            for method in [method] if method is not None else [ApiMethod.Method.GET, ApiMethod.Method.POST]:
+                from avishan.configure import get_avishan_config
+                data.append(ApiMethod(
+                    target=getattr(self.target, method_name),
+                    url=get_avishan_config().AVISHAN_URLS_START + "/" + self.target.class_plural_snake_case_name() + url,
+                    method=method
+                ))
+        return data
 
 
 class Function:
+
     def __init__(self, target):
         self.target = target
         self.name = target.__name__
-        # self.inputs: List[FunctionAttribute] = self.extract_inputs()
-        # self.outputs: FunctionAttribute = self.extract_outputs()
-        self.doc = docstring_parser.parse(target.__doc__)
+        self.short_description: Optional[str] = None
+        self.long_description: Optional[str] = None
+        self.args: List[Attribute] = []
+        self.returns: Optional[Attribute] = None
+        self._doc = docstring_parser.parse(target.__doc__)
+        if self.__class__ == Function:
+            self.load_from_doc()
 
-    def extract_inputs(self) -> List['FunctionAttribute']:
-        """
-        Extracts args for it's method. Using python "inspect" module.
-        """
-        data = []
-        for key, value in dict(inspect.signature(self.target).parameters.items()).items():
-            if key in ['kwargs', 'self', 'cls']:
-                continue
-            data.append(FunctionAttribute(value))
-        return data
-
-    def extract_outputs(self) -> 'FunctionAttribute':
-        """
-        Extracts method returning arguments to "Attribute" objects.
-        """
-        try:
-            return FunctionAttribute(inspect.signature(self.target).return_annotation)
-        except ValueError:
-            return None
+    def load_from_doc(self):
+        raise NotImplementedError()
 
     def __str__(self):
         return self.name
 
 
 class Method(Function):
-    pass
+
+    def __init__(self, target):
+        super().__init__(target)
+        self.target_class = self.get_class_that_defined_method(target)
+        if self.__class__ == Method:
+            self.load_from_doc()
+
+    @staticmethod
+    def get_class_that_defined_method(method):
+        if inspect.ismethod(method):
+            for cls in inspect.getmro(method.__self__.__class__):
+                if cls.__dict__.get(method.__name__) is method:
+                    return cls
+            method = method.__func__
+        if inspect.isfunction(method):
+            cls = getattr(inspect.getmodule(method),
+                          method.__qualname__.split('.<locals>', 1)[0].rsplit('.', 1)[0])
+            if isinstance(cls, type):
+                return cls
+        return getattr(method, '__objclass__', None)
+
+
+class ApiMethod(Method):
+    class Method(Enum):
+        GET = auto()
+        POST = auto()
+        PUT = auto()
+        DELETE = auto()
+
+    class Response:
+        def __init__(self, returns: 'Attribute', description: str, status_code: int = 200, ):
+            self.status_code = status_code
+            self.returns = returns
+            self.description = description
+
+    def __init__(self, target, url: str, method: 'ApiMethod.Method'):
+        super().__init__(target)
+        self.responses: List[ApiMethod.Response] = []
+        self.method: ApiMethod.Method = method
+        self.url: str = url
+        self.load_from_doc()
+
+    def load_from_doc(self):
+        self.short_description = self._doc.short_description
+        self.long_description = self._doc.long_description
+        self.args = [Attribute.create_from_doc_param(item) for item in self._doc.params]
+        self.responses = self.load_responses_from_doc()
+
+    def load_responses_from_doc(self) -> List['ApiMethod.Response']:
+        responses = []
+        for item in self._doc.meta:
+            if not isinstance(item, DocstringMeta):
+                continue
+            if item.args[0] != 'response':
+                continue
+            responses.append(
+                ApiMethod.Response(
+                    returns=Attribute(
+                        name='returns',
+                        type=Attribute.create_type_from_doc_param(item.args[1]),
+                        type_of=Attribute.create_type_of_from_doc_param(item.args[1])
+                    ),
+                    description=item.description,
+                    status_code=int(item.args[2])
+                )
+            )
+        return responses
 
 
 class Attribute:
@@ -129,39 +211,83 @@ class Attribute:
     _TYPE_POOL = {
         TYPE.STRING: (str, models.CharField, models.TextField),
         TYPE.INT: (int, models.IntegerField, models.AutoField),
-        TYPE.FLOAT: (float, models.FloatField),
+        TYPE.FLOAT: (float, models.FloatField, MoneyField),
         TYPE.DATE: (datetime.date, models.DateField),
         TYPE.TIME: (datetime.time, models.TimeField),
         TYPE.DATETIME: (datetime.datetime, models.DateTimeField),
         TYPE.BOOLEAN: (bool, models.BooleanField),
-        TYPE.OBJECT: (models.OneToOneField, models.ForeignKey, models.FileField),
+        TYPE.OBJECT: (models.OneToOneField, models.ForeignKey),
+        TYPE.ARRAY: (list, List, tuple, Tuple),
         TYPE.FILE: (models.FileField,),
     }
 
-    def __init__(self, name: str, representation_type: 'Attribute.TYPE', representation_type_of=None):
+    def __init__(self, name: str, type: 'Attribute.TYPE', type_of: type = None,
+                 description: str = None, example: str = None):
         self.name = name
-        self.representation_type: Attribute.TYPE = representation_type
+        self.type: Attribute.TYPE = type
         """
         If representation type is OBJECT or ARRAY it can be defined.
         """
-        self.representation_type_of = representation_type_of
-        self.doc = None
+        self.type_of = type_of
+        self.description = description
+        self.example = example
+        self._doc = None
+
+    @classmethod
+    def create_from_doc_param(cls, doc_param: DocstringParam) -> 'Attribute':
+        return Attribute(
+            name=doc_param.arg_name,
+            type=Attribute.create_type_from_doc_param(doc_param.type_name),
+            type_of=Attribute.create_type_of_from_doc_param(doc_param.type_name),
+            description=doc_param.description
+        )
+
+    @classmethod
+    def create_type_from_doc_param(cls, type_string: str) -> 'Attribute.TYPE':
+        if type_string.find('[') > 0:
+            return Attribute.type_finder(entry=type_string[:type_string.find('[')])
+        return Attribute.type_finder(entry=type_string)
+
+    @classmethod
+    def create_type_of_from_doc_param(cls, type_string: str) -> Optional[type]:
+        if type_string.find('[') > 0:
+            found = cls.create_type_from_doc_param(type_string=type_string)
+            if found is Attribute.TYPE.ARRAY:
+                return AvishanModel.get_model_with_class_name(type_string[type_string.find('[') + 1: -1])
+
+        return None
 
     @staticmethod
     def type_finder(entry) -> 'Attribute.TYPE':
-        for target, pool in Attribute._TYPE_POOL.items():
-            if entry in pool:
-                return target
 
         for target, pool in Attribute._TYPE_POOL.items():
             for swimmer in pool:
+                if entry is swimmer:
+                    return target
+
+        # instanced type
+        for target, pool in Attribute._TYPE_POOL.items():
+            for swimmer in pool:
+                if swimmer is str:
+                    continue
                 if isinstance(entry, swimmer):
                     return target
 
+        # inherited type
         for target, pool in Attribute._TYPE_POOL.items():
             for swimmer in pool:
-                if issubclass(entry, swimmer):
+                if inspect.isclass(entry) and issubclass(entry, swimmer):
                     return target
+
+        # string of type
+        for target, pool in Attribute._TYPE_POOL.items():
+            for swimmer in pool:
+                if entry == swimmer.__name__:
+                    return target
+
+        if AvishanModel.get_model_with_class_name(entry) is not None:
+            return Attribute.TYPE.OBJECT
+
         raise NotImplementedError()
 
     def __str__(self):
@@ -173,14 +299,14 @@ class DjangoFieldAttribute(Attribute):
     def __init__(self, target: models.Field):
         super().__init__(
             name=target.name,
-            representation_type=self.define_representation_type(target)
+            type=self.define_representation_type(target)
         )
-        if self.representation_type is Attribute.TYPE.OBJECT:
+        if self.type is Attribute.TYPE.OBJECT:
             if isinstance(target, (models.OneToOneField, models.ForeignKey)):
                 self.representation_type_of = target.related_model
             else:
                 raise NotImplementedError()
-        if self.representation_type is Attribute.TYPE.ARRAY:
+        if self.type is Attribute.TYPE.ARRAY:
             raise NotImplementedError()
         self.target = target
 
@@ -200,9 +326,7 @@ class DjangoFieldAttribute(Attribute):
         converts django fields models to defined types.
         :param field: target field
         """
-        a = Attribute.type_finder(field.__class__)
-
-        return a
+        return Attribute.type_finder(field.__class__)
 
 
 class FunctionAttribute(Attribute):
@@ -213,7 +337,7 @@ class FunctionAttribute(Attribute):
 
         super().__init__(
             name=parameter.name,
-            representation_type=self.define_representation_type(parameter)
+            type=self.define_representation_type(parameter)
         )
         self.is_required = self.define_is_required(parameter)
 

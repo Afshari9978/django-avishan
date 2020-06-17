@@ -64,12 +64,45 @@ class AvishanModel(models.Model, AvishanFaker):
         return []
 
     @classmethod
-    def get(cls, avishan_to_dict: bool = False, avishan_raise_400: bool = False,
+    def openapi_documented_methods(cls) -> List[Union[str, Tuple[str, str, str]]]:
+        """Returns list of methods should be visible by openapi documentation
+
+        The list can have three types of items:
+
+        * Item with just name of the method, which name will automatically adds to the url and method to GET
+
+            :Example: [('app_verify')] -> ['<MODEL_NAME/app_verify>(GET)']
+
+        * Item with name as the first string and added part of url to the model as second one. And method as third.
+
+            :Example: [('all', '', 'GET'), ('delete', '/{id}/delete', 'DELETE')] ->
+            ['<MODEL_NAME>(GET)', '<MODEL_NAME>/{id}/delete(DELETE)']
+
+        :return: list of document visible methods
+        :rtype: List[Union[str, Tuple[str, str]]]
+        """
+        return [
+            ('all', '', 'GET'),
+            ('create', '', 'POST'),
+            ('get', '/{id}', 'GET'),
+            ('update', '/{id}', 'PUT'),
+            ('remove', '/{id}', 'DELETE')
+        ]
+
+    @classmethod
+    def openapi_documented_fields(cls) -> List[str]:
+        """Returns list of field names should be visible by openapi documentation
+
+        :return: list of document visible fields
+        :rtype: List[str]
+        """
+        return [field.name for field in list(cls._meta.fields + cls._meta.many_to_many)]
+
+    @classmethod
+    def get(cls, avishan_raise_400: bool = False,
             **kwargs):
         from avishan.exceptions import ErrorMessageException
         # todo 0.2.1 compact, private, added properties
-        if avishan_to_dict:
-            return cls.get(avishan_to_dict=False, avishan_raise_400=avishan_raise_400, **kwargs).to_dict()
 
         try:
             return cls.objects.get(**kwargs)
@@ -82,10 +115,9 @@ class AvishanModel(models.Model, AvishanFaker):
             raise e
 
     @classmethod
-    def filter(cls, avishan_to_dict: bool = False, **kwargs):
+    def filter(cls, **kwargs):
         # todo show filterable fields on doc
-        if avishan_to_dict:
-            return [item.to_dict() for item in cls.filter(**kwargs)]
+        # todo use django-filter for on-url filter
 
         if 'request' in current_request.keys():
             for item in current_request['request'].GET.keys():
@@ -99,8 +131,20 @@ class AvishanModel(models.Model, AvishanFaker):
             return cls.objects.all()
 
     @classmethod
-    def all(cls, avishan_to_dict: bool = False):
-        return cls.filter(avishan_to_dict=avishan_to_dict)
+    def all(cls):
+        return cls.filter()
+
+    @classmethod
+    def _all_documentation_params(cls):
+        return stringcase.titlecase(cls.class_name()), cls.class_name(), cls.class_name()
+
+    @classmethod
+    def _all_documentation_raw(cls):
+        return """List of all %s items
+
+        :response List[%s] 200: when fine.
+        :return List[%s]: Items, usually ordered by id, acceding
+        """
 
     @classmethod
     def create(cls, **kwargs):
@@ -813,23 +857,20 @@ class Email(AvishanModel):
             a = 1
 
     @classmethod
-    def get(cls, address: str = None, avishan_to_dict: bool = False, avishan_raise_400: bool = False,
+    def get(cls, address: str = None, avishan_raise_400: bool = False,
             **kwargs) -> 'Email':
         if address is not None:
             kwargs['address'] = cls.validate_signature(address)
-        return super().get(avishan_to_dict, avishan_raise_400, **kwargs)
+        return super().get(avishan_raise_400, **kwargs)
 
     def update(self, address: str = None) -> 'Email':
         return super().update(address=self.validate_signature(address))
 
     @classmethod
-    def filter(cls, avishan_to_dict: bool = False, **kwargs):
-        data = {
-            'avishan_to_dict': avishan_to_dict, **kwargs
-        }
-        if 'address' in data.keys():
-            data['address'] = cls.validate_signature(kwargs['address'])
-        return super().filter(**data)
+    def filter(cls, **kwargs):
+        if 'address' in kwargs.keys():
+            kwargs['address'] = cls.validate_signature(kwargs['address'])
+        return super().filter(**kwargs)
 
 
 class EmailVerification(AvishanModel):
@@ -996,11 +1037,11 @@ class Phone(AvishanModel):
             return Phone.create(number=phone_number)
 
     @classmethod
-    def get(cls, number: str = None, avishan_to_dict: bool = False, avishan_raise_400: bool = False,
+    def get(cls, number: str = None, avishan_raise_400: bool = False,
             **kwargs) -> 'Phone':
         if number is not None:
             kwargs['number'] = cls.validate_signature(number)
-        return super().get(avishan_to_dict, avishan_raise_400, **kwargs)
+        return super().get(avishan_raise_400, **kwargs)
 
     def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
         if self.number:
@@ -1008,13 +1049,10 @@ class Phone(AvishanModel):
         super().save(force_insert, force_update, using, update_fields)
 
     @classmethod
-    def filter(cls, avishan_to_dict: bool = False, **kwargs):
-        data = {
-            'avishan_to_dict': avishan_to_dict, **kwargs
-        }
-        if 'number' in data.keys():
-            data['number'] = cls.validate_signature(kwargs['number'])
-        return super().filter(**data)
+    def filter(cls, **kwargs):
+        if 'number' in kwargs.keys():
+            kwargs['number'] = cls.validate_signature(kwargs['number'])
+        return super().filter(**kwargs)
 
 
 class PhoneVerification(AvishanModel):
@@ -1699,7 +1737,7 @@ class Activity(AvishanModel):
                object_class: str = None,
                object_id: int = None,
                data: str = None
-               ) -> 'Activity':
+               ) -> Optional['Activity']:
         """Creates object of :class:`Activity`
 
         :param str title: activity showing title
