@@ -3,7 +3,7 @@ from typing import Union, Type, List
 from django.core.management import BaseCommand
 
 
-# no import from avishan here
+# WARNING: no import from avishan here
 
 
 class AvishanConfigure:
@@ -133,6 +133,13 @@ class AvishanConfigFather:
     # Chayi
     CHAYI_PROJECT_PACKAGE: str = None
     CHAYI_MODEL_FILE_IMPORTS: str = None
+
+    # Openapi
+    OPENAPI_APPLICATION_TITLE = 'NOT_SET'
+    OPENAPI_APPLICATION_DESCRIPTION = 'NOT_SET'
+    OPENAPI_APPLICATION_VERSION = 'NOT_SET'
+    """List of OpenApi.Server"""
+    OPENAPI_APPLICATION_SERVERS: list = []
 
     @classmethod
     def on_startup(cls):

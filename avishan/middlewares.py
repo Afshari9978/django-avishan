@@ -84,8 +84,6 @@ class Wrapper:
         json_safe = not current_request['json_unsafe']
         if current_request['is_api']:
             response = current_request['response'].copy()
-        # else:
-        #     messages.warning(current_request['request'], 'ای بابا')
 
         if current_request['is_tracked'] or current_request['exception'] is not None:
             self.save_request_track(current_request)
@@ -133,6 +131,7 @@ class Wrapper:
         current_request['messages'] = {
             'debug': [], 'info': [], 'success': [], 'warning': [], 'error': []
         }
+        current_request['DEBUG'] = False
 
     @staticmethod
     def fill_messages_framework(current_request):

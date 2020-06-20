@@ -130,10 +130,6 @@ class AvishanView(View):
             return self.class_attributes_type[key].__args__[0](value)
         return value
 
-    @staticmethod
-    def documentation() -> Optional[ApiDocumentation]:
-        return None
-
 
 class AvishanApiView(AvishanView):
     is_api = True
@@ -199,184 +195,7 @@ class AvishanModelApiView(AvishanApiView):
     model: Type[AvishanModel] = None
     model_item: AvishanModel = None
     model_function: Callable = None  # todo these sends model not dict
-
-    @staticmethod
-    def documentation() -> Optional[ApiDocumentation]:
-        # todo remove private fields from responses
-        doc = ApiDocumentation()
-        for model in AvishanModel.get_non_abstract_models():
-            model_create = getattr(model, 'create')
-            model_update = getattr(model, 'update')
-            if len(dict(inspect.signature(model_create).parameters.items()).keys()) == 1 and \
-                    list(dict(inspect.signature(model_create).parameters.items()).keys())[0] == 'kwargs':
-                model_create_schema = Schema(
-                    name=model.class_name()
-                )
-            else:
-                model_create_schema = Schema.create_from_function(model.class_name(), model_create)
-            if len(dict(inspect.signature(model_update).parameters.items()).keys()) == 2 and \
-                    list(dict(inspect.signature(model_update).parameters.items()).keys())[1] == 'kwargs' and \
-                    list(dict(inspect.signature(model_update).parameters.items()).keys())[0] == 'self':
-                model_update_schema = Schema(
-                    name=model.class_name()
-                )
-            else:
-                model_update_schema = Schema.create_from_function(model.class_name(), model_update)
-
-            doc.paths.append(
-                Path(
-                    url=f'{get_avishan_config().AVISHAN_URLS_START}/{model.class_plural_snake_case_name()}',
-                    methods=[
-                        PathGetMethod(
-                            responses=PathResponseGroup(
-                                responses=[
-                                    PathResponse(
-                                        status_code=200,
-                                        contents=[Content(
-                                            schema=Schema.schema_in_json(
-                                                schema=Schema(
-                                                    name=model.class_name(),
-                                                    type='array',
-                                                    items=Schema(name=model.class_name())),
-                                                name=model.class_name()
-                                            ),
-                                            type='application/json'
-                                        )],
-                                        description='Get list of all items'
-                                    )
-                                ]
-                            )
-                        ),
-                        PathPostMethod(
-                            responses=PathResponseGroup(
-                                responses=[
-                                    PathResponse(
-                                        status_code=200,
-                                        contents=[Content(
-                                            schema=Schema.schema_in_json(
-                                                name=model.class_name(),
-                                                schema=Schema.create_from_model(
-                                                    model
-                                                )
-                                            ),
-                                            type='application/json'
-                                        )]
-                                    )
-                                ]
-                            ),
-                            request=PathRequest(
-                                contents=[
-                                    Content(
-                                        schema=model_create_schema,
-                                        type='application/json'
-                                    )
-                                ]
-                            )
-                        )
-                    ]
-                )
-            )
-            doc.paths.append(Path(
-                url=f'{get_avishan_config().AVISHAN_URLS_START}/{model.class_plural_snake_case_name()}/'
-                    + "{item_id}",
-                methods=[
-                    PathGetMethod(
-                        responses=PathResponseGroup(
-                            responses=[
-                                PathResponse(
-                                    status_code=200,
-                                    contents=[Content(
-                                        schema=Schema.schema_in_json(
-                                            name=model.class_name(),
-                                            schema=Schema.create_from_model(
-                                                model
-                                            )
-                                        ),
-                                        type='application/json'
-                                    )],
-                                    description='Get item'
-                                )
-                            ]
-                        )
-                    ),
-                    PathPutMethod(
-                        responses=PathResponseGroup(
-                            responses=[
-                                PathResponse(
-                                    status_code=200,
-                                    contents=[Content(
-                                        schema=Schema.schema_in_json(
-                                            name=model.class_name(),
-                                            schema=Schema.create_from_model(
-                                                model
-                                            )
-                                        ),
-                                        type='application/json'
-                                    )]
-                                )
-                            ]
-                        ),
-                        request=PathRequest(
-                            contents=[
-                                Content(
-                                    schema=model_update_schema,
-                                    type='application/json'
-                                )
-                            ]
-                        )
-                    ),
-                    PathDeleteMethod(
-                        responses=PathResponseGroup(
-                            responses=[
-                                PathResponse(
-                                    status_code=200,
-                                    contents=[Content(
-                                        schema=Schema.schema_in_json(
-                                            name=model.class_name(),
-                                            schema=Schema.create_from_model(
-                                                model
-                                            )
-                                        ),
-                                        type='application/json'
-                                    )],
-                                    description='Delete item'
-                                )
-                            ]
-                        )
-                    )
-                ]
-            )
-            )
-            # todo custom function
-            # for method in model.direct_callable_methods():
-            #     method = getattr(model, method)
-            #     method_name = method.__name__
-            #     method_signature = dict(inspect.signature(method).parameters.items())
-            #     method_return = inspect.signature(method).return_annotation
-            #     if inspect.isclass(method_return) and issubclass(method_return, AvishanModel):
-            #         method_response_schema = Schema.schema_in_json(
-            #             name=model.class_name(),
-            #             schema=Schema.create_from_model(
-            #                 method_return
-            #             )
-            #         )
-            #
-            #     method_response_schema = None  # todo force for return type
-            #     method_request_schema = None
-            #
-            #     if inspect.ismethod(method) and method.__self__ is model:
-            #         # class method
-            #         a = 1
-            #
-            #     else:
-            #         # object method
-            #         if len(method_signature.keys()) == 1 and list(method_signature.keys())[0] == 'self':
-            #             method_method = 'get'
-            #         else:
-            #             method_method = 'post'
-            #         a = 1
-
-        return doc
+    model_function_name: str = None
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -385,69 +204,83 @@ class AvishanModelApiView(AvishanApiView):
         super().setup(request, *args, **kwargs)
         model_plural_name = kwargs.get('model_plural_name', None)
         model_item_id = kwargs.get('model_item_id', None)
-        model_function_name = kwargs.get('model_function_name', None)
+        self.model_function_name = kwargs.get('model_function_name', None)
         self.model = AvishanModel.get_model_by_plural_snake_case_name(model_plural_name)
         if not self.model:
             raise ErrorMessageException('Entered model name not found')
 
         if model_item_id is not None:
             self.model_item = self.model.get(avishan_raise_400=True, id=int(model_item_id))
-        if model_function_name is not None:
-            if model_function_name not in \
-                    self.model.direct_callable_methods() + self.model.direct_non_authenticated_callable_methods():
+        if self.model_function_name is not None:
+            if self.model_function_name not in \
+                    self.model.direct_callable_methods_names() + \
+                    self.model.direct_non_authenticated_callable_methods_names():
                 raise AuthException(AuthException.METHOD_NOT_DIRECT_CALLABLE)
-            if model_function_name in self.model.direct_non_authenticated_callable_methods():
+            if self.model_function_name in self.model.direct_non_authenticated_callable_methods_names():
                 self.authenticate = False
             try:
                 if self.model_item is None:
-                    self.model_function = getattr(self.model, model_function_name)
+                    self.model_function = getattr(self.model, self.model_function_name)
                 else:
-                    self.model_function = getattr(self.model_item, model_function_name)
+                    self.model_function = getattr(self.model_item, self.model_function_name)
             except AttributeError:
                 raise ErrorMessageException(AvishanTranslatable(
                     EN=f'Requested method not found in model {self.model.class_name()}'
                 ))
-            # todo have check on callables from model
 
-    def parse_returned_data(self, returned):
+    @staticmethod
+    def parse_returned_data(returned):
         if isinstance(returned, QuerySet):
-            returned = [item.to_dict() for item in returned]
-            self.response[self.model.class_plural_snake_case_name()] = returned
+            return [item.to_dict() for item in returned]
         elif isinstance(returned, list):
             if len(returned) > 0 and isinstance(returned[0], AvishanModel):
-                returned = [item.to_dict() for item in returned]
-            self.response[self.model.class_plural_snake_case_name()] = returned
+                return [item.to_dict() for item in returned]
+            return returned
         elif isinstance(returned, AvishanModel):
-            self.response[self.model.class_snake_case_name()] = returned.to_dict()
+            return returned.to_dict()
         else:
-            self.response[self.model.class_plural_snake_case_name()] = returned
+            return returned
 
     def get(self, request, *args, **kwargs):
         if self.model_function is None:
             if self.model_item is None:
-                self.response[self.model.class_plural_snake_case_name()] = [item.to_dict() for item in
-                                                                            self.model.all()]
+                self.model_function_name = 'all'
+                result = [item.to_dict() for item in
+                          self.model.all()]
             else:
-                self.response[self.model.class_snake_case_name()] = self.model_item.to_dict()
+                self.model_function_name = 'get'
+                result = self.model_item.to_dict()
         else:
-            self.parse_returned_data(self.model_function())
+            result = self.model_function()
+        self.response[self.model.direct_callable_method_find_json_key(method_name=self.model_function_name)] = \
+            self.parse_returned_data(result)
 
     def post(self, request, *args, **kwargs):
         if self.model_function is None:
+            self.model_function_name = 'create'
             data = request.data[self.model.class_snake_case_name()]
-            self.response[self.model.class_snake_case_name()] = self.model.create(**data).to_dict()
+            result = self.model.create(**data).to_dict()
         else:
             data = request.data
-            self.parse_returned_data(self.model_function(**data))
+            result = self.model_function(**data)
+
+        self.response[self.model.direct_callable_method_find_json_key(method_name=self.model_function_name)] = \
+            self.parse_returned_data(result)
 
     def put(self, request, *args, **kwargs):
 
         request_data = request.data[self.model.class_snake_case_name()].copy()
+        result = self.model_item.update(**request_data).to_dict()
+        self.model_function_name = 'update'
 
-        self.response[self.model.class_snake_case_name()] = self.model_item.update(**request_data).to_dict()
+        self.response[self.model.direct_callable_method_find_json_key(method_name=self.model_function_name)] = \
+            self.parse_returned_data(result)
 
     def delete(self, request, *args, **kwargs):
-        self.response[self.model.class_snake_case_name()] = self.model_item.remove()
+        self.model_function_name = 'remove'
+        result = self.model_item.remove()
+        self.response[self.model.direct_callable_method_find_json_key(method_name=self.model_function_name)] = \
+            self.parse_returned_data(result)
 
 
 class PasswordHash(AvishanApiView):

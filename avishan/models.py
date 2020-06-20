@@ -21,7 +21,6 @@ from avishan.misc.bch_datetime import BchDatetime
 from django.db import models
 
 
-# todo error redirects should be 302 instead of 301.
 # todo related name on abstracts
 # todo app name needed for models
 class AvishanModel(models.Model, AvishanFaker):
@@ -56,12 +55,50 @@ class AvishanModel(models.Model, AvishanFaker):
     """
 
     @classmethod
-    def direct_callable_methods(cls) -> List[str]:
+    def direct_callable_methods(cls) -> List[Union[str, Tuple[str, str], Tuple[str, str, str]]]:
+        return [
+            ('all', cls.class_plural_snake_case_name()),
+            ('create', cls.class_snake_case_name(), cls.class_snake_case_name()),
+            ('get', cls.class_snake_case_name()),
+            ('update', cls.class_snake_case_name(), cls.class_snake_case_name()),
+            ('remove', cls.class_snake_case_name()),
+        ]
+
+    @classmethod
+    def direct_non_authenticated_callable_methods(cls) -> List[Union[str, Tuple[str, str], Tuple[str, str, str]]]:
         return []
 
     @classmethod
-    def direct_non_authenticated_callable_methods(cls) -> List[str]:
-        return []
+    def direct_callable_methods_default_json_key(cls) -> str:
+        return cls.class_plural_snake_case_name()
+
+    @classmethod
+    def direct_callable_methods_names(cls) -> List[str]:
+        names = []
+        for item in cls.direct_callable_methods():
+            if isinstance(item, str):
+                names.append(item)
+            else:
+                names.append(item[0])
+        return names
+
+    @classmethod
+    def direct_non_authenticated_callable_methods_names(cls) -> List[str]:
+        names = []
+        for item in cls.direct_non_authenticated_callable_methods():
+            if isinstance(item, str):
+                names.append(item)
+            else:
+                names.append(item[0])
+        return names
+
+    @classmethod
+    def direct_callable_method_find_json_key(cls, method_name: str) -> str:
+        for item in cls.direct_callable_methods() + cls.direct_non_authenticated_callable_methods():
+            if isinstance(item, str) and method_name == item:
+                return cls.direct_callable_methods_default_json_key()
+            if not isinstance(item, str) and method_name == item[0]:
+                return item[1]
 
     @classmethod
     def openapi_documented_methods(cls) -> List[Union[str, Tuple[str, str, str]]]:
@@ -115,6 +152,18 @@ class AvishanModel(models.Model, AvishanFaker):
             raise e
 
     @classmethod
+    def _get_documentation_params(cls):
+        return stringcase.titlecase(cls.class_name()), cls.class_name(), cls.class_name()
+
+    @classmethod
+    def _get_documentation_raw(cls):
+        return """Get %s item
+
+        :response %s 200: Success
+        :return %s: Item
+        """
+
+    @classmethod
     def filter(cls, **kwargs):
         # todo show filterable fields on doc
         # todo use django-filter for on-url filter
@@ -136,21 +185,18 @@ class AvishanModel(models.Model, AvishanFaker):
 
     @classmethod
     def _all_documentation_params(cls):
-        return stringcase.titlecase(cls.class_name()), cls.class_name(), cls.class_name()
+        return stringcase.titlecase(cls.class_plural_name()), cls.class_name(), cls.class_name()
 
     @classmethod
     def _all_documentation_raw(cls):
-        return """List of all %s items
+        return """Get %s
 
-        :response List[%s] 200: when fine.
+        :response List[%s] 200: Success
         :return List[%s]: Items, usually ordered by id, acceding
         """
 
     @classmethod
     def create(cls, **kwargs):
-        """
-        Backend create method for inserting object to database
-        """
 
         create_kwargs, many_to_many_objects, after_creation = cls._clean_model_data_kwargs(**kwargs)
         created = cls.objects.create(**create_kwargs)
@@ -167,6 +213,18 @@ class AvishanModel(models.Model, AvishanFaker):
                     **target_object
                 })
         return created
+
+    @classmethod
+    def _create_documentation_params(cls):
+        return stringcase.titlecase(cls.class_name()), cls.class_name(), cls.class_name()
+
+    @classmethod
+    def _create_documentation_raw(cls):
+        return """Create %s
+
+        :response %s 200: Created
+        :return %s: Current created object
+        """
 
     def update(self, **kwargs):
 
@@ -192,10 +250,34 @@ class AvishanModel(models.Model, AvishanFaker):
         self.save()
         return self
 
+    @classmethod
+    def _update_documentation_params(cls):
+        return stringcase.titlecase(cls.class_name()), cls.class_name(), cls.class_name()
+
+    @classmethod
+    def _update_documentation_raw(cls):
+        return """Edit %s
+
+        :response %s 200: Edited
+        :return %s: Current edited object
+        """
+
     def remove(self) -> dict:
         temp = self.to_dict()
         self.delete()
         return temp
+
+    @classmethod
+    def _remove_documentation_params(cls):
+        return stringcase.titlecase(cls.class_name()), cls.class_name(), cls.class_name()
+
+    @classmethod
+    def _remove_documentation_raw(cls):
+        return """Delete %s
+
+        :response %s 200: Deleted
+        :return %s: Deleted object
+        """
 
     @classmethod
     def update_properties(cls) -> Dict[str, Parameter]:
@@ -1553,7 +1635,7 @@ class Image(AvishanModel):
 
     @classmethod
     def direct_callable_methods(cls) -> List[str]:
-        return super().direct_callable_methods() + ['image_from_multipart_form_data_request']
+        return super().direct_callable_methods() + [('image_from_multipart_form_data_request', 'image')]
 
     @staticmethod
     def image_from_url(url: str) -> 'Image':

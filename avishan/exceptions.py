@@ -192,6 +192,8 @@ def save_traceback():
     )
     if tbe.exc_traceback is not None:
         current_request['traceback'] = ''.join(tbe.format())
+        if current_request['DEBUG']:
+            print(current_request['traceback'])
         if current_request['exception_record']:
             current_request['exception_record'].traceback = current_request['traceback']
             current_request['exception_record'].save()
