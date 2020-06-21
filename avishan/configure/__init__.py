@@ -5,7 +5,6 @@ from django.core.management import BaseCommand
 
 # WARNING: no import from avishan here
 
-
 class AvishanConfigure:
 
     @staticmethod
@@ -193,6 +192,12 @@ class AvishanConfigFather:
                 }
             }
         ]
+
+    @classmethod
+    def get_openapi_schema_models(cls):
+        from avishan.models import AvishanModel
+        from avishan.descriptor import DjangoAvishanModel
+        return [DjangoAvishanModel(target=item) for item in AvishanModel.get_non_abstract_models()]
 
 
 def get_avishan_config() -> Union[Type[AvishanConfigFather]]:

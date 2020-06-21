@@ -3,7 +3,8 @@ from typing import Tuple, List, Optional, Union
 from django.db import models
 from django.db.models.base import ModelBase
 
-from avishan.descriptor import Attribute, DjangoModel, ApiMethod
+from avishan.configure import get_avishan_config
+from avishan.descriptor import Attribute, DjangoAvishanModel, ApiMethod, Model, DjangoModel
 from avishan.models import AvishanModel
 
 
@@ -21,8 +22,7 @@ class OpenApi:
         self.application_description = application_description
         self.application_version = application_version
         self.application_servers = application_servers
-        self.models: List[DjangoModel] = [DjangoModel(target=model) for model in
-                                          sorted(AvishanModel.get_non_abstract_models(), key=lambda x: x.class_name())]
+        self.models: List[Model] = sorted(get_avishan_config().get_openapi_schema_models(), key=lambda x: x.name)
 
     def export(self) -> dict:
         # todo security

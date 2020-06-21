@@ -20,6 +20,8 @@ class Model:
         self.long_description = None
         self.short_description = None
         self._doc = docstring_parser.parse(target.__doc__)
+        self.attributes = []
+        self.methods = []
         self.load_from_doc()
 
     def load_from_doc(self):
@@ -31,32 +33,39 @@ class Model:
 
 
 class DjangoModel(Model):
-    """
-    Model descriptor for django models. Not only AvishanModel inherited ones.
-    """
 
-    def __init__(self, target: Type[models.Model]):
+    def __init__(self, target: Type[Union[models.Model, object]]):
         super().__init__(
             target=target,
             name=target._meta.object_name
         )
-        if issubclass(self.target, AvishanModel):
-            self.attributes = self.extract_attributes()
-            self.methods = self.extract_methods()
+        self.attributes = self.extract_attributes()
 
     def extract_attributes(self) -> List['DjangoFieldAttribute']:
         """
         Extracts fields from model and create DjangoFieldAttribute from them.
         """
 
-        # items = sorted(
-        #     [DjangoFieldAttribute(target=self.target.get_field(field_name)) for field_name in
-        #      self.target.openapi_documented_fields()],
-        #     key=lambda x: x.name
-        # )
-        items = [DjangoFieldAttribute(target=self.target.get_field(field_name)) for field_name in
-                 self.target.openapi_documented_fields()]
-        return items
+        return [DjangoFieldAttribute(target=item) for item in self.target._meta.fields]
+
+
+class DjangoAvishanModel(DjangoModel):
+    """
+    Model descriptor for django models. Not only AvishanModel inherited ones.
+    """
+
+    def __init__(self, target: Type[models.Model]):
+        super().__init__(target=target)
+        self.attributes = self.extract_attributes()
+        self.methods = self.extract_methods()
+
+    def extract_attributes(self) -> List['DjangoFieldAttribute']:
+        """
+        Extracts fields from model and create DjangoFieldAttribute from them.
+        """
+
+        return [DjangoFieldAttribute(target=self.target.get_field(field_name)) for field_name in
+                self.target.openapi_documented_fields()]
 
     def extract_methods(self) -> List['Method']:
         """
@@ -282,6 +291,13 @@ class Attribute:
 
     @staticmethod
     def type_finder(entry) -> 'Attribute._TYPE':
+        try:
+            from typing import _Union
+            if isinstance(entry, _Union):
+                for item in entry.__args__:
+                    return Attribute.type_finder(item)
+        except ImportError():
+            pass
 
         for target, pool in Attribute._TYPE_POOL.items():
             for swimmer in pool:
@@ -308,7 +324,8 @@ class Attribute:
                 if entry == swimmer.__name__:
                     return target
 
-        if AvishanModel.get_model_with_class_name(entry) is not None or isinstance(entry, ModelBase):
+        if (isinstance(entry, str) and AvishanModel.get_model_with_class_name(entry) is not None) \
+                or isinstance(entry, ModelBase):
             return Attribute._TYPE.OBJECT
 
         raise NotImplementedError()
@@ -365,7 +382,19 @@ class FunctionAttribute(Attribute):
             type=self.define_representation_type(parameter)
         )
         if self.type is Attribute._TYPE.OBJECT:
-            self.type_of = parameter.annotation
+            if isinstance(parameter.annotation, str):
+                self.type_of = AvishanModel.get_model_with_class_name(parameter.annotation)
+            else:
+                temp = parameter.annotation
+                try:
+                    from typing import _Union
+                    if isinstance(parameter.annotation, _Union):
+                        for item in parameter.annotation.__args__:
+                            temp = item
+                            break
+                except ImportError():
+                    pass
+                self.type_of = temp
         self.is_required = self.define_is_required(parameter)
 
     @staticmethod
