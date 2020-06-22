@@ -131,12 +131,18 @@ class ChayiWriter:
                 continue
             data += f'    public static final boolean {method_name}_token = false;\n'
 
-        for method_name in ['create'] + model.direct_callable_methods_names():
+        data += '    public static final boolean create_token = true;\n'
+        for method_name in model.direct_callable_methods_names():
             if method_name in skip:
                 continue
             data += f'    public static final boolean {method_name}_token = true;\n'
 
-        for method_name in ['create'] + model.direct_callable_methods_names() + \
+        if inspect.ismethod(getattr(model, 'create')):
+            data += '    public static final boolean create_on_item = false;\n'
+        else:
+            data += '    public static final boolean create_on_item = true;\n'
+
+        for method_name in model.direct_callable_methods_names() + \
                            model.direct_non_authenticated_callable_methods_names():
             if method_name in skip:
                 continue
@@ -147,7 +153,23 @@ class ChayiWriter:
 
         data += '\n\n'
 
-        for method_name in ['create'] + model.direct_non_authenticated_callable_methods_names() + \
+        method = getattr(model, 'create')
+        # request
+        data += f'    public static RequestBody create_request('
+        for key, value in dict(inspect.signature(method).parameters.items()).items():
+            if key in ['self', 'cls', 'kwargs', 'args']:
+                continue
+            data += f'{self.model_file_write_param_type(value.annotation)} {key}, '
+        if data.endswith(', '):
+            data = data[:-2]
+        data += ") {\n"
+        data += '        JsonObject wrapper = new JsonObject();'
+        data += '        JsonObject object = new JsonObject();\n'
+        data += f'        wrapper.add("{model.class_snake_case_name()}", object);'
+        data += self.model_file_write_direct_callable_method_body(method)
+        data += '        object = wrapper;'
+        data += '        return RequestBody.create(MediaType.parse("json"), object.toString());\n    }\n\n'
+        for method_name in model.direct_non_authenticated_callable_methods_names() + \
                            model.direct_callable_methods_names():
             if method_name in skip:
                 continue
