@@ -858,23 +858,57 @@ class UserUserGroup(AvishanModel):
         return f'{self.base_user} - {self.user_group}'
 
 
-class Email(AvishanModel):
-    address = models.CharField(max_length=255, unique=True)
+class Verifiable(AvishanModel):
+    class Meta:
+        abstract = True
+
+    key = models.CharField(max_length=255, unique=True)
     date_verified = models.DateTimeField(default=None, null=True, blank=True)
 
-    django_admin_list_display = [address, date_verified]
-    django_admin_search_fields = [address]
+    django_admin_list_display = [key, 'date_verified']
+    django_admin_search_fields = [key]
 
     @classmethod
     def direct_non_authenticated_callable_methods(cls) -> List[str]:
         return super().direct_non_authenticated_callable_methods() + ['start_verification', 'check_verification']
 
     @classmethod
-    def create(cls, address: str) -> 'Email':
-        return super().create(address=cls.validate_signature(address))
+    def create(cls, key: str):
+        return super().create(key=cls.validate_signature(key))
+
+    @classmethod
+    def get_or_create(cls, key: str):
+        try:
+            return cls.get(key=key)
+        except cls.DoesNotExist:
+            return cls.create(key=key)
+
+    @classmethod
+    def get(cls, avishan_raise_400: bool = False, **kwargs):
+        kwargs['key'] = cls.validate_signature(kwargs['key'])
+        return super().get(avishan_raise_400, **kwargs)
+
+    def update(self, key: str):
+        return super().update(key=self.validate_signature(key))
+
+    @classmethod
+    def filter(cls, **kwargs):
+        if 'key' in kwargs.keys():
+            kwargs['key'] = cls.validate_signature(kwargs['key'])
+        return super().filter(**kwargs)
+
+    @staticmethod
+    def validate_signature(key: str) -> str:
+        return key  # todo
+
+    def __str__(self):
+        return self.key
+
+
+class Email(Verifiable):
 
     def start_verification(self):
-        self.send_verification_email(EmailVerification.create_verification(self).verification_code)
+        self._send_verification_email(EmailVerification.create_verification(self).verification_code)
         return self
 
     def check_verification(self, code: str):
@@ -882,11 +916,6 @@ class Email(AvishanModel):
             self.date_verified = datetime.datetime.now()
             self.save()
         return self
-
-    def send_verification_email(self, verification_code):
-        from avishan.libraries.mailgun.functions import send_mail
-        send_mail(recipient_list=[self.address], subject='Cayload Verification Code',
-                  message=f'Your verification code is: {verification_code}')
 
     @staticmethod
     def send_bulk_mail(subject: str, message: str, recipient_list: List[str], html_message: str = None):
@@ -901,140 +930,22 @@ class Email(AvishanModel):
         from avishan.libraries.mailgun.functions import send_mail as mailgun_send_mail
 
         if get_avishan_config().EMAIL_SENDER_ADDRESS is not None:
-            self.send_bulk_mail(subject, message, [self.address], html_message)
+            self.send_bulk_mail(subject, message, [self.key], html_message)
         elif get_avishan_config().MAILGUN_API_KEY is not None:
-            mailgun_send_mail(recipient_list=[self.address], subject=subject, message=message)
+            mailgun_send_mail(recipient_list=[self.key], subject=subject, message=message)
         else:
             raise ErrorMessageException(AvishanTranslatable(
                 EN='Email Provider not found'
             ))
 
-    def send_verification_code(self):
-        # todo calculate time
-        email_verification = EmailVerification.create_verification(email=self)
-        self.send_mail(
-            subject='Cayload Verification Code',
-            message=f'Your verification code is: {email_verification.verification_code}'
-        )
-
-    def verify(self, code: str):
-        if EmailVerification.check_email(self, code):
-            self.date_verified = datetime.datetime.now()
-            self.save()
-
-    def __str__(self):
-        return self.address
-
-    @staticmethod
-    def validate_signature(email: str) -> str:
-        return email  # todo
-
-    @staticmethod
-    def get_or_create_email(email_address: str) -> 'Email':
-        try:
-            return Email.get(address=email_address)
-        except Email.DoesNotExist:
-            return Email.create(address=email_address)
-        except Exception as e:
-            a = 1
-
-    @classmethod
-    def get(cls, address: str = None, avishan_raise_400: bool = False,
-            **kwargs) -> 'Email':
-        if address is not None:
-            kwargs['address'] = cls.validate_signature(address)
-        return super().get(avishan_raise_400, **kwargs)
-
-    def update(self, address: str = None) -> 'Email':
-        return super().update(address=self.validate_signature(address))
-
-    @classmethod
-    def filter(cls, **kwargs):
-        if 'address' in kwargs.keys():
-            kwargs['address'] = cls.validate_signature(kwargs['address'])
-        return super().filter(**kwargs)
+    def _send_verification_email(self, verification_code):
+        # todo add multiple mail providers
+        from avishan.libraries.mailgun.functions import send_mail
+        send_mail(recipient_list=[self.key], subject='Cayload Verification Code',
+                  message=f'Your verification code is: {verification_code}')
 
 
-class EmailVerification(AvishanModel):
-    email = models.OneToOneField(Email, on_delete=models.CASCADE, related_name='verification')
-    verification_code = models.CharField(max_length=255, blank=True, null=True, default=None)
-    verification_date = models.DateTimeField(auto_now_add=True)
-    tried_codes = models.TextField(blank=True, default="")
-
-    private_fields = [verification_code, verification_date, tried_codes]
-    export_ignore = True
-
-    django_admin_list_display = [email, verification_code, verification_date]
-    django_admin_raw_id_fields = [email]
-    django_admin_search_fields = [email]
-
-    @staticmethod
-    def create_verification(email: Email) -> 'EmailVerification':
-        from avishan.exceptions import ErrorMessageException
-
-        if hasattr(email, 'verification'):
-            previous = email.verification
-            if (BchDatetime() - BchDatetime(
-                    previous.verification_date)).total_seconds() < get_avishan_config().EMAIL_VERIFICATION_GAP_SECONDS:
-                raise ErrorMessageException(AvishanTranslatable(
-                    EN='Verification Code sent recently, Please try again later'
-                ), status_code=status.HTTP_401_UNAUTHORIZED)
-            previous.remove()
-        return EmailVerification.create(email=email, verification_code=EmailVerification.create_verification_code())
-
-    @staticmethod
-    def check_email(email: Email, code: str) -> bool:
-        from avishan.exceptions import ErrorMessageException
-        try:
-            item = EmailVerification.get(email=email)
-        except EmailVerification.DoesNotExist:
-            raise ErrorMessageException(AvishanTranslatable(
-                EN=f'Email Verification not found for email {email}'
-            ))
-        if (BchDatetime() - BchDatetime(
-                item.verification_date)).total_seconds() > get_avishan_config().EMAIL_VERIFICATION_VALID_SECONDS:
-            item.remove()
-            raise ErrorMessageException(AvishanTranslatable(
-                EN='Code Expired, Request new one'
-            ))
-        if item.verification_code == code:
-            item.remove()
-            return True
-        if len(item.tried_codes.splitlines()) > get_avishan_config().EMAIL_VERIFICATION_TRIES_COUNT - 1:
-            item.remove()
-            raise ErrorMessageException(AvishanTranslatable(
-                EN=f'Incorrect code repeated {get_avishan_config().EMAIL_VERIFICATION_TRIES_COUNT} times, request new code'
-            ))
-        item.tried_codes += f"{code}\n"
-        item.save()
-        raise ErrorMessageException(AvishanTranslatable(
-            EN='Incorrect code'
-        ))
-
-    @staticmethod
-    def create_verification_code() -> str:
-        import random
-        return str(random.randint(
-            10 ** (get_avishan_config().POA_VERIFICATION_CODE_LENGTH - 1),
-            10 ** get_avishan_config().POA_VERIFICATION_CODE_LENGTH - 1)
-        )
-
-
-class Phone(AvishanModel):
-    number = models.CharField(max_length=255, unique=True)
-    date_verified = models.DateTimeField(default=None, null=True, blank=True)
-
-    django_admin_list_display = [number, date_verified]
-    django_admin_search_fields = [number]
-
-    @classmethod
-    def direct_non_authenticated_callable_methods(cls) -> List[str]:
-        return super().direct_non_authenticated_callable_methods() + ['start_verification', 'check_verification']
-
-    @classmethod
-    def create(cls, number: str):
-        return super().create(number=number)
-
+class Phone(Verifiable):
     @staticmethod
     def send_bulk_sms():
         pass  # todo
@@ -1072,8 +983,6 @@ class Phone(AvishanModel):
             self.date_verified = datetime.datetime.now()
             self.save()
 
-    def __str__(self):
-        return self.number
 
     @staticmethod
     def validate_signature(phone: str, country_data: dict = None) -> str:
@@ -1137,16 +1046,83 @@ class Phone(AvishanModel):
         return super().filter(**kwargs)
 
 
-class PhoneVerification(AvishanModel):
-    phone = models.OneToOneField(Phone, on_delete=models.CASCADE, related_name='verification')
+class Verification(AvishanModel):
+    class Meta:
+        abstract = True
+
     verification_code = models.CharField(max_length=255, blank=True, null=True, default=None)
     verification_date = models.DateTimeField(auto_now_add=True)
     tried_codes = models.TextField(blank=True, default="")
 
     private_fields = [verification_code, verification_date, tried_codes]
 
+
+class EmailVerification(Verification):
+    email = models.OneToOneField(Email, on_delete=models.CASCADE, related_name='verification')
+
+    export_ignore = True
+
+    django_admin_list_display = [email, 'verification_code', 'verification_date']
+    django_admin_raw_id_fields = [email]
+    django_admin_search_fields = [email]
+
+    @staticmethod
+    def create_verification(email: Email) -> 'EmailVerification':
+        from avishan.exceptions import ErrorMessageException
+
+        if hasattr(email, 'verification'):
+            previous = email.verification
+            if (BchDatetime() - BchDatetime(
+                    previous.verification_date)).total_seconds() < get_avishan_config().EMAIL_VERIFICATION_GAP_SECONDS:
+                raise ErrorMessageException(AvishanTranslatable(
+                    EN='Verification Code sent recently, Please try again later'
+                ), status_code=status.HTTP_401_UNAUTHORIZED)
+            previous.remove()
+        return EmailVerification.create(email=email, verification_code=EmailVerification.create_verification_code())
+
+    @staticmethod
+    def check_email(email: Email, code: str) -> bool:
+        from avishan.exceptions import ErrorMessageException
+        try:
+            item = EmailVerification.get(email=email)
+        except EmailVerification.DoesNotExist:
+            raise ErrorMessageException(AvishanTranslatable(
+                EN=f'Email Verification not found for email {email}'
+            ))
+        if (BchDatetime() - BchDatetime(
+                item.verification_date)).total_seconds() > get_avishan_config().EMAIL_VERIFICATION_VALID_SECONDS:
+            item.remove()
+            raise ErrorMessageException(AvishanTranslatable(
+                EN='Code Expired, Request new one'
+            ))
+        if item.verification_code == code:
+            item.remove()
+            return True
+        if len(item.tried_codes.splitlines()) > get_avishan_config().EMAIL_VERIFICATION_TRIES_COUNT - 1:
+            item.remove()
+            raise ErrorMessageException(AvishanTranslatable(
+                EN=f'Incorrect code repeated {get_avishan_config().EMAIL_VERIFICATION_TRIES_COUNT} times, request new code'
+            ))
+        item.tried_codes += f"{code}\n"
+        item.save()
+        raise ErrorMessageException(AvishanTranslatable(
+            EN='Incorrect code'
+        ))
+
+    @staticmethod
+    def create_verification_code() -> str:
+        import random
+        return str(random.randint(
+            10 ** (get_avishan_config().POA_VERIFICATION_CODE_LENGTH - 1),
+            10 ** get_avishan_config().POA_VERIFICATION_CODE_LENGTH - 1)
+        )
+
+
+class PhoneVerification(Verification):
+    phone = models.OneToOneField(Phone, on_delete=models.CASCADE, related_name='verification')
+
     django_admin_raw_id_fields = [phone]
-    django_admin_list_display = [phone, verification_code, verification_date]
+    django_admin_list_display = [phone, 'verification_code', 'verification_date']
     django_admin_search_fields = [phone]
 
     @classmethod

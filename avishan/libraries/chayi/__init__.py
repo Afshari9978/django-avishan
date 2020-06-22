@@ -124,15 +124,22 @@ class ChayiWriter:
 
     def model_file_write_direct_callable_methods(self, model: Type[AvishanModel]) -> str:
         data = ''
+        skip = ['all', 'create', 'update', 'remove', 'get']
 
-        for method_name in model.direct_non_authenticated_callable_methods():
+        for method_name in model.direct_non_authenticated_callable_methods_names():
+            if method_name in skip:
+                continue
             data += f'    public static final boolean {method_name}_token = false;\n'
 
-        for method_name in ['create'] + model.direct_callable_methods():
+        for method_name in ['create'] + model.direct_callable_methods_names():
+            if method_name in skip:
+                continue
             data += f'    public static final boolean {method_name}_token = true;\n'
 
-        for method_name in ['create'] + model.direct_callable_methods() + \
-                           model.direct_non_authenticated_callable_methods():
+        for method_name in ['create'] + model.direct_callable_methods_names() + \
+                           model.direct_non_authenticated_callable_methods_names():
+            if method_name in skip:
+                continue
             if inspect.ismethod(getattr(model, method_name)):
                 data += f'    public static final boolean {method_name}_on_item = false;\n'
             else:
@@ -140,13 +147,15 @@ class ChayiWriter:
 
         data += '\n\n'
 
-        for method_name in [
-                               'create'] + model.direct_non_authenticated_callable_methods() + model.direct_callable_methods():
+        for method_name in ['create'] + model.direct_non_authenticated_callable_methods_names() + \
+                           model.direct_callable_methods_names():
+            if method_name in skip:
+                continue
             method = getattr(model, method_name)
             # request
             data += f'    public static RequestBody {method_name}_request('
             for key, value in dict(inspect.signature(method).parameters.items()).items():
-                if key in ['self', 'cls']:
+                if key in ['self', 'cls', 'kwargs', 'args']:
                     continue
                 data += f'{self.model_file_write_param_type(value.annotation)} {key}, '
             if data.endswith(', '):
