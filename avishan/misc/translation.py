@@ -18,12 +18,15 @@ class AvishanTranslatable:
     def __str__(self):
         from avishan import current_request
 
-        if current_request['language'] is None:
-            lang = get_avishan_config().LANGUAGE
-        else:
-            lang = current_request['language']
-        if lang.upper() in self.__dict__.keys() and self.__dict__[lang.upper()] is not None:
-            return self.__dict__[lang.upper()]
+        try:
+            if current_request['language'] is None:
+                lang = get_avishan_config().LANGUAGE
+            else:
+                lang = current_request['language']
+            if lang.upper() in self.__dict__.keys() and self.__dict__[lang.upper()] is not None:
+                return self.__dict__[lang.upper()]
+        except:
+            pass
         try:
             return list(self.__dict__.values())[0]
         except IndexError:

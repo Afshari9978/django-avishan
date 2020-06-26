@@ -72,21 +72,47 @@ class AvishanConfigFather:
     USE_JALALI_DATETIME: bool = False
     LANGUAGE = LANGUAGES.EN
     NEW_USERS_LANGUAGE = None
-    EMAIL_VERIFICATION_GAP_SECONDS = 5 * 60
-    EMAIL_VERIFICATION_VALID_SECONDS = 30 * 60
-    EMAIL_VERIFICATION_TRIES_COUNT = 3
-    EMAIL_VERIFICATION_CODE_LENGTH = 6
-    SMS_SIGN_IN_TEMPLATE = 'signin'
-    SMS_SIGN_UP_TEMPLATE = 'signup'
+    ASYNC_AVAILABLE: bool = False
 
-    # POA
-    POA_VERIFICATION_CODE_LENGTH = 4
-    POA_VERIFICATION_VALID_SECONDS = 10 * 60
+    # Email Providers
+    DJANGO_SMTP_EMAIL_ENABLE = False
+    MAILGUN_EMAIL_ENABLE = False
 
-    # PhoneVerification
+    # SMS Providers
+    KAVENEGAR_SMS_ENABLE = False
+
+    # Django SMTP
+    DJANGO_SMTP_SENDER_ADDRESS: str = None
+
+    # Mailgun
+    MAILGUN_DOMAIN_NAME: str = None
+    MAILGUN_API_KEY: str = None
+    MAILGUN_SENDER_ADDRESS: str = None
+    MAILGUN_SENDER_NAME: str = None
+
+    # Kavenegar
+    KAVENEGAR_API_TOKEN: str = None
+    KAVENEGAR_SIGN_IN_TEMPLATE = None
+    KAVENEGAR_SIGN_UP_TEMPLATE = None
+    KAVENEGAR_DEFAULT_TEMPLATE = KAVENEGAR_SIGN_IN_TEMPLATE
+
+    # Phone Verification
     PHONE_VERIFICATION_GAP_SECONDS = 90
     PHONE_VERIFICATION_TRIES_COUNT = 3
-    PHONE_MINIMUM_LENGTH = 10
+    PHONE_VERIFICATION_CODE_LENGTH = 4
+    PHONE_VERIFICATION_VALID_SECONDS = 10 * 60
+
+    # Email Verification
+    EMAIL_VERIFICATION_GAP_SECONDS = 4 * 60
+    EMAIL_VERIFICATION_TRIES_COUNT = 3
+    EMAIL_VERIFICATION_CODE_LENGTH = 6
+    EMAIL_VERIFICATION_VALID_SECONDS = 30 * 60
+
+    # Phone OTP
+    POA_VERIFICATION_CODE_LENGTH = 4
+    POA_VERIFICATION_VALID_SECONDS = 10 * 60
+    POA_VERIFICATION_GAP_SECONDS = 60
+
 
     # Faker
     FAKER_LOCALE: str = 'fa_IR'
@@ -113,18 +139,6 @@ class AvishanConfigFather:
         "description": 'set language for this request',
         "required": False,
     }]
-
-    # Kavenegar
-    KAVENEGAR_API_TOKEN: str = None
-
-    # Django Email
-    EMAIL_SENDER_ADDRESS: str = None  # none if not using it
-
-    # Mailgun
-    MAILGUN_DOMAIN_NAME: str = None
-    MAILGUN_API_KEY: str = None  # none if not using it
-    MAILGUN_SENDER_ADDRESS: str = None
-    MAILGUN_SENDER_NAME: str = None
 
     # Neshan
     NESHAN_API_KEY: str = None

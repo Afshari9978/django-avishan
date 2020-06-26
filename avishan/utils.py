@@ -297,17 +297,7 @@ def find_and_check_user():
         'lgn'] or authentication_type_object.last_logout:
         raise AuthException(AuthException.DEACTIVATED_TOKEN)
 
-    populate_current_request(login_with=authentication_type_object)
-
-
-def populate_current_request(login_with: 'AuthenticationType'):
-    current_request['base_user'] = login_with.user_user_group.base_user
-    current_request['user_group'] = login_with.user_user_group.user_group
-    current_request['user_user_group'] = login_with.user_user_group
-    current_request['authentication_object'] = login_with
-    if current_request['language'] is None:
-        current_request['language'] = login_with.user_user_group.base_user.language
-    current_request['add_token'] = True
+    authentication_type_object.populate_current_request()
 
 
 def create_avishan_config_file(app_name: str = None):
