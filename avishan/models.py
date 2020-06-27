@@ -55,76 +55,50 @@ class AvishanModel(models.Model, AvishanFaker):
     """
 
     @classmethod
-    def direct_callable_methods(cls) -> List[Union[str, Tuple[str, str], Tuple[str, str, str]]]:
-        return [
-            ('all', cls.class_plural_snake_case_name()),
-            ('create', cls.class_snake_case_name(), cls.class_snake_case_name()),
-            ('get', cls.class_snake_case_name()),
-            ('update', cls.class_snake_case_name(), cls.class_snake_case_name()),
-            ('remove', cls.class_snake_case_name()),
-        ]
-
-    @classmethod
-    def direct_non_authenticated_callable_methods(cls) -> List[Union[str, Tuple[str, str], Tuple[str, str, str]]]:
-        return []
-
-    @classmethod
-    def direct_callable_methods_default_json_key(cls) -> str:
-        return cls.class_plural_snake_case_name()
-
-    @classmethod
-    def direct_callable_methods_names(cls) -> List[str]:
-        names = []
-        for item in cls.direct_callable_methods():
-            if isinstance(item, str):
-                names.append(item)
-            else:
-                names.append(item[0])
-        return names
-
-    @classmethod
-    def direct_non_authenticated_callable_methods_names(cls) -> List[str]:
-        names = []
-        for item in cls.direct_non_authenticated_callable_methods():
-            if isinstance(item, str):
-                names.append(item)
-            else:
-                names.append(item[0])
-        return names
-
-    @classmethod
-    def direct_callable_method_find_json_key(cls, method_name: str) -> str:
-        for item in cls.direct_callable_methods() + cls.direct_non_authenticated_callable_methods():
-            if isinstance(item, str) and method_name == item:
-                return cls.direct_callable_methods_default_json_key()
-            if not isinstance(item, str) and method_name == item[0]:
-                return item[1]
-
-    @classmethod
-    def openapi_documented_methods(cls) -> List[Union[str, Tuple[str, str, str]]]:
-        """Returns list of methods should be visible by openapi documentation
-
-        The list can have three types of items:
-
-        * Item with just name of the method, which name will automatically adds to the url and method to GET
-
-            :Example: [('app_verify')] -> ['<MODEL_NAME/app_verify>(GET)']
-
-        * Item with name as the first string and added part of url to the model as second one. And method as third.
-
-            :Example: [('all', '', 'GET'), ('delete', '/{id}/delete', 'DELETE')] ->
-            ['<MODEL_NAME>(GET)', '<MODEL_NAME>/{id}/delete(DELETE)']
-
-        :return: list of document visible methods
-        :rtype: List[Union[str, Tuple[str, str]]]
+    def direct_callable_methods(cls):
         """
+        method name, response json key, (request json key)
+        :return:
+        :rtype: DirectCallable
+        """
+        from avishan.descriptor import DirectCallable
         return [
-            ('all', '', 'GET'),
-            ('create', '', 'POST'),
-            ('get', '/{id}', 'GET'),
-            ('update', '/{id}', 'PUT'),
-            ('remove', '/{id}', 'DELETE')
+            DirectCallable(
+                model=cls,
+                target_name='all'
+            ),
+            DirectCallable(
+                model=cls,
+                target_name='create',
+                response_json_key=cls.class_snake_case_name(),
+                method=DirectCallable.METHOD.POST
+            ),
+            DirectCallable(
+                model=cls,
+                target_name='get',
+                response_json_key=cls.class_snake_case_name(),
+                url='/{id}'
+            ),
+            DirectCallable(
+                model=cls,
+                target_name='update',
+                response_json_key=cls.class_snake_case_name(),
+                request_json_key=cls.class_snake_case_name(),
+                url='/{id}',
+                method=DirectCallable.METHOD.PUT
+            ),
+            DirectCallable(
+                model=cls,
+                target_name='remove',
+                response_json_key=cls.class_snake_case_name(),
+                url='/{id}',
+                method=DirectCallable.METHOD.DELETE
+            )
         ]
+
+    @classmethod
+    def openapi_documented_methods(cls):
+        return cls.direct_callable_methods()
 
     @classmethod
     def openapi_documented_fields(cls) -> List[str]:
@@ -869,10 +843,6 @@ class Identifier(AvishanModel):
     django_admin_search_fields = [key]
 
     @classmethod
-    def direct_non_authenticated_callable_methods(cls) -> List[str]:
-        return super().direct_non_authenticated_callable_methods() + ['start_verification', 'check_verification']
-
-    @classmethod
     def create(cls, key: str):
         return super().create(key=cls.validate_signature(key))
 
@@ -1122,6 +1092,21 @@ class AuthenticationType(AvishanModel):
         abstract = True
 
     @classmethod
+    def direct_callable_methods(cls):
+        from avishan.descriptor import DirectCallable
+
+        return super().direct_callable_methods() + [
+            DirectCallable(
+                model=cls,
+                target_name='login',
+                response_json_key=cls.class_snake_case_name(),
+                url='/login',
+                method=DirectCallable.METHOD.POST,
+                authenticate=False
+            )
+        ]
+
+    @classmethod
     def _register(cls, user_user_group: UserUserGroup, key: str, **kwargs) -> 'AuthenticationType':
         from avishan.exceptions import AuthException
 
@@ -1215,6 +1200,32 @@ class KeyValueAuthentication(AuthenticationType):
         abstract = True
 
     @classmethod
+    def register(cls, user_user_group: UserUserGroup, key: str, password: Optional[str] = None) -> \
+            Union['EmailPasswordAuthenticate', 'PhonePasswordAuthenticate']:
+
+        data = {
+            'user_user_group': user_user_group,
+            'key': key
+        }
+
+        if password is not None:
+            data['hashed_password'] = cls._hash_password(password)
+
+        return cls._register(**data)
+
+    # noinspection PyMethodOverriding
+    @classmethod
+    def login(cls, key: str, password: str, user_group: UserGroup = None, **kwargs) -> 'KeyValueAuthentication':
+        return super().login(key=key, user_group=user_group, password=password, **kwargs)
+
+    def add_password(self, password: str) -> bool:
+        if self.hashed_password is None:
+            self.hashed_password = self._hash_password(password)
+            self.save()
+            return True
+        return False
+
+    @classmethod
     def key_field(cls) -> Union[models.ForeignKey, models.Field]:
         return cls.get_field('key')
 
@@ -1238,27 +1249,6 @@ class KeyValueAuthentication(AuthenticationType):
         """
         import bcrypt
         return bcrypt.checkpw(password.encode('utf8'), hashed_password.encode('utf8'))
-
-    @classmethod
-    def register(cls, user_user_group: UserUserGroup, key: str, password: Optional[str] = None) -> \
-            Union['EmailPasswordAuthenticate', 'PhonePasswordAuthenticate']:
-
-        data = {
-            'user_user_group': user_user_group,
-            'key': key
-        }
-
-        if password is not None:
-            data['hashed_password'] = cls._hash_password(password)
-
-        return cls._register(**data)
-
-    def add_password(self, password: str) -> bool:
-        if self.hashed_password is None:
-            self.hashed_password = self._hash_password(password)
-            self.save()
-            return True
-        return False
 
     @classmethod
     def _login_post_check(cls, **kwargs):
@@ -1497,7 +1487,15 @@ class Image(AvishanModel):
 
     @classmethod
     def direct_callable_methods(cls) -> List[str]:
-        return super().direct_callable_methods() + [('image_from_multipart_form_data_request', 'image')]
+        from avishan.descriptor import DirectCallable
+        return super().direct_callable_methods() + [
+            DirectCallable(
+                model=cls,
+                target_name='image_from_multipart_form_data_request',
+                response_json_key='image',
+                url='/image_from_multipart_form_data_request',
+                method=DirectCallable.METHOD.POST,
+            )]
 
     @staticmethod
     def image_from_url(url: str) -> 'Image':

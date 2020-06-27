@@ -21,7 +21,7 @@ def avishan_chayi_create(request):
 
 
 @AvishanTemplateViewDecorator(authenticate=False)
-def avishan_test(request):
+def avishan_redoc(request):
     from avishan.libraries.openapi3.rebuild import OpenApi
 
     open_api_yaml = OpenApi(

@@ -123,33 +123,37 @@ class ChayiWriter:
         return data + "    }\n\n"
 
     def model_file_write_direct_callable_methods(self, model: Type[AvishanModel]) -> str:
+        from avishan.descriptor import DirectCallable
+
         data = ''
         skip = ['all', 'create', 'update', 'remove', 'get']
 
-        for method_name in model.direct_non_authenticated_callable_methods_names():
-            if method_name in skip:
+        for direct_callable in model.direct_callable_methods():
+            if direct_callable.name in skip:
                 continue
-            data += f'    public static final boolean {method_name}_token = false;\n'
+            if not direct_callable.authenticate:
+                data += f'    public static final boolean {direct_callable.name}_token = false;\n'
 
         data += '    public static final boolean create_token = true;\n'
-        for method_name in model.direct_callable_methods_names():
-            if method_name in skip:
+        for direct_callable in model.direct_callable_methods():
+            direct_callable: DirectCallable
+            if direct_callable.name in skip:
                 continue
-            data += f'    public static final boolean {method_name}_token = true;\n'
+            data += f'    public static final boolean {direct_callable.name}_token = true;\n'
 
         if inspect.ismethod(getattr(model, 'create')):
             data += '    public static final boolean create_on_item = false;\n'
         else:
             data += '    public static final boolean create_on_item = true;\n'
 
-        for method_name in model.direct_callable_methods_names() + \
-                           model.direct_non_authenticated_callable_methods_names():
-            if method_name in skip:
+        for direct_callable in model.direct_callable_methods():
+            direct_callable: DirectCallable
+            if direct_callable.name in skip:
                 continue
-            if inspect.ismethod(getattr(model, method_name)):
-                data += f'    public static final boolean {method_name}_on_item = false;\n'
+            if inspect.ismethod(direct_callable.target):
+                data += f'    public static final boolean {direct_callable.name}_on_item = false;\n'
             else:
-                data += f'    public static final boolean {method_name}_on_item = true;\n'
+                data += f'    public static final boolean {direct_callable.name}_on_item = true;\n'
 
         data += '\n\n'
 
@@ -169,13 +173,13 @@ class ChayiWriter:
         data += self.model_file_write_direct_callable_method_body(method)
         data += '        object = wrapper;'
         data += '        return RequestBody.create(MediaType.parse("json"), object.toString());\n    }\n\n'
-        for method_name in model.direct_non_authenticated_callable_methods_names() + \
-                           model.direct_callable_methods_names():
-            if method_name in skip:
+        for direct_callable in model.direct_callable_methods():
+            direct_callable: DirectCallable
+            if direct_callable.name in skip:
                 continue
-            method = getattr(model, method_name)
+            method = direct_callable.target
             # request
-            data += f'    public static RequestBody {method_name}_request('
+            data += f'    public static RequestBody {direct_callable.name}_request('
             for key, value in dict(inspect.signature(method).parameters.items()).items():
                 if key in ['self', 'cls', 'kwargs', 'args']:
                     continue
@@ -183,13 +187,13 @@ class ChayiWriter:
             if data.endswith(', '):
                 data = data[:-2]
             data += ") {\n"
-            if method_name == 'create':
+            if direct_callable.name == 'create':
                 data += '        JsonObject wrapper = new JsonObject();'
             data += '        JsonObject object = new JsonObject();\n'
-            if method_name == 'create':
+            if direct_callable.name == 'create':
                 data += f'        wrapper.add("{model.class_snake_case_name()}", object);'
             data += self.model_file_write_direct_callable_method_body(method)
-            if method_name == 'create':
+            if direct_callable.name == 'create':
                 data += '        object = wrapper;'
             data += '        return RequestBody.create(MediaType.parse("json"), object.toString());\n    }\n\n'
 

@@ -11,6 +11,7 @@ from django.views import View
 
 from avishan import current_request
 from avishan.configure import get_avishan_config
+from avishan.descriptor import DirectCallable
 from avishan.exceptions import ErrorMessageException, AvishanException, AuthException
 from avishan.libraries.openapi3.classes import ApiDocumentation, Path, PathGetMethod, PathResponseGroup, \
     PathResponse, Content, Schema, PathPostMethod, PathRequest, PathPutMethod, PathDeleteMethod
@@ -196,6 +197,7 @@ class AvishanModelApiView(AvishanApiView):
     model_item: AvishanModel = None
     model_function: Callable = None  # todo these sends model not dict
     model_function_name: str = None
+    direct_callable: Optional[DirectCallable] = None
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -209,15 +211,29 @@ class AvishanModelApiView(AvishanApiView):
         if not self.model:
             raise ErrorMessageException('Entered model name not found')
 
+        if self.model_function_name is None:
+            if request.method == 'GET':
+                if model_item_id is None:
+                    self.model_function_name = 'all'
+                else:
+                    self.model_function_name = 'get'
+            elif request.method == 'POST':
+                self.model_function_name = 'create'
+            elif request.method == 'PUT':
+                self.model_function_name = 'update'
+            elif request.method == 'DELETE':
+                self.model_function_name = 'remove'
+
         if model_item_id is not None:
             self.model_item = self.model.get(avishan_raise_400=True, id=int(model_item_id))
         if self.model_function_name is not None:
-            if self.model_function_name not in \
-                    self.model.direct_callable_methods_names() + \
-                    self.model.direct_non_authenticated_callable_methods_names():
+            for direct_callable in self.model.direct_callable_methods():
+                if self.model_function_name == direct_callable.name:
+                    self.direct_callable = direct_callable
+                    break
+            if not self.direct_callable:
                 raise AuthException(AuthException.METHOD_NOT_DIRECT_CALLABLE)
-            if self.model_function_name in self.model.direct_non_authenticated_callable_methods_names():
-                self.authenticate = False
+            self.authenticate = self.direct_callable.authenticate
             try:
                 if self.model_item is None:
                     self.model_function = getattr(self.model, self.model_function_name)
@@ -242,45 +258,25 @@ class AvishanModelApiView(AvishanApiView):
             return returned
 
     def get(self, request, *args, **kwargs):
-        if self.model_function is None:
-            if self.model_item is None:
-                self.model_function_name = 'all'
-                result = [item.to_dict() for item in
-                          self.model.all()]
-            else:
-                self.model_function_name = 'get'
-                result = self.model_item.to_dict()
+        if self.model_function_name == 'get':
+            result = self.model_item
         else:
             result = self.model_function()
-        self.response[self.model.direct_callable_method_find_json_key(method_name=self.model_function_name)] = \
-            self.parse_returned_data(result)
+        self.response[self.direct_callable.response_json_key] = self.parse_returned_data(result)
 
     def post(self, request, *args, **kwargs):
-        if self.model_function is None:
-            self.model_function_name = 'create'
-            data = request.data[self.model.class_snake_case_name()]
-            result = self.model.create(**data).to_dict()
-        else:
-            data = request.data
-            result = self.model_function(**data)
-
-        self.response[self.model.direct_callable_method_find_json_key(method_name=self.model_function_name)] = \
-            self.parse_returned_data(result)
+        data = request.data[self.direct_callable.request_json_key]
+        result = self.model_function(**data)
+        self.response[self.direct_callable.response_json_key] = self.parse_returned_data(result)
 
     def put(self, request, *args, **kwargs):
-
-        request_data = request.data[self.model.class_snake_case_name()].copy()
-        result = self.model_item.update(**request_data).to_dict()
-        self.model_function_name = 'update'
-
-        self.response[self.model.direct_callable_method_find_json_key(method_name=self.model_function_name)] = \
-            self.parse_returned_data(result)
+        data = request.data[self.direct_callable.request_json_key]
+        result = self.model_function(**data)
+        self.response[self.direct_callable.response_json_key] = self.parse_returned_data(result)
 
     def delete(self, request, *args, **kwargs):
-        self.model_function_name = 'remove'
-        result = self.model_item.remove()
-        self.response[self.model.direct_callable_method_find_json_key(method_name=self.model_function_name)] = \
-            self.parse_returned_data(result)
+        result = self.model_function()
+        self.response[self.direct_callable.response_json_key] = self.parse_returned_data(result)
 
 
 class PasswordHash(AvishanApiView):

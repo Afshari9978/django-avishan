@@ -1,11 +1,9 @@
 from typing import Tuple, List, Optional, Union
 
-from django.db import models
 from django.db.models.base import ModelBase
 
 from avishan.configure import get_avishan_config
-from avishan.descriptor import Attribute, DjangoAvishanModel, ApiMethod, Model, DjangoModel
-from avishan.models import AvishanModel
+from avishan.descriptor import Attribute, ApiMethod, Model, DjangoModel, DirectCallable
 
 
 # todo tags
@@ -59,11 +57,12 @@ class OpenApi:
     def _export_paths(self) -> dict:
         data = {}
         for model in self.models:
+            if model.name in get_avishan_config().get_openapi_ignored_path_models():
+                continue
             for api_method in model.methods:
                 api_method: ApiMethod
                 if api_method.url not in data.keys():
                     data[api_method.url] = Path(url=api_method.url)
-
                 setattr(data[api_method.url], api_method.method.name.lower(), Operation(
                     summary=api_method.short_description,
                     description=api_method.long_description,
@@ -164,14 +163,14 @@ class Property:
 
 class Schema:
     _TYPE_POOL = {
-        Attribute._TYPE.STRING: ('string', None),
-        Attribute._TYPE.INT: ('integer', None),
-        Attribute._TYPE.FLOAT: ('number', 'float'),
-        Attribute._TYPE.DATE: ('string', 'date'),
-        Attribute._TYPE.TIME: ('string', 'time'),
-        Attribute._TYPE.DATETIME: ('string', 'date-time'),
-        Attribute._TYPE.BOOLEAN: ('boolean', None),
-        Attribute._TYPE.ARRAY: ('array', None)
+        Attribute.TYPE.STRING: ('string', None),
+        Attribute.TYPE.INT: ('integer', None),
+        Attribute.TYPE.FLOAT: ('number', 'float'),
+        Attribute.TYPE.DATE: ('string', 'date'),
+        Attribute.TYPE.TIME: ('string', 'time'),
+        Attribute.TYPE.DATETIME: ('string', 'date-time'),
+        Attribute.TYPE.BOOLEAN: ('boolean', None),
+        Attribute.TYPE.ARRAY: ('array', None)
     }
 
     def __init__(self,
@@ -196,9 +195,9 @@ class Schema:
 
     @classmethod
     def create_from_attribute(cls, attribute: Attribute) -> 'Schema':
-        if attribute.type is Attribute._TYPE.OBJECT:
+        if attribute.type is Attribute.TYPE.OBJECT:
             return Schema(name=attribute.type_of.__name__)
-        if attribute.type is Attribute._TYPE.FILE:
+        if attribute.type is Attribute.TYPE.FILE:
             return Schema(name='File')
 
         create_kwargs = {
@@ -206,7 +205,7 @@ class Schema:
             'format': cls.type_exchange(attribute.type)[1],
             'description': attribute.description
         }
-        if attribute.type is Attribute._TYPE.ARRAY:
+        if attribute.type is Attribute.TYPE.ARRAY:
             create_kwargs['items'] = cls.type_exchange(attribute.type_of)
 
         return Schema(**create_kwargs)
@@ -223,7 +222,7 @@ class Schema:
         return cls.create_object_from_args(model.attributes)
 
     @classmethod
-    def type_exchange(cls, entry: Union[Attribute._TYPE, ModelBase]) -> Union[Tuple[str, str], 'Schema']:
+    def type_exchange(cls, entry: Union[Attribute.TYPE, ModelBase]) -> Union[Tuple[str, str], 'Schema']:
         try:
             return cls._TYPE_POOL[entry]
         except KeyError:
@@ -327,20 +326,35 @@ class Operation:
         self.responses = responses
 
     @staticmethod
-    def extract_request_body_from_api_method(api_method: ApiMethod) -> Optional[RequestBody]:
+    def extract_request_body_from_api_method(api_method: DirectCallable) -> Optional[RequestBody]:
         if len(api_method.args) == 0:
             return None
-
-        return RequestBody(content=Content(schema=Schema.create_object_from_args(api_method.args)))
+        content = Content(schema=Schema.create_object_from_args(api_method.args))
+        content.schema = Schema(
+            type='object',
+            properties=[Property(
+                name=api_method.request_json_key,
+                schema=content.schema
+            )]
+        )
+        return RequestBody(content=content)
 
     @staticmethod
-    def extract_responses_from_api_method(api_method: ApiMethod) -> List[Response]:
+    def extract_responses_from_api_method(api_method: DirectCallable) -> List[Response]:
         responses = []
         for item in api_method.responses:
+            content = Content.create_from_attribute(item.returns)
+            content.schema = Schema(
+                type='object',
+                properties=[Property(
+                    name=api_method.response_json_key,
+                    schema=content.schema
+                )]
+            )
             responses.append(Response(
                 status_code=item.status_code,
                 description=item.description,
-                content=Content.create_from_attribute(item.returns)
+                content=content
             ))
 
         return responses

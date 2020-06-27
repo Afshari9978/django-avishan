@@ -113,7 +113,6 @@ class AvishanConfigFather:
     POA_VERIFICATION_VALID_SECONDS = 10 * 60
     POA_VERIFICATION_GAP_SECONDS = 60
 
-
     # Faker
     FAKER_LOCALE: str = 'fa_IR'
     FAKER_SEED: int = None
@@ -159,7 +158,6 @@ class AvishanConfigFather:
         """
         This method will be called anytime server starts. But just the method from get_avishan_config() result.
         """
-        pass
 
     @classmethod
     def on_request(cls):
@@ -212,6 +210,13 @@ class AvishanConfigFather:
         from avishan.models import AvishanModel
         from avishan.descriptor import DjangoAvishanModel
         return [DjangoAvishanModel(target=item) for item in AvishanModel.get_non_abstract_models()]
+
+    @classmethod
+    def get_openapi_ignored_path_models(cls) -> List[str]:
+        return []   
+        return ['Activity', 'BaseUser', 'EmailPasswordAuthenticate', 'EmailVerification', 'PhoneOtpAuthenticate',
+                'PhonePasswordAuthenticate', 'PhoneVerification', 'RequestTrackException', 'RequestTrack',
+                'TranslatableChar', 'VisitorKey']
 
 
 def get_avishan_config() -> Union[Type[AvishanConfigFather]]:
