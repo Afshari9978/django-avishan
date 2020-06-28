@@ -123,7 +123,7 @@ class ChayiWriter:
         return data + "    }\n\n"
 
     def model_file_write_direct_callable_methods(self, model: Type[AvishanModel]) -> str:
-        from avishan.descriptor import DirectCallable
+
 
         data = ''
         skip = ['all', 'create', 'update', 'remove', 'get']

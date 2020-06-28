@@ -13,6 +13,7 @@ from avishan.configure import get_avishan_config, AvishanConfigFather
 from avishan.libraries.faker import AvishanFaker
 from avishan.misc import status
 from avishan.misc.translation import AvishanTranslatable
+from avishan.descriptor import DirectCallable
 
 import datetime
 from typing import Optional
@@ -55,13 +56,12 @@ class AvishanModel(models.Model, AvishanFaker):
     """
 
     @classmethod
-    def direct_callable_methods(cls):
+    def direct_callable_methods(cls) -> List[DirectCallable]:
         """
         method name, response json key, (request json key)
         :return:
         :rtype: DirectCallable
         """
-        from avishan.descriptor import DirectCallable
         return [
             DirectCallable(
                 model=cls,
@@ -1093,7 +1093,7 @@ class AuthenticationType(AvishanModel):
 
     @classmethod
     def direct_callable_methods(cls):
-        from avishan.descriptor import DirectCallable
+
 
         return super().direct_callable_methods() + [
             DirectCallable(
@@ -1486,8 +1486,8 @@ class Image(AvishanModel):
             return super().__str__()
 
     @classmethod
-    def direct_callable_methods(cls) -> List[str]:
-        from avishan.descriptor import DirectCallable
+    def direct_callable_methods(cls) -> List[DirectCallable]:
+
         return super().direct_callable_methods() + [
             DirectCallable(
                 model=cls,

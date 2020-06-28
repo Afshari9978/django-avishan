@@ -8,14 +8,12 @@ import stringcase as stringcase
 from django.db import models
 from django.db.models.base import ModelBase
 from djmoney.models.fields import MoneyField
-from docstring_parser import Docstring, DocstringMeta, DocstringParam
-
-from avishan.models import AvishanModel
+from docstring_parser import DocstringMeta, DocstringParam
 
 
 class Model:
 
-    def __init__(self, target: Type[Union[AvishanModel, models.Model, object]], name: str):
+    def __init__(self, target: Type[Union[models.Model, object]], name: str):
         self.target = target
         self.name = name
         self.long_description = None
@@ -202,7 +200,7 @@ class ApiMethod(Method):
 class DirectCallable(ApiMethod):
 
     def __init__(self,
-                 model: Type[AvishanModel],
+                 model: type,
                  target_name: str,
                  response_json_key: str = None,
                  request_json_key: str = None,
@@ -224,7 +222,8 @@ class DirectCallable(ApiMethod):
 
         self.target_class = model
         if self.short_description is None:
-            self.short_description = stringcase.titlecase(self.target_class.class_name()) + " " + stringcase.titlecase(self.name)
+            self.short_description = stringcase.titlecase(self.target_class.class_name()) + " " + stringcase.titlecase(
+                self.name)
         self.response_json_key = response_json_key
         self.request_json_key = request_json_key
         self.authenticate = authenticate
@@ -302,6 +301,8 @@ class Attribute:
 
     @classmethod
     def create_type_of_from_doc_param(cls, type_string: str) -> Optional[type]:
+        from avishan.models import AvishanModel
+
         if type_string.find('[') > 0:
             found = cls.create_type_from_doc_param(type_string=type_string)
             if found is Attribute.TYPE.ARRAY:
@@ -312,6 +313,8 @@ class Attribute:
 
     @staticmethod
     def type_finder(entry) -> 'Attribute.TYPE':
+        from avishan.models import AvishanModel
+
         try:
             from typing import _Union
             if isinstance(entry, _Union):
@@ -395,6 +398,8 @@ class FunctionAttribute(Attribute):
 
     # todo default
     def __init__(self, parameter: inspect.Parameter):
+        from avishan.models import AvishanModel
+
         if parameter is inspect.Parameter.empty or parameter.name in ['self', 'cls']:
             raise ValueError
 
