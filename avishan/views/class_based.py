@@ -265,7 +265,7 @@ class AvishanModelApiView(AvishanApiView):
         self.response[self.direct_callable.response_json_key] = self.parse_returned_data(result)
 
     def post(self, request, *args, **kwargs):
-        if self.direct_callable.request_json_key is None:
+        if self.direct_callable.dismiss_request_json_key:
             data = request.data
         else:
             data = request.data[self.direct_callable.request_json_key]
@@ -273,7 +273,7 @@ class AvishanModelApiView(AvishanApiView):
         self.response[self.direct_callable.response_json_key] = self.parse_returned_data(result)
 
     def put(self, request, *args, **kwargs):
-        if self.direct_callable.request_json_key is None:
+        if self.direct_callable.dismiss_request_json_key:
             data = request.data
         else:
             data = request.data[self.direct_callable.request_json_key]

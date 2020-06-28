@@ -206,7 +206,9 @@ class DirectCallable(ApiMethod):
                  request_json_key: str = None,
                  url: str = '',
                  method: ApiMethod.METHOD = ApiMethod.METHOD.GET,
-                 authenticate: bool = True
+                 authenticate: bool = True,
+                 dismiss_request_json_key: bool = False,
+                 dismiss_response_json_key: bool = False,
                  ):
         from avishan.configure import get_avishan_config
         if response_json_key is None:
@@ -226,6 +228,8 @@ class DirectCallable(ApiMethod):
                 self.name)
         self.response_json_key = response_json_key
         self.request_json_key = request_json_key
+        self.dismiss_request_json_key = dismiss_request_json_key
+        self.dismiss_response_json_key = dismiss_response_json_key
         self.authenticate = authenticate
 
 
