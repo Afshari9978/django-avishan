@@ -1151,14 +1151,14 @@ class AuthenticationType(AvishanModel):
         kwargs['found_object'] = found_object
         kwargs['submit_login'] = True
 
-        cls._login_post_check(**kwargs)
+        cls._login_post_check(kwargs)
 
         if kwargs['submit_login']:
             found_object._submit_login()
         return found_object
 
     @classmethod
-    def _login_post_check(cls, **kwargs):
+    def _login_post_check(cls, kwargs):
         """
         Checks for post login
         :param kwargs:
@@ -1251,7 +1251,7 @@ class KeyValueAuthentication(AuthenticationType):
         return bcrypt.checkpw(password.encode('utf8'), hashed_password.encode('utf8'))
 
     @classmethod
-    def _login_post_check(cls, **kwargs):
+    def _login_post_check(cls, kwargs):
         from avishan.exceptions import AuthException
 
         if not cls._check_password(kwargs['password'], kwargs['found_object'].hashed_password):
@@ -1294,7 +1294,7 @@ class OtpAuthentication(AuthenticationType):
         return super().login(key=key, user_group=user_group, verify=False)
 
     @classmethod
-    def _login_post_check(cls, **kwargs):
+    def _login_post_check(cls, kwargs):
         from avishan.exceptions import ErrorMessageException, AuthException
 
         found_object: PhoneOtpAuthenticate = kwargs['found_object']
