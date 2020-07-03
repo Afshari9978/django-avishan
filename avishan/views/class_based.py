@@ -1,7 +1,7 @@
 import datetime
 import inspect
 import json
-from typing import List, get_type_hints, Type, Callable, Optional
+from typing import List, get_type_hints, Type, Callable, Optional, Union
 
 from django.core.handlers.wsgi import WSGIRequest
 from django.db import models
@@ -191,7 +191,6 @@ class AvishanTemplateView(AvishanView):
 
 
 class AvishanModelApiView(AvishanApiView):
-    authenticate = True
     track_it = True
     model: Type[AvishanModel] = None
     model_item: AvishanModel = None
@@ -207,7 +206,7 @@ class AvishanModelApiView(AvishanApiView):
         model_plural_name = kwargs.get('model_plural_name', None)
         model_item_id = kwargs.get('model_item_id', None)
         self.model_function_name = kwargs.get('model_function_name', None)
-        self.model = AvishanModel.get_model_by_plural_snake_case_name(model_plural_name)
+        self.model: Union[AvishanModel, type] = AvishanModel.get_model_by_plural_snake_case_name(model_plural_name)
         if not self.model:
             raise ErrorMessageException('Entered model name not found')
 
@@ -262,6 +261,9 @@ class AvishanModelApiView(AvishanApiView):
             result = self.model_item
         else:
             result = self.model_function()
+
+            if isinstance(result, QuerySet):
+                result = self.model.queryset_handler(request.GET, queryset=result)
         self.response[self.direct_callable.response_json_key] = self.parse_returned_data(result)
 
     def post(self, request, *args, **kwargs):

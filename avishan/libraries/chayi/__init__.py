@@ -123,7 +123,7 @@ class ChayiWriter:
         return data + "    }\n\n"
 
     def model_file_write_direct_callable_methods(self, model: Type[AvishanModel]) -> str:
-
+        from avishan.descriptor import DirectCallable
 
         data = ''
         skip = ['all', 'create', 'update', 'remove', 'get']
@@ -203,6 +203,8 @@ class ChayiWriter:
         data = ''
 
         for key, value in dict(inspect.signature(method).parameters.items()).items():
+            if key in ['kwargs']:
+                continue
             data = self.write_with_type_check(value.annotation, key, data)
         return data
 
@@ -211,6 +213,7 @@ class ChayiWriter:
             return text
         if null_checked:
             text += '    '
+        # noinspection PyUnresolvedReferences
         if annotation in [str, int, bool, float]:
             text += f'        object.add("{key}", new JsonPrimitive({key}));\n'
         elif isinstance(annotation, typing._Union) and len(annotation.__args__) == 2:
@@ -244,9 +247,8 @@ class ChayiWriter:
             text += f'            object.add("{key}", {key}_object);\n'
             text += '        }\n'
 
-
         else:
-            raise NotImplementedError()
+            raise NotImplementedError(annotation)
         return text
 
     def model_file_write_getter_setters(self, model: Type[AvishanModel]) -> str:
@@ -310,6 +312,7 @@ class ChayiWriter:
             return 'File'
         raise NotImplementedError()
 
+    # noinspection PyUnresolvedReferences
     def model_file_write_param_type(self, annotation: inspect.Parameter) -> str:
         if isinstance(annotation, models.base.ModelBase):
             return annotation.__name__
@@ -452,6 +455,7 @@ public class File {
 
 }"""
 
+    # noinspection PyUnresolvedReferences
     def model_file_write_added_to_dict(self, data: str, name: str, python_type: Type[type]) -> str:
 
         data += '    @Expose(serialize = false)\n'

@@ -6,7 +6,6 @@ from typing import List, Type, Union, Tuple, Dict
 import requests
 import stringcase
 from django.core.files.uploadedfile import InMemoryUploadedFile
-from django.db.models import NOT_PROVIDED
 
 from avishan import current_request
 from avishan.configure import get_avishan_config, AvishanConfigFather
@@ -21,16 +20,23 @@ from typing import Optional
 from avishan.misc.bch_datetime import BchDatetime
 from django.db import models
 
-
 # todo related name on abstracts
 # todo app name needed for models
-class AvishanModel(models.Model, AvishanFaker):
+from avishan.models_extensions import AvishanModelDjangoAdminExtension, AvishanModelModelDetailsExtension, \
+    AvishanModelFilterExtension
+
+
+class AvishanModel(
+    models.Model,
+    AvishanFaker,
+    AvishanModelDjangoAdminExtension,
+    AvishanModelModelDetailsExtension,
+    AvishanModelFilterExtension
+):
     # todo 0.2.1: use manager or simply create functions here?
     # todo 0.2.0 relation on_delete will call our remove() ?
     class Meta:
         abstract = True
-
-    UNCHANGED = '__UNCHANGED__'
 
     """
     Models default settings
@@ -38,22 +44,6 @@ class AvishanModel(models.Model, AvishanFaker):
     private_fields: List[Union[models.Field, str]] = []
     export_ignore: bool = False  # todo check
     to_dict_added_fields: List[Tuple[str, Type[type]]] = []
-
-    """
-    Django admin default values. Set this for all inherited models
-    """
-    django_admin_date_hierarchy: Optional[str] = None
-    django_admin_list_display: List[models.Field] = []
-    django_admin_list_filter: List[models.Field] = []
-    django_admin_list_max_show_all: int = 300
-    django_admin_list_per_page: int = 100
-    django_admin_raw_id_fields: List[models.Field] = []
-    django_admin_readonly_fields: List[models.Field] = []
-    django_admin_search_fields: List[models.Field] = []
-
-    """
-    CRUD functions
-    """
 
     @classmethod
     def direct_callable_methods(cls) -> List[DirectCallable]:
@@ -65,7 +55,8 @@ class AvishanModel(models.Model, AvishanFaker):
         return [
             DirectCallable(
                 model=cls,
-                target_name='all'
+                target_name='all',
+                authenticate=False
             ),
             DirectCallable(
                 model=cls,
@@ -455,133 +446,6 @@ class AvishanModel(models.Model, AvishanFaker):
         return output
 
     @classmethod
-    def class_name(cls) -> str:
-        return cls.__name__
-
-    @classmethod
-    def class_plural_name(cls) -> str:
-        return cls.class_name() + "s"
-
-    @classmethod
-    def class_snake_case_name(cls) -> str:
-        return stringcase.snakecase(cls.class_name())
-
-    @classmethod
-    def class_plural_snake_case_name(cls) -> str:
-        return stringcase.snakecase(cls.class_plural_name())
-
-    @classmethod
-    def app_name(cls) -> str:
-        return cls._meta.app_label
-
-    @staticmethod
-    def get_non_abstract_models(app_name: str = None) -> List[Type['AvishanModel']]:
-        return [x for x in AvishanModel.get_models(app_name) if x._meta.abstract is False]
-
-    @staticmethod
-    def get_models(app_name: str = None) -> List[Type['AvishanModel']]:
-        # todo 0.2.1 check for app name to be in avishan_config file
-        def get_sub_classes(parent):
-            subs = [parent]
-            for child in parent.__subclasses__():
-                subs += get_sub_classes(child)
-            return subs
-
-        total = []
-        if not app_name:
-            for model in AvishanModel.__subclasses__():
-                total += get_sub_classes(model)
-            return list(set(total))
-
-        return [x for x in AvishanModel.get_models() if x._meta.app_label == app_name]
-
-    @staticmethod
-    def get_model_with_class_name(class_name: str) -> Optional[Type['AvishanModel']]:
-        for item in AvishanModel.get_models():
-            if item.class_name() == class_name:
-                return item
-        return None
-
-    @staticmethod
-    def get_model_by_plural_snake_case_name(name: str) -> Optional[Type['AvishanModel']]:
-        for model in AvishanModel.get_non_abstract_models():
-            if model.class_plural_snake_case_name() == name:
-                return model
-        return None
-
-    @staticmethod
-    def get_model_by_snake_case_name(name: str) -> Optional[Type['AvishanModel']]:
-        for model in AvishanModel.get_non_abstract_models():
-            if model.class_snake_case_name() == name:
-                return model
-        return None
-
-    @staticmethod
-    def get_app_names() -> List[str]:
-        from django.apps import apps
-        return [key.name for key in apps.get_app_configs() if
-                key.name in get_avishan_config().MONITORED_APPS_NAMES]
-
-    @classmethod
-    def get_fields(cls) -> List[models.Field]:
-        return list(cls._meta.fields)
-
-    @classmethod
-    def get_full_fields(cls) -> List[models.Field]:
-        return list(cls._meta.fields + cls._meta.many_to_many)
-
-    @classmethod
-    def get_field(cls, field_name: str) -> models.Field:
-        for item in cls.get_fields():
-            if item.name == field_name:
-                return item
-        raise ValueError(AvishanTranslatable(
-            EN=f'field {field_name} not found in model {cls.class_name()}'
-        ))
-
-    @classmethod
-    def is_field_identifier_for_model(cls, field: models.Field) -> bool:
-        """
-        Checks if field is enough for finding an object from db.
-        :param field: for example for 'id' or other unique fields, it will be True
-        :return:
-        """
-        return field.primary_key or field.unique
-
-    @staticmethod
-    def is_field_readonly(field: models.Field) -> bool:
-        """
-        Checks if field is read-only type and must not entered by user
-        :param field: for example auto create date-times
-        :return:
-        """
-        if (isinstance(field, models.DateField) or isinstance(field, models.DateTimeField) or
-            isinstance(field, models.TimeField)) and (field.auto_now or field.auto_now_add):
-            return True
-        if field.primary_key:
-            return True
-        return False
-
-    @staticmethod
-    def is_field_required(field: models.Field) -> bool:
-        """
-        Checks if field is required and create-blocking for model
-        :param field:
-        :return: True if required
-        """
-        if field.name == 'id' or field.default != NOT_PROVIDED or \
-                isinstance(field, models.DateField) or isinstance(field, models.TimeField) and (
-                field.auto_now or field.auto_now_add):
-            return False
-        if isinstance(field, models.ManyToManyField):
-            return False
-
-        if field.blank or field.null:
-            return False
-
-        return True
-
-    @classmethod
     def cast_field_data(cls, data, field: models.Field):
         """
         Cast data to it's appropriate form
@@ -683,11 +547,6 @@ class AvishanModel(models.Model, AvishanFaker):
         if total:
             return total
         return 0
-
-    @staticmethod
-    def all_subclasses(parent_class):
-        return set(parent_class.__subclasses__()).union(
-            [s for c in parent_class.__subclasses__() for s in AvishanModel.all_subclasses(c)])
 
     @classmethod
     def chayi_ignore_serialize_field(cls, field: models.Field) -> bool:
@@ -1093,7 +952,6 @@ class AuthenticationType(AvishanModel):
 
     @classmethod
     def direct_callable_methods(cls):
-
 
         return super().direct_callable_methods() + [
             DirectCallable(

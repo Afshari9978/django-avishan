@@ -2,6 +2,7 @@ bcrypt>=3.1.7
 colour>=0.1.5
 Django==3.0.7
 django-cors-headers>=3.2.1
+django-filter>=2.3.0
 django-money>=1.1
 docstring-parser>=0.7.1
 Faker==4.0.3

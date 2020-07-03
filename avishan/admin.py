@@ -16,6 +16,7 @@ def maker(source: list) -> list:
 
 
 for model in AvishanModel.get_non_abstract_models():
+    model: AvishanModel
     model_admin_dict = {
         'list_filter': maker(model.django_admin_list_filter),
         'list_max_show_all': model.django_admin_list_max_show_all,
