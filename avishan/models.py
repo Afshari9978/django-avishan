@@ -56,7 +56,6 @@ class AvishanModel(
             DirectCallable(
                 model=cls,
                 target_name='all',
-                authenticate=False
             ),
             DirectCallable(
                 model=cls,
