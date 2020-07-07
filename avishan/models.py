@@ -56,12 +56,14 @@ class AvishanModel(
             DirectCallable(
                 model=cls,
                 target_name='all',
+                url=''
             ),
             DirectCallable(
                 model=cls,
                 target_name='create',
                 response_json_key=cls.class_snake_case_name(),
-                method=DirectCallable.METHOD.POST
+                method=DirectCallable.METHOD.POST,
+                url=''
             ),
             DirectCallable(
                 model=cls,
@@ -957,7 +959,6 @@ class AuthenticationType(AvishanModel):
                 model=cls,
                 target_name='login',
                 response_json_key=cls.class_snake_case_name(),
-                url='/login',
                 method=DirectCallable.METHOD.POST,
                 authenticate=False
             )
@@ -972,7 +973,10 @@ class AuthenticationType(AvishanModel):
         except cls.key_field().related_model.DoesNotExist:
             key_item = cls.key_field().related_model.create(key)
         try:
-            cls.objects.get(**{cls.key_field().name: key_item, 'user_user_group': user_user_group})
+            cls.objects.get(**{
+                'key': key_item,
+                'user_user_group__user_group': user_user_group.user_group
+            })
             raise AuthException(AuthException.DUPLICATE_AUTHENTICATION_IDENTIFIER)
         except cls.DoesNotExist:
             pass
@@ -1134,15 +1138,9 @@ class OtpAuthentication(AuthenticationType):
     @classmethod
     def register(cls, user_user_group: UserUserGroup, key: str) -> 'OtpAuthentication':
 
-        try:
-            key_item = cls.key_field().related_model.get(key=key)
-        except cls.key_field().related_model.DoesNotExist:
-            key_item = cls.key_field().related_model.create(key=key)
-            current_request['status_code'] = status.HTTP_201_CREATED
-
         data = {
             'user_user_group': user_user_group,
-            'key': key_item.key
+            'key': key
         }
         return cls._register(**data)
 
@@ -1350,7 +1348,6 @@ class Image(AvishanModel):
                 model=cls,
                 target_name='image_from_multipart_form_data_request',
                 response_json_key='image',
-                url='/image_from_multipart_form_data_request',
                 method=DirectCallable.METHOD.POST,
             )]
 

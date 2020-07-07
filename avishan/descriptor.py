@@ -204,17 +204,22 @@ class DirectCallable(ApiMethod):
                  target_name: str,
                  response_json_key: str = None,
                  request_json_key: str = None,
-                 url: str = '',
+                 url: str = None,
                  method: ApiMethod.METHOD = ApiMethod.METHOD.GET,
                  authenticate: bool = True,
                  dismiss_request_json_key: bool = False,
                  dismiss_response_json_key: bool = False,
                  ):
         from avishan.configure import get_avishan_config
+        from avishan.models import AvishanModel
+        model: AvishanModel
         if response_json_key is None:
             response_json_key = model.class_plural_snake_case_name()
         if request_json_key is None:
             request_json_key = model.class_snake_case_name()
+
+        if url is None:
+            url = f'/{target_name}'
 
         super().__init__(
             target=getattr(model, target_name),
@@ -228,7 +233,9 @@ class DirectCallable(ApiMethod):
                 self.name)
         self.response_json_key = response_json_key
         self.request_json_key = request_json_key
-        self.dismiss_request_json_key = dismiss_request_json_key
+        self.dismiss_request_json_key = dismiss_request_json_key if \
+            method not in [ApiMethod.METHOD.GET, ApiMethod.METHOD.DELETE] else \
+            True
         self.dismiss_response_json_key = dismiss_response_json_key
         self.authenticate = authenticate
 
@@ -358,6 +365,25 @@ class Attribute:
 
         raise NotImplementedError()
 
+    @staticmethod
+    def type_caster(entry, target_type: 'Attribute.TYPE'):
+        if target_type is Attribute.TYPE.STRING:
+            return str(entry)
+        if target_type is Attribute.TYPE.INT:
+            return int(entry)
+        if target_type is Attribute.TYPE.FLOAT:
+            return float(entry)
+        if target_type is Attribute.TYPE.DATE:
+            return datetime.date(entry)
+        if target_type is Attribute.TYPE.DATETIME:
+            return datetime.datetime(entry)
+        if target_type is Attribute.TYPE.BOOLEAN:
+            return bool(entry)
+        if target_type is Attribute.TYPE.ARRAY:
+            if not isinstance(entry, list):
+                return list(entry)
+            return entry
+
     def __str__(self):
         return self.name
 
@@ -411,20 +437,29 @@ class FunctionAttribute(Attribute):
             name=parameter.name,
             type=self.define_representation_type(parameter)
         )
+        temp = parameter.annotation
         if self.type is Attribute.TYPE.OBJECT:
             if isinstance(parameter.annotation, str):
                 self.type_of = AvishanModel.get_model_with_class_name(parameter.annotation)
             else:
-                temp = parameter.annotation
                 try:
                     from typing import _Union
                     if isinstance(parameter.annotation, _Union):
                         for item in parameter.annotation.__args__:
                             temp = item
                             break
-                except ImportError():
+                except Exception:
                     pass
                 self.type_of = temp
+        if self.type is Attribute.TYPE.ARRAY:
+            temp = parameter.annotation.__args__[0]
+            try:
+                from typing import _ForwardRef
+                if isinstance(temp, _ForwardRef):
+                    temp = AvishanModel.get_model_with_class_name(temp.__forward_arg__)
+            except Exception:
+                pass
+            self.type_of = temp
         self.is_required = self.define_is_required(parameter)
 
     @staticmethod

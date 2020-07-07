@@ -11,7 +11,7 @@ from django.views import View
 
 from avishan import current_request
 from avishan.configure import get_avishan_config
-from avishan.descriptor import DirectCallable
+from avishan.descriptor import DirectCallable, FunctionAttribute
 from avishan.exceptions import ErrorMessageException, AvishanException, AuthException
 from avishan.libraries.openapi3.classes import ApiDocumentation, Path, PathGetMethod, PathResponseGroup, \
     PathResponse, Content, Schema, PathPostMethod, PathRequest, PathPutMethod, PathDeleteMethod
@@ -243,19 +243,6 @@ class AvishanModelApiView(AvishanApiView):
                     EN=f'Requested method not found in model {self.model.class_name()}'
                 ))
 
-    @staticmethod
-    def parse_returned_data(returned):
-        if isinstance(returned, QuerySet):
-            return [item.to_dict() for item in returned]
-        elif isinstance(returned, list):
-            if len(returned) > 0 and isinstance(returned[0], AvishanModel):
-                return [item.to_dict() for item in returned]
-            return returned
-        elif isinstance(returned, AvishanModel):
-            return returned.to_dict()
-        else:
-            return returned
-
     def get(self, request, *args, **kwargs):
         if self.model_function_name == 'get':
             result = self.model_item
@@ -271,20 +258,67 @@ class AvishanModelApiView(AvishanApiView):
             data = request.data
         else:
             data = request.data[self.direct_callable.request_json_key]
+
+        # data = self.parse_request_data(**data)
         result = self.model_function(**data)
         self.response[self.direct_callable.response_json_key] = self.parse_returned_data(result)
 
     def put(self, request, *args, **kwargs):
-        if self.direct_callable.dismiss_request_json_key:
-            data = request.data
-        else:
-            data = request.data[self.direct_callable.request_json_key]
-        result = self.model_function(**data)
-        self.response[self.direct_callable.response_json_key] = self.parse_returned_data(result)
+        self.post(request, *args, **kwargs)
 
     def delete(self, request, *args, **kwargs):
         result = self.model_function()
         self.response[self.direct_callable.response_json_key] = self.parse_returned_data(result)
+
+    @staticmethod
+    def parse_returned_data(returned):
+        if isinstance(returned, QuerySet):
+            return [item.to_dict() for item in returned]
+        elif isinstance(returned, list):
+            if len(returned) > 0 and isinstance(returned[0], AvishanModel):
+                return [item.to_dict() for item in returned]
+            return returned
+        elif isinstance(returned, AvishanModel):
+            return returned.to_dict()
+        else:
+            return returned
+
+    def parse_request_data(self, **kwargs):
+        cleaned = {}
+        for function_attribute in self.direct_callable.args:
+            function_attribute: FunctionAttribute
+            if function_attribute.is_required and function_attribute.name not in kwargs.keys():
+                raise ErrorMessageException(f'field "{function_attribute.name}" is required')
+
+            if function_attribute.type is function_attribute.TYPE.OBJECT:
+                cleaned[function_attribute.name] = self._parse_request_object(
+                    function_attribute=function_attribute, target_dict=kwargs[function_attribute.name]
+                )
+            elif function_attribute.type is function_attribute.TYPE.ARRAY:
+                cleaned[function_attribute.name] = [
+                    self._parse_request_object(
+                        function_attribute=function_attribute, target_dict=item
+                    ) for item in kwargs[function_attribute.name]
+                ]
+            elif function_attribute.type is function_attribute.TYPE.FILE:
+                raise NotImplementedError()
+            else:
+                cleaned[function_attribute.name] = function_attribute.type_caster(
+                    entry=kwargs[function_attribute.name],
+                    target_type=function_attribute.type
+                )
+
+        return cleaned
+
+    @staticmethod
+    def _parse_request_object(function_attribute: FunctionAttribute, target_dict: dict):
+        if function_attribute.type is function_attribute.TYPE.OBJECT and not isinstance(target_dict, dict):
+            raise ErrorMessageException(f'value for "{function_attribute.name}" must be dict')
+        if 'id' in target_dict.keys():
+            return function_attribute.type_of.get(
+                id=int(target_dict['id'])
+            )
+        return function_attribute.type_of(**target_dict)
 
 
 class PasswordHash(AvishanApiView):
