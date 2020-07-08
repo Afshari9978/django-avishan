@@ -566,7 +566,7 @@ class BaseUser(AvishanModel):
 
     private_fields = [date_created, 'id']
 
-    django_admin_list_display = ['id', is_active, language, date_created]
+    django_admin_list_display = ['__str__', 'id', is_active, language, date_created]
     django_admin_list_filter = [language, is_active]
 
     @classmethod

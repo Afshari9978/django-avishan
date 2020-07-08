@@ -166,6 +166,7 @@ class Wrapper:
             request_data = json.dumps(current_request['request'].data, indent=2)
             request_data_size = sys.getsizeof(json.dumps(current_request['request'].data))
         except:
+            print("*DEBUG* request parse error")
             request_data = "NOT_AVAILABLE"
             request_data_size = -1
 
@@ -175,6 +176,12 @@ class Wrapper:
                 request_headers += f'{key[5:]}={value}\n'
         for key in current_request['request'].FILES.keys():
             request_headers += f'FILE({key})\n'
+
+        try:
+            response_data = json.dumps(current_request['response'], indent=2)
+        except:
+            print("*DEBUG* response parse error:", current_request['response'])
+            response_data = 'NOT_AVAILABLE'
 
         try:
             created = current_request['request_track_object'].update(
@@ -189,8 +196,8 @@ class Wrapper:
                 request_data=request_data,
                 request_data_size=request_data_size,
                 request_headers=request_headers,
-                response_data=json.dumps(current_request['response'], indent=2),
-                response_data_size=sys.getsizeof(json.dumps(current_request['response'])),
+                response_data=response_data,
+                response_data_size=sys.getsizeof(response_data),
                 start_time=current_request['start_time'],
                 end_time=current_request['end_time'],
                 total_execution_milliseconds=int((current_request['end_time'] - current_request[
