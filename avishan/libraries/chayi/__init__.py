@@ -128,18 +128,14 @@ class ChayiWriter:
         data = ''
         skip = ['all', 'create', 'update', 'remove', 'get']
 
+        data += '    public static final boolean create_token = true;\n'
         for direct_callable in model.direct_callable_methods():
             if direct_callable.name in skip:
                 continue
             if not direct_callable.authenticate:
                 data += f'    public static final boolean {direct_callable.name}_token = false;\n'
-
-        data += '    public static final boolean create_token = true;\n'
-        for direct_callable in model.direct_callable_methods():
-            direct_callable: DirectCallable
-            if direct_callable.name in skip:
-                continue
-            data += f'    public static final boolean {direct_callable.name}_token = true;\n'
+            else:
+                data += f'    public static final boolean {direct_callable.name}_token = true;\n'
 
         if inspect.ismethod(getattr(model, 'create')):
             data += '    public static final boolean create_on_item = false;\n'
@@ -430,7 +426,7 @@ public class Image {
         return id;
     }
     public String getFile() {
-        return Constants.ZIMA_URL_BASE + file;
+        return Constants.BASE_URL + file;
     }
     
 }"""
@@ -450,7 +446,7 @@ public class File {
     }
     
     public String getFile() {
-        return Constants.ZIMA_URL_BASE + file;
+        return Constants.BASE_URL + file;
     }
 
 }"""
