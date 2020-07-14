@@ -207,6 +207,8 @@ class Schema:
         }
         if attribute.type is Attribute.TYPE.ARRAY:
             create_kwargs['items'] = cls.type_exchange(attribute.type_of)
+            if isinstance(create_kwargs['items'], tuple):
+                create_kwargs['items'] = Schema(type=create_kwargs['items'][0])
 
         return Schema(**create_kwargs)
 
@@ -244,7 +246,10 @@ class Schema:
         if self.description:
             data['description'] = self.description
         if self.items:
-            data['items'] = self.items.export()
+            try:
+                data['items'] = self.items.export()
+            except:
+                a = 1
         if len(self.properties) > 0:
             data['properties'] = {}
             for item in self.properties:

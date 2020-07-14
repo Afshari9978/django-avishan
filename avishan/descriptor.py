@@ -403,6 +403,8 @@ class DjangoFieldAttribute(Attribute):
                 raise NotImplementedError()
         if self.type is Attribute.TYPE.ARRAY:
             raise NotImplementedError()
+        if self.type is Attribute.TYPE.FILE:
+            self.type = Attribute.TYPE.STRING
         self.target = target
 
     @property
@@ -453,12 +455,17 @@ class FunctionAttribute(Attribute):
                 self.type_of = temp
         if self.type is Attribute.TYPE.ARRAY:
             temp = parameter.annotation.__args__[0]
+            found_here = False
             try:
                 from typing import _ForwardRef
                 if isinstance(temp, _ForwardRef):
                     temp = AvishanModel.get_model_with_class_name(temp.__forward_arg__)
+                    found_here = True
             except Exception:
                 pass
+
+            if not found_here:
+                temp = Attribute.type_finder(temp)
             self.type_of = temp
         self.is_required = self.define_is_required(parameter)
 
