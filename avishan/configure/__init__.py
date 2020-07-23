@@ -213,7 +213,6 @@ class AvishanConfigFather:
 
     @classmethod
     def get_openapi_ignored_path_models(cls) -> List[str]:
-        return []   
         return ['Activity', 'BaseUser', 'EmailPasswordAuthenticate', 'EmailVerification', 'PhoneOtpAuthenticate',
                 'PhonePasswordAuthenticate', 'PhoneVerification', 'RequestTrackException', 'RequestTrack',
                 'TranslatableChar', 'VisitorKey']

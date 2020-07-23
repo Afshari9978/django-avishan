@@ -151,10 +151,10 @@ class Property:
         self.schema = schema
 
     @classmethod
-    def create_from_attribute(cls, attribute: Attribute) -> 'Property':
+    def create_from_attribute(cls, attribute: Attribute, request_body_related: bool = False) -> 'Property':
         return Property(
             name=attribute.name,
-            schema=Schema.create_from_attribute(attribute)
+            schema=Schema.create_from_attribute(attribute, request_body_related)
         )
 
     def export(self) -> dict:
@@ -194,9 +194,17 @@ class Schema:
         self.description = description
 
     @classmethod
-    def create_from_attribute(cls, attribute: Attribute) -> 'Schema':
+    def create_from_attribute(cls, attribute: Attribute, request_body_related: bool = False) -> 'Schema':
         if attribute.type is Attribute.TYPE.OBJECT:
-            return Schema(name=attribute.type_of.__name__)
+            if request_body_related:
+                return Schema(
+                    type='object',
+                    properties=[
+                        Property(name='id', schema=Schema(type='integer'))
+                    ]
+                )
+            else:
+                return Schema(name=attribute.type_of.__name__)
         if attribute.type is Attribute.TYPE.FILE:
             return Schema(name='File')
 
@@ -213,10 +221,10 @@ class Schema:
         return Schema(**create_kwargs)
 
     @classmethod
-    def create_object_from_args(cls, args: List[Attribute]) -> 'Schema':
+    def create_object_from_args(cls, args: List[Attribute], request_body_related: bool = False) -> 'Schema':
         return Schema(
             type='object',
-            properties=[Property.create_from_attribute(item) for item in args]
+            properties=[Property.create_from_attribute(item, request_body_related) for item in args]
         )
 
     @classmethod
@@ -334,7 +342,7 @@ class Operation:
     def extract_request_body_from_api_method(api_method: DirectCallable) -> Optional[RequestBody]:
         if len(api_method.args) == 0:
             return None
-        content = Content(schema=Schema.create_object_from_args(api_method.args))
+        content = Content(schema=Schema.create_object_from_args(api_method.args, request_body_related=True))
         content.schema = Schema(
             type='object',
             properties=[Property(

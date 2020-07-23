@@ -492,14 +492,23 @@ class AvishanModel(
             if not isinstance(data, dict):
                 raise ValueError('ForeignKey or ManyToMany relation should contain dict with id')
             output = cast_class.objects.get(id=int(data['id']))
-        elif isinstance(cast_class, datetime.datetime):
-            if not isinstance(data, dict):
-                raise ValueError('Datetime should contain dict')
-            output = BchDatetime(data).to_datetime()
-        elif isinstance(cast_class, datetime.date):
-            if not isinstance(data, dict):
-                raise ValueError('Date should contain dict')
-            output = BchDatetime(data).to_date()
+
+        elif cast_class is datetime.datetime:
+            if isinstance(data, dict):
+                output = BchDatetime(data).to_datetime()
+            elif isinstance(data, str):
+                output = datetime.datetime.strptime(data, '%Y-%m-%dT%H:%M:%S.%f')
+            else:
+                raise ValueError('Cannot parse datetime, supported types are dict (containing year, month, .etc) or str'
+                                 ' (with format "%Y-%m-%dT%H:%M:%S.%f")')
+        elif cast_class is datetime.date:
+            if isinstance(data, dict):
+                output = BchDatetime(data).to_date()
+            elif isinstance(data, str):
+                output = datetime.datetime.strptime(data, '%Y-%m-%d').date()
+            else:
+                raise ValueError('Cannot parse date, supported types are dict (containing year, month, .etc) or str'
+                                 ' (with format "%Y-%m-%d")')
         else:
             output = cast_class(data)
 
@@ -1324,6 +1333,23 @@ class VisitorKey(AuthenticationType):
         return self.key
 
 
+class File(AvishanModel):
+    file = models.FileField(blank=True, null=True)
+    base_user = models.ForeignKey(BaseUser, on_delete=models.SET_NULL, null=True, blank=True)
+    date_created = models.DateTimeField(auto_now_add=True)
+
+    export_ignore = True
+
+    django_admin_list_display = [file, base_user, date_created]
+    django_admin_raw_id_fields = [base_user]
+
+    def to_dict(self, exclude_list: List[Union[models.Field, str]] = ()) -> dict:
+        return {
+            'id': self.id,
+            'file': self.file.url
+        }
+
+
 class Image(AvishanModel):
     file = models.ImageField(blank=True, null=True)
     base_user = models.ForeignKey(BaseUser, on_delete=models.SET_NULL, null=True, blank=True)
@@ -1393,24 +1419,12 @@ class Image(AvishanModel):
 
     @classmethod
     def image_from_multipart_form_data_request(cls, name: str = 'file') -> 'Image':
+        """Upload Image
+
+        :param name:
+        :return:
+        """
         return cls.image_from_in_memory_upload(file=current_request['request'].FILES.get(name))
-
-
-class File(AvishanModel):
-    file = models.FileField(blank=True, null=True)
-    base_user = models.ForeignKey(BaseUser, on_delete=models.SET_NULL, null=True, blank=True)
-    date_created = models.DateTimeField(auto_now_add=True)
-
-    export_ignore = True
-
-    django_admin_list_display = [file, base_user, date_created]
-    django_admin_raw_id_fields = [base_user]
-
-    def to_dict(self, exclude_list: List[Union[models.Field, str]] = ()) -> dict:
-        return {
-            'id': self.id,
-            'file': self.file.url
-        }
 
 
 class RequestTrack(AvishanModel):
