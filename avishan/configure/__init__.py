@@ -123,14 +123,6 @@ class AvishanConfigFather:
     # VisitorToken
     VISITOR_KEY_LENGTH = 40
 
-    # Panel
-    PANEL_ROOT = 'panel'
-    PANEL_TITLE = 'پنل مدیریت'
-    PANEL_ENABLE_LOG: bool = False  # todo
-    PANEL_LOGIN_CLASS_NAME = 'PhonePasswordAuthenticate'
-    PANEL_LOGIN_USER_GROUP_TITLE = 'admin'
-    PANEL_TRANSLATION_DICT: dict = {}
-
     # open api
     REQUEST_COMMON_URL_PARAMETERS = [{
         "name": 'language',
