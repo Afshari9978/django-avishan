@@ -2,9 +2,9 @@ import datetime
 from typing import Optional, Union, List
 
 from django.http import HttpResponse
+from django.utils import timezone
 
 from avishan.exceptions import AuthException, AvishanException
-from avishan.misc.bch_datetime import BchDatetime
 from . import current_request
 from .configure import get_avishan_config
 from .misc import status
@@ -235,17 +235,14 @@ def encode_token(authentication_object: 'AuthenticationType') -> Optional[str]:
     import jwt
     from datetime import timedelta
 
-    now = BchDatetime()
+    now = timezone.now()
     token_data = {
         'at_n': authentication_object.class_name(),
         'at_id': authentication_object.id,
         'exp': (now + timedelta(
-            seconds=authentication_object.user_user_group.user_group.token_valid_seconds)).to_unix_timestamp(),
-        'crt': now.to_unix_timestamp(),
-        'lgn':
-            BchDatetime(authentication_object.last_login).to_unix_timestamp()
-            if authentication_object.last_login
-            else now.to_unix_timestamp()
+            seconds=authentication_object.user_user_group.user_group.token_valid_seconds)).timestamp(),
+        'crt': now.timestamp(),
+        'lgn': authentication_object.last_login.timestamp() if authentication_object.last_login else now.timestamp()
     }
     return jwt.encode(token_data,
                       get_avishan_config().JWT_KEY,
@@ -293,8 +290,8 @@ def find_and_check_user():
         raise AuthException(AuthException.GROUP_ACCOUNT_NOT_ACTIVE)
     if not user_user_group.base_user.is_active:
         raise AuthException(AuthException.ACCOUNT_NOT_ACTIVE)
-    if BchDatetime(authentication_type_object.last_login).to_unix_timestamp() != current_request['decoded_token'][
-        'lgn'] or authentication_type_object.last_logout:
+    if authentication_type_object.last_login.timestamp() != current_request['decoded_token']['lgn'] \
+            or authentication_type_object.last_logout:
         raise AuthException(AuthException.DEACTIVATED_TOKEN)
 
     authentication_type_object.populate_current_request()

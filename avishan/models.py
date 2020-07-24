@@ -3,9 +3,9 @@ import re
 from inspect import Parameter
 from typing import List, Type, Union, Tuple, Dict
 
-import requests
 import stringcase
 from django.core.files.uploadedfile import InMemoryUploadedFile
+from django.utils import timezone
 
 from avishan import current_request
 from avishan.configure import get_avishan_config, AvishanConfigFather
@@ -17,7 +17,6 @@ from avishan.descriptor import DirectCallable
 import datetime
 from typing import Optional
 
-from avishan.misc.bch_datetime import BchDatetime
 from django.db import models
 
 # todo related name on abstracts
@@ -41,7 +40,7 @@ class AvishanModel(
     """
     Models default settings
     """
-    private_fields: List[Union[models.Field, str]] = []
+    to_dict_private_fields: List[Union[models.Field, str]] = []
     export_ignore: bool = False  # todo check
     to_dict_added_fields: List[Tuple[str, Type[type]]] = []
 
@@ -99,13 +98,20 @@ class AvishanModel(
         :return: list of document visible fields
         :rtype: List[str]
         """
-        return [field.name for field in list(cls._meta.fields + cls._meta.many_to_many)]
+        total = list(cls._meta.fields + cls._meta.many_to_many)
+        privates = []
+        for item in cls.to_dict_private_fields:
+            if not isinstance(item, str):
+                privates.append(item.name)
+            else:
+                privates.append(item)
+
+        return [field.name for field in total if field.name not in privates]
 
     @classmethod
     def get(cls, avishan_raise_400: bool = False,
             **kwargs):
         from avishan.exceptions import ErrorMessageException
-        # todo 0.2.1 compact, private, added properties
 
         try:
             return cls.objects.get(**kwargs)
@@ -156,7 +162,7 @@ class AvishanModel(
     @classmethod
     def _all_documentation_raw(cls):
         return """Get %s
-
+        
         :response List[%s] 200: Success
         :return List[%s]: Items, usually ordered by id, acceding
         """
@@ -290,38 +296,54 @@ class AvishanModel(
         Convert object to dict
         :return:
         """
+        from khayyam import JalaliDatetime, JalaliDate
 
-        # todo 0.2.1: compact
         dicted = {}
 
         for field in self.get_full_fields():
-            if (field not in self.private_fields and field.name not in self.private_fields) and \
+            if (field not in self.to_dict_private_fields and field.name not in self.to_dict_private_fields) and \
                     (field not in exclude_list and field.name not in exclude_list):
                 value = self.get_data_from_field(field)
                 if value is None:
                     dicted[field.name] = None
                 elif isinstance(field, models.DateField):
-                    try:
+                    if get_avishan_config().USE_DATETIME_DICT:
+                        if value is None:
+                            dicted[field.name] = {}
                         if get_avishan_config().USE_JALALI_DATETIME:
-                            dicted[field.name] = BchDatetime(value).to_dict(full=True)
-                        else:
-                            if value is None:
-                                dicted[field.name] = {}
+                            if isinstance(field, models.DateTimeField):
+                                value = JalaliDatetime(value)
                             else:
-                                dicted[field.name] = {
-                                    'year': value.year,
-                                    'month': value.month,
-                                    'day': value.day
-                                }
-                                if isinstance(field, models.DateTimeField):
-                                    dicted[field.name] = {**{
-                                        'hour': value.hour,
-                                        'minute': value.minute,
-                                        'second': value.second,
-                                        'microsecond': value.microsecond
-                                    }, **dicted[field.name]}
-                    except:
-                        dicted[field.name] = {}
+                                value = JalaliDate(value)
+
+                        if value is not None:
+                            dicted[field.name] = {
+                                'year': value.year,
+                                'month': value.month,
+                                'day': value.day
+                            }
+                            if isinstance(field, models.DateTimeField):
+                                dicted[field.name]['hour'] = value.hour
+                                dicted[field.name]['minute'] = value.minute
+                                dicted[field.name]['second'] = value.second
+                                dicted[field.name]['microsecond'] = value.microsecond
+                    else:
+                        if value is None:
+                            dicted[field.name] = None
+                        elif get_avishan_config().USE_JALALI_DATETIME:
+                            if isinstance(field, models.DateTimeField):
+                                format_string = get_avishan_config().DATETIME_STRING_FORMAT
+                                dicted[field.name] = JalaliDatetime(value)
+                            else:
+                                format_string = get_avishan_config().DATE_STRING_FORMAT
+                                dicted[field.name] = JalaliDate(value)
+                            dicted[field.name] = dicted[field.name].strftime(format_string)
+                        else:
+                            if isinstance(field, models.DateTimeField):
+                                dicted[field.name] = value.strftime(get_avishan_config().DATETIME_STRING_FORMAT)
+                            else:
+                                dicted[field.name] = value.strftime(get_avishan_config().DATE_STRING_FORMAT)
+
                 elif isinstance(field, (models.OneToOneField, models.ForeignKey)):
                     dicted[field.name] = value.to_dict()
                 elif isinstance(field, models.ManyToManyField):
@@ -454,6 +476,8 @@ class AvishanModel(
         :param field: target field
         :return: after cast data
         """
+        from khayyam import JalaliDatetime
+
         if data is None:
             return None
         if isinstance(field, (models.CharField, models.TextField)):
@@ -463,10 +487,7 @@ class AvishanModel(
         elif isinstance(field, models.FloatField):
             cast_class = float
         elif isinstance(field, models.TimeField):
-            if not isinstance(data, datetime.time):
-                cast_class = datetime.time
-            else:
-                cast_class = None
+            raise NotImplementedError('AvishanModel.cast_field_data for models.TimeField')
         elif isinstance(field, models.DateTimeField):
             if not isinstance(data, datetime.datetime):
                 cast_class = datetime.datetime
@@ -492,23 +513,34 @@ class AvishanModel(
             if not isinstance(data, dict):
                 raise ValueError('ForeignKey or ManyToMany relation should contain dict with id')
             output = cast_class.objects.get(id=int(data['id']))
-
         elif cast_class is datetime.datetime:
             if isinstance(data, dict):
-                output = BchDatetime(data).to_datetime()
+                if get_avishan_config().USE_JALALI_DATETIME:
+                    output = JalaliDatetime(**data).todatetime()
+                else:
+                    output = datetime.datetime(**data)
             elif isinstance(data, str):
-                output = datetime.datetime.strptime(data, '%Y-%m-%dT%H:%M:%S.%f')
+                if get_avishan_config().USE_JALALI_DATETIME:
+                    output = JalaliDatetime.strptime(data, get_avishan_config().DATETIME_STRING_FORMAT).todatetime()
+                else:
+                    output = datetime.datetime.strptime(data, get_avishan_config().DATETIME_STRING_FORMAT)
             else:
                 raise ValueError('Cannot parse datetime, supported types are dict (containing year, month, .etc) or str'
-                                 ' (with format "%Y-%m-%dT%H:%M:%S.%f")')
+                                 f' (with format "{get_avishan_config().DATETIME_STRING_FORMAT}")')
         elif cast_class is datetime.date:
             if isinstance(data, dict):
-                output = BchDatetime(data).to_date()
+                if get_avishan_config().USE_JALALI_DATETIME:
+                    output = JalaliDatetime(**data).todate()
+                else:
+                    output = datetime.datetime(**data).date()
             elif isinstance(data, str):
-                output = datetime.datetime.strptime(data, '%Y-%m-%d').date()
+                if get_avishan_config().USE_JALALI_DATETIME:
+                    output = JalaliDatetime.strptime(data, get_avishan_config().DATE_STRING_FORMAT).todatetime().date()
+                else:
+                    output = datetime.datetime.strptime(data, get_avishan_config().DATE_STRING_FORMAT).date()
             else:
                 raise ValueError('Cannot parse date, supported types are dict (containing year, month, .etc) or str'
-                                 ' (with format "%Y-%m-%d")')
+                                 f' (with format "{get_avishan_config().DATE_STRING_FORMAT}")')
         else:
             output = cast_class(data)
 
@@ -521,7 +553,7 @@ class AvishanModel(
         return cls.get(**input_dict)
 
     # todo 0.2.2: check None amount for choice added fields
-    def get_data_from_field(self, field: models.Field, string_format_dates: bool = False):
+    def get_data_from_field(self, field: models.Field):
         from avishan.exceptions import ErrorMessageException
         if field.choices is not None:
             for k, v in field.choices:
@@ -531,19 +563,6 @@ class AvishanModel(
                 EN=f'Incorrect Data entered for field {field.name} in model {self.class_name()}',
                 FA=f'اطلاعات نامعتبر برای فیلد {field.name} مدل {self.class_name()}'
             ))
-        if string_format_dates:
-            if string_format_dates:
-                if isinstance(field, models.DateTimeField):
-                    if get_avishan_config().USE_JALALI_DATETIME:
-                        return BchDatetime(self.__getattribute__(field.name)).to_str('%Y/%m/%d %H:%M:%S')
-                    return self.__getattribute__(field.name).strftime("%Y/%m/%d %H:%M:%S")
-                if isinstance(field, models.DateField):
-                    if get_avishan_config().USE_JALALI_DATETIME:
-                        return BchDatetime(self.__getattribute__(field.name)).to_str('%Y/%m/%d')
-                    return self.__getattribute__(field.name).strftime("%Y/%m/%d")
-                if isinstance(field, models.TimeField):
-                    return self.__getattribute__(field.name).strftime("%H:%M:%S")
-            return self.__getattribute__(field.name)
 
         if isinstance(field, models.ManyToManyField):
             return self.__getattribute__(field.name).all()
@@ -569,9 +588,10 @@ class BaseUser(AvishanModel):
     """
 
     """Only active users can use system. This field checks on every request"""
-    is_active = models.BooleanField(default=True, blank=True)
-    language = models.CharField(max_length=255, default=AvishanConfigFather.LANGUAGES.EN)
-    date_created = models.DateTimeField(auto_now_add=True)
+    is_active = models.BooleanField(default=True, blank=True, help_text='Checks if user can use system')
+    language = models.CharField(max_length=255, default=AvishanConfigFather.LANGUAGES.EN,
+                                help_text='Language for user, using 2 words ISO standard: EN, FA, AR')
+    date_created = models.DateTimeField(auto_now_add=True, help_text='Date user joined system')
 
     private_fields = [date_created, 'id']
 
@@ -593,7 +613,6 @@ class BaseUser(AvishanModel):
         if hasattr(self, 'user'):
             return str(self.user)
         return super().__str__()
-    # todo ye rahi bezarim in betoone username mese adam bargardoone
 
 
 class UserGroup(AvishanModel):
@@ -603,8 +622,9 @@ class UserGroup(AvishanModel):
     """
 
     """Unique titles for groups. examples: Customer, User, Driver, Admin, Supervisor"""
-    title = models.CharField(max_length=255, unique=True)
-    token_valid_seconds = models.BigIntegerField(default=30 * 60, blank=True)
+    title = models.CharField(max_length=255, unique=True,
+                             help_text='Project specific groups, like "driver", "customer"')
+    token_valid_seconds = models.BigIntegerField(default=30 * 60, blank=True, help_text='Token valid seconds')
 
     private_fields = [
         token_valid_seconds,
@@ -648,14 +668,16 @@ class UserUserGroup(AvishanModel):
     lack of reliability on django Meta unique_together. 
     """
     # todo 0.2.1: raise appropriate exception for exceeding unique rule here.
-    base_user = models.ForeignKey(BaseUser, on_delete=models.CASCADE, related_name='user_user_groups')
-    user_group = models.ForeignKey(UserGroup, on_delete=models.CASCADE, related_name='user_user_groups')
-    date_created = models.DateTimeField(auto_now_add=True)
+    base_user = models.ForeignKey(BaseUser, on_delete=models.CASCADE, related_name='user_user_groups',
+                                  help_text='BaseUser object side')
+    user_group = models.ForeignKey(UserGroup, on_delete=models.CASCADE, related_name='user_user_groups',
+                                   help_text='UserGroup object side')
+    date_created = models.DateTimeField(auto_now_add=True, help_text='Date BaseUser added to this UserGroup')
     """
     Each token have address to models.authentication.UserUserGroup object. If this fields become false, user cannot use 
     system with this role. "is_active" field on models.authentication.BaseUser will not override on this field. 
     """
-    is_active = models.BooleanField(default=True, blank=True)
+    is_active = models.BooleanField(default=True, blank=True, help_text='Is BaseUser active with this UserGroup')
 
     django_admin_list_display = [base_user, user_group, date_created]
     django_admin_list_filter = [user_group]
@@ -705,14 +727,18 @@ class Identifier(AvishanModel):
     class Meta:
         abstract = True
 
-    key = models.CharField(max_length=255, unique=True)
-    date_verified = models.DateTimeField(default=None, null=True, blank=True)
+    key = models.CharField(max_length=255, unique=True, help_text='Unique value of target data')
+    date_verified = models.DateTimeField(default=None, null=True, blank=True, help_text='Last date identifier accepted')
 
     django_admin_list_display = [key, 'date_verified']
     django_admin_search_fields = [key]
 
     @classmethod
     def create(cls, key: str):
+        """
+
+        :param str key: Target key
+        """
         return super().create(key=cls.validate_signature(key))
 
     @classmethod
@@ -850,11 +876,11 @@ class IdentifierVerification(AvishanModel):
     class Meta:
         abstract = True
 
-    verification_code = models.CharField(max_length=255)
-    verification_date = models.DateTimeField(auto_now_add=True)
-    tried_codes = models.TextField(blank=True, default="")
+    verification_code = models.CharField(max_length=255, help_text='Code sent to user')
+    verification_date = models.DateTimeField(auto_now_add=True, help_text='Date code sent to user')
+    tried_codes = models.TextField(blank=True, default="", help_text='Incorrect codes user tried')
 
-    private_fields = [verification_code, verification_date, tried_codes]
+    to_dict_private_fields = [verification_code, verification_date, tried_codes]
     django_admin_list_display = ['identifier', 'verification_code', 'verification_date']
     django_admin_raw_id_fields = ['identifier']
     django_admin_search_fields = ['identifier']
@@ -872,7 +898,7 @@ class IdentifierVerification(AvishanModel):
         if hasattr(target, 'verification'):
             previous = target.verification
 
-            if (datetime.datetime.now() - previous.verification_date).total_seconds() < gap_seconds:
+            if (timezone.now() - previous.verification_date).total_seconds() < gap_seconds:
                 raise ErrorMessageException(AvishanTranslatable(
                     EN='Verification Code sent recently, Please try again later',
                     FA='برای ارسال مجدد کد، کمی صبر کنید'
@@ -901,7 +927,7 @@ class IdentifierVerification(AvishanModel):
             valid_seconds = get_avishan_config().EMAIL_VERIFICATION_VALID_SECONDS
             tries_count = get_avishan_config().EMAIL_VERIFICATION_TRIES_COUNT
 
-        if (datetime.datetime.now() - item.verification_date).total_seconds() > valid_seconds:
+        if (timezone.now() - item.verification_date).total_seconds() > valid_seconds:
             item.remove()
             raise ErrorMessageException(AvishanTranslatable(
                 EN='Code Expired, Request a new one',
@@ -909,7 +935,7 @@ class IdentifierVerification(AvishanModel):
             ))
         if item.verification_code == code:
             item.remove()
-            target.date_verified = datetime.datetime.now()
+            target.date_verified = timezone.now()
             target.save()
             return True
         if len(item.tried_codes.splitlines()) > tries_count - 1:
@@ -937,18 +963,20 @@ class IdentifierVerification(AvishanModel):
 
 
 class EmailVerification(IdentifierVerification):
-    identifier = models.OneToOneField(Email, on_delete=models.CASCADE, related_name='verification')
+    identifier = models.OneToOneField(Email, on_delete=models.CASCADE, related_name='verification',
+                                      help_text='Related Email object')
 
 
 class PhoneVerification(IdentifierVerification):
-    identifier = models.OneToOneField(Phone, on_delete=models.CASCADE, related_name='verification')
+    identifier = models.OneToOneField(Phone, on_delete=models.CASCADE, related_name='verification',
+                                      help_text='Related Phone object')
 
 
 class AuthenticationType(AvishanModel):
-    user_user_group = models.OneToOneField(UserUserGroup, on_delete=models.CASCADE)
-    last_used = models.DateTimeField(default=None, blank=True, null=True)
-    last_login = models.DateTimeField(default=None, blank=True, null=True)
-    last_logout = models.DateTimeField(default=None, blank=True, null=True)
+    user_user_group = models.OneToOneField(UserUserGroup, on_delete=models.CASCADE, help_text='Target UserUserGroup')
+    last_used = models.DateTimeField(default=None, blank=True, null=True, help_text='Last time user sent request')
+    last_login = models.DateTimeField(default=None, blank=True, null=True, help_text='Last time user logged in')
+    last_logout = models.DateTimeField(default=None, blank=True, null=True, help_text='Last time user logged out')
 
     export_ignore = True
 
@@ -1001,17 +1029,17 @@ class AuthenticationType(AvishanModel):
         return cls.create(**creation_dict)
 
     @classmethod
-    def login(cls, key: str, user_group: UserGroup = None, **kwargs) -> 'AuthenticationType':
+    def login(cls, key: str, user_group_title: str = None, **kwargs) -> 'AuthenticationType':
         from avishan.exceptions import AuthException
 
         try:
-            if not user_group:
+            if not user_group_title:
                 found_object: KeyValueAuthentication = cls.objects.get(
                     key=cls.key_field().related_model.get(key=key))
             else:
                 found_object: KeyValueAuthentication = cls.objects.get(**{
                     'key': cls.key_field().related_model.get(key=key),
-                    'user_user_group__user_group': user_group
+                    'user_user_group__user_group__title': user_group_title
                 })
 
         except cls.DoesNotExist:
@@ -1037,14 +1065,14 @@ class AuthenticationType(AvishanModel):
         pass
 
     def _submit_login(self):
-        self.last_login = datetime.datetime.now()
+        self.last_login = timezone.now()
         self.last_used = None
         self.last_logout = None
         self.save()
         self.populate_current_request()
 
     def _submit_logout(self):
-        self.last_logout = datetime.datetime.now()
+        self.last_logout = timezone.now()
         self.save()
         current_request['authentication_object'] = None
         current_request['add_token'] = False
@@ -1064,7 +1092,9 @@ class AuthenticationType(AvishanModel):
 
 
 class KeyValueAuthentication(AuthenticationType):
-    hashed_password = models.CharField(max_length=255, blank=True, null=True, default=None)
+    hashed_password = models.CharField(max_length=255, blank=True, null=True, default=None, help_text='Hashed password')
+
+    to_dict_private_fields = [hashed_password]
 
     class Meta:
         abstract = True
@@ -1085,8 +1115,8 @@ class KeyValueAuthentication(AuthenticationType):
 
     # noinspection PyMethodOverriding
     @classmethod
-    def login(cls, key: str, password: str, user_group: UserGroup = None, **kwargs) -> 'KeyValueAuthentication':
-        return super().login(key=key, user_group=user_group, password=password, **kwargs)
+    def login(cls, key: str, password: str, user_group_title: str = None, **kwargs) -> 'KeyValueAuthentication':
+        return super().login(key=key, user_group_title=user_group_title, password=password, **kwargs)
 
     def add_password(self, password: str) -> bool:
         if self.hashed_password is None:
@@ -1129,17 +1159,21 @@ class KeyValueAuthentication(AuthenticationType):
 
 
 class EmailPasswordAuthenticate(KeyValueAuthentication):
-    key = models.ForeignKey(Email, on_delete=models.CASCADE, related_name='password_authenticates')
+    key = models.ForeignKey(Email, on_delete=models.CASCADE, related_name='password_authenticates',
+                            help_text='Related Email object')
 
 
 class PhonePasswordAuthenticate(KeyValueAuthentication):
-    key = models.ForeignKey(Phone, on_delete=models.CASCADE, related_name='password_authenticates')
+    key = models.ForeignKey(Phone, on_delete=models.CASCADE, related_name='password_authenticates',
+                            help_text='Related Phone object')
 
 
 class OtpAuthentication(AuthenticationType):
-    code = models.CharField(max_length=255, blank=True, null=True)
-    date_sent = models.DateTimeField(null=True, blank=True, default=None)
-    tried_codes = models.TextField(blank=True, default="")
+    code = models.CharField(max_length=255, blank=True, null=True, help_text='Code sent to user')
+    date_sent = models.DateTimeField(null=True, blank=True, default=None, help_text='Date code sent to user')
+    tried_codes = models.TextField(blank=True, default="", help_text='Incorrect user tried codes')
+
+    to_dict_private_fields = [code, tried_codes, date_sent]
 
     class Meta:
         abstract = True
@@ -1154,8 +1188,8 @@ class OtpAuthentication(AuthenticationType):
         return cls._register(**data)
 
     @classmethod
-    def login(cls, key: str, user_group: UserGroup = None, **kwargs) -> 'OtpAuthentication':
-        return super().login(key=key, user_group=user_group, verify=False)
+    def login(cls, key: str, user_group_title: str = None, **kwargs) -> 'OtpAuthentication':
+        return super().login(key=key, user_group_title=user_group_title, verify=False)
 
     @classmethod
     def _login_post_check(cls, kwargs):
@@ -1169,7 +1203,7 @@ class OtpAuthentication(AuthenticationType):
 
         if not kwargs.get('verify', False):
             kwargs['submit_login'] = False
-            if found_object.date_sent and (datetime.datetime.now() - found_object.date_sent).total_seconds() < gap:
+            if found_object.date_sent and (timezone.now() - found_object.date_sent).total_seconds() < gap:
                 raise ErrorMessageException(AvishanTranslatable(
                     EN='Verification code sent recently, Please try again later',
                     FA='برای ارسال مجدد کد، کمی صبر کنید'
@@ -1191,7 +1225,7 @@ class OtpAuthentication(AuthenticationType):
             found_object.tried_codes = ""
             found_object.save()
             if found_object.key.date_verified is None:
-                found_object.key.date_verified = datetime.datetime.now()
+                found_object.key.date_verified = timezone.now()
                 found_object.key.save()
 
     @classmethod
@@ -1211,7 +1245,7 @@ class OtpAuthentication(AuthenticationType):
 
     def send_otp_code(self):
         self.code = self.create_otp_code()
-        self.date_sent = datetime.datetime.now()
+        self.date_sent = timezone.now()
         self.tried_codes = ""
         self.save()
 
@@ -1228,7 +1262,7 @@ class OtpAuthentication(AuthenticationType):
                 EN='Code not found for this account',
                 FA='برای این حساب کدی پیدا نشد'
             ))
-        if (datetime.datetime.now() - self.date_sent).total_seconds() > valid_seconds:
+        if (timezone.now() - self.date_sent).total_seconds() > valid_seconds:
             self.code = None
             self.save()
             raise ErrorMessageException(AvishanTranslatable(
@@ -1258,7 +1292,8 @@ class OtpAuthentication(AuthenticationType):
 
 
 class PhoneOtpAuthenticate(OtpAuthentication):
-    key = models.ForeignKey(Phone, on_delete=models.CASCADE, related_name='otp_authenticates')
+    key = models.ForeignKey(Phone, on_delete=models.CASCADE, related_name='otp_authenticates',
+                            help_text='Related Phone object')
 
     def send_otp_code(self):
         from avishan.exceptions import ErrorMessageException
@@ -1276,7 +1311,7 @@ class PhoneOtpAuthenticate(OtpAuthentication):
 
 
 class VisitorKey(AuthenticationType):
-    key = models.CharField(max_length=255, unique=True)
+    key = models.CharField(max_length=255, unique=True, help_text='Random generated key')
 
     django_admin_list_display = key,
     django_admin_search_fields = key,
@@ -1313,14 +1348,14 @@ class VisitorKey(AuthenticationType):
         return cls.objects.create(**data)
 
     @classmethod
-    def login(cls, key: str, user_group: UserGroup) -> 'VisitorKey':
+    def login(cls, key: str, user_group_title: str = None) -> 'VisitorKey':
         from avishan.exceptions import AuthException
 
         try:
             found_object = cls.objects.get(
                 **{
                     'key': key,
-                    "user_user_group__user_group": user_group
+                    "user_user_group__user_group__title": user_group_title
                 }
             )
         except cls.DoesNotExist:
@@ -1334,9 +1369,9 @@ class VisitorKey(AuthenticationType):
 
 
 class File(AvishanModel):
-    file = models.FileField(blank=True, null=True)
-    base_user = models.ForeignKey(BaseUser, on_delete=models.SET_NULL, null=True, blank=True)
-    date_created = models.DateTimeField(auto_now_add=True)
+    file = models.FileField(blank=True, null=True, help_text='File url')
+    base_user = models.ForeignKey(BaseUser, on_delete=models.SET_NULL, null=True, blank=True, help_text='Uploaded by')
+    date_created = models.DateTimeField(auto_now_add=True, help_text='Date uploaded')
 
     export_ignore = True
 
@@ -1351,9 +1386,9 @@ class File(AvishanModel):
 
 
 class Image(AvishanModel):
-    file = models.ImageField(blank=True, null=True)
-    base_user = models.ForeignKey(BaseUser, on_delete=models.SET_NULL, null=True, blank=True)
-    date_created = models.DateTimeField(auto_now_add=True)
+    file = models.ImageField(blank=True, null=True, help_text='Image url')
+    base_user = models.ForeignKey(BaseUser, on_delete=models.SET_NULL, null=True, blank=True, help_text='Uploaded by')
+    date_created = models.DateTimeField(auto_now_add=True, help_text='Date uploaded')
 
     export_ignore = True
 
@@ -1368,20 +1403,23 @@ class Image(AvishanModel):
 
     @classmethod
     def direct_callable_methods(cls) -> List[DirectCallable]:
+        total = []
+        for item in super().direct_callable_methods():
+            total.append(item)
+            if item.name == 'create':
+                item.hide_in_redoc = True
 
-        return super().direct_callable_methods() + [
+        return total + [
             DirectCallable(
                 model=cls,
                 target_name='image_from_multipart_form_data_request',
                 response_json_key='image',
                 method=DirectCallable.METHOD.POST,
+                dismiss_request_json_key=True
             )]
 
     @staticmethod
     def image_from_url(url: str) -> 'Image':
-        """
-        :param url: like "core/init_files/blue-car.png"
-        """
         from django.core.files import File
 
         name = url.split('/')[-1]
@@ -1421,8 +1459,10 @@ class Image(AvishanModel):
     def image_from_multipart_form_data_request(cls, name: str = 'file') -> 'Image':
         """Upload Image
 
-        :param name:
-        :return:
+        Upload image to server using "multipart/form-data".
+
+        :param str? name: key in multipart form data
+        :response Image 200: Saved
         """
         return cls.image_from_in_memory_upload(file=current_request['request'].FILES.get(name))
 
@@ -1554,8 +1594,7 @@ class Activity(AvishanModel):
         :param str object_class: name of target class, defaults to None
         :param int object_id: target object, defaults to None
         :param str data: notes about activity, defaults to None
-        :return: created activity
-        :rtype: Activity
+        :return Activity: created activity
         """
         request_track = current_request['request_track_object']
         user_user_group = current_request['user_user_group']
@@ -1576,3 +1615,13 @@ class Activity(AvishanModel):
 
     def __str__(self):
         return self.title
+
+
+class Country(AvishanModel):
+    name = models.CharField(max_length=255)
+    alpha_2_code = models.CharField(max_length=255)
+    alpha_3_code = models.CharField(max_length=255)
+    region = models.CharField(max_length=255)
+    native_name = models.CharField(max_length=255, blank=True, null=True)
+    numeric_code = models.CharField(max_length=255, unique=True)
+    flag_url = models.CharField(max_length=255)

@@ -57,7 +57,6 @@ class DjangoAvishanModel(DjangoModel):
         super().__init__(target=target)
 
         self.prepare_docs()
-
         self.attributes = self.extract_attributes()
         self.methods = self.extract_methods()
 
@@ -101,6 +100,8 @@ class Function:
         self.long_description: Optional[str] = None
         self.args: List[Attribute] = self.load_args_from_signature(self.target)
         self.returns: Optional[Attribute] = None
+        if self.name == 'login':
+            a = 1
         self._doc = docstring_parser.parse(target.__doc__)
         if self.__class__ == Function:
             self.load_from_doc()
@@ -209,6 +210,7 @@ class DirectCallable(ApiMethod):
                  authenticate: bool = True,
                  dismiss_request_json_key: bool = False,
                  dismiss_response_json_key: bool = False,
+                 hide_in_redoc: bool = False
                  ):
         from avishan.configure import get_avishan_config
         from avishan.models import AvishanModel
@@ -238,6 +240,7 @@ class DirectCallable(ApiMethod):
             True
         self.dismiss_response_json_key = dismiss_response_json_key
         self.authenticate = authenticate
+        self.hide_in_redoc = hide_in_redoc
 
 
 class Attribute:
@@ -306,8 +309,11 @@ class Attribute:
 
     @classmethod
     def create_type_from_doc_param(cls, type_string: str) -> 'Attribute.TYPE':
-        if type_string.find('[') > 0:
-            return Attribute.type_finder(entry=type_string[:type_string.find('[')])
+        try:
+            if type_string.find('[') > 0:
+                return Attribute.type_finder(entry=type_string[:type_string.find('[')])
+        except AttributeError as e:
+            a = 1
         return Attribute.type_finder(entry=type_string)
 
     @classmethod
@@ -325,6 +331,12 @@ class Attribute:
     @staticmethod
     def type_finder(entry) -> 'Attribute.TYPE':
         from avishan.models import AvishanModel
+        if entry == 'datetime.datetime':
+            entry = datetime.datetime
+        elif entry == 'datetime.date':
+            entry = datetime.date
+        elif entry == 'datetime.time':
+            entry = datetime.time
 
         try:
             from typing import _Union
@@ -394,7 +406,8 @@ class DjangoFieldAttribute(Attribute):
     def __init__(self, target: models.Field):
         super().__init__(
             name=target.name,
-            type=self.define_representation_type(target)
+            type=self.define_representation_type(target),
+            description=target.help_text
         )
         if self.type is Attribute.TYPE.OBJECT:
             if isinstance(target, (models.OneToOneField, models.ForeignKey)):

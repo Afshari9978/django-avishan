@@ -6,6 +6,7 @@ from typing import Type
 from django.contrib import messages
 from django.core.handlers.wsgi import WSGIRequest
 from django.http import JsonResponse
+from django.utils import timezone
 
 from avishan.configure import get_avishan_config
 from avishan.exceptions import AvishanException, save_traceback
@@ -22,7 +23,7 @@ class Wrapper:
         from avishan.utils import discard_monitor, find_token, decode_token, add_token_to_response, find_and_check_user
         from avishan import current_request
 
-        start_time = datetime.datetime.now()
+        start_time = timezone.now()
 
         self.initialize_request_storage(current_request)
         current_request['request'] = request
@@ -154,7 +155,7 @@ class Wrapper:
                     current_request['request_track_object']:
                 current_request['request_track_object'].delete()
                 return
-        current_request['end_time'] = datetime.datetime.now()
+        current_request['end_time'] = timezone.now()
 
         authentication_type_class_title = "NOT_AVAILABLE"
         authentication_type_object_id = 0
@@ -162,13 +163,14 @@ class Wrapper:
             authentication_type_class_title = current_request['authentication_object'].__class__.__name__
             authentication_type_object_id = current_request['authentication_object'].id
 
-        try:
-            request_data = json.dumps(current_request['request'].data, indent=2)
-            request_data_size = sys.getsizeof(json.dumps(current_request['request'].data))
-        except:
-            print("*DEBUG* request parse error")
-            request_data = "NOT_AVAILABLE"
-            request_data_size = -1
+        request_data = "NOT_AVAILABLE"
+        request_data_size = -1
+        if current_request['request'].method in ['POST', 'PUT']:
+            try:
+                request_data = json.dumps(current_request['request'].data, indent=2)
+                request_data_size = sys.getsizeof(json.dumps(current_request['request'].data))
+            except:
+                print("*DEBUG* request parse error")
 
         request_headers = ""
         for key, value in current_request['request'].META.items():

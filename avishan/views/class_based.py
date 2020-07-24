@@ -7,6 +7,7 @@ from django.core.handlers.wsgi import WSGIRequest
 from django.db import models
 from django.db.models import QuerySet
 from django.http import JsonResponse
+from django.utils import timezone
 from django.views import View
 
 from avishan import current_request
@@ -76,7 +77,7 @@ class AvishanView(View):
         self.current_request = current_request
         self.current_request['view_name'] = self.__class__.__name__
         self.current_request['request_track_exec'] = [
-            {'title': 'begin', 'now': datetime.datetime.now()}
+            {'title': 'begin', 'now': timezone.now()}
         ]
         self.current_request['is_api'] = self.is_api
         if self.track_it and not self.current_request['is_tracked']:
@@ -102,9 +103,9 @@ class AvishanView(View):
         try:
             if self.authenticate and not self.is_authenticated():
                 raise AuthException(AuthException.TOKEN_NOT_FOUND)
-            self.current_request['view_start_time'] = datetime.datetime.now()
+            self.current_request['view_start_time'] = timezone.now()
             result = super().dispatch(request, *args, **kwargs)
-            self.current_request['view_end_time'] = datetime.datetime.now()
+            self.current_request['view_end_time'] = timezone.now()
 
         except AvishanException as e:
             raise e

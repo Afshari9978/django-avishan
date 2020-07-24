@@ -2,6 +2,7 @@ import datetime
 import json
 
 from django.http import JsonResponse
+from django.utils import timezone
 
 from avishan.exceptions import AvishanException, AuthException
 from . import current_request
@@ -20,7 +21,7 @@ class AvishanViewDecorator:
         def wrapper(*args, **kwargs):
             current_request['view_name'] = view_function.__name__
             current_request['request_track_exec'] = [
-                {'title': 'begin', 'now': datetime.datetime.now()}
+                {'title': 'begin', 'now': timezone.now()}
             ]
             current_request['is_api'] = self.is_api
             if self.track_it and not current_request['is_tracked']:
@@ -45,9 +46,9 @@ class AvishanViewDecorator:
 
                 self.after_request()
 
-                current_request['view_start_time'] = datetime.datetime.now()
+                current_request['view_start_time'] = timezone.now()
                 result = view_function(*args, **kwargs)
-                current_request['view_end_time'] = datetime.datetime.now()
+                current_request['view_end_time'] = timezone.now()
 
                 self.before_response()
 

@@ -1,6 +1,7 @@
 from typing import Tuple, List, Optional, Union
 
 from django.db.models.base import ModelBase
+from django.utils import timezone
 
 from avishan.configure import get_avishan_config
 from avishan.descriptor import Attribute, ApiMethod, Model, DjangoModel, DirectCallable
@@ -60,7 +61,9 @@ class OpenApi:
             if model.name in get_avishan_config().get_openapi_ignored_path_models():
                 continue
             for api_method in model.methods:
-                api_method: ApiMethod
+                api_method: DirectCallable
+                if api_method.hide_in_redoc:
+                    continue
                 if api_method.url not in data.keys():
                     data[api_method.url] = Path(url=api_method.url)
                 setattr(data[api_method.url], api_method.method.name.lower(), Operation(
@@ -254,14 +257,17 @@ class Schema:
         if self.description:
             data['description'] = self.description
         if self.items:
-            try:
-                data['items'] = self.items.export()
-            except:
-                a = 1
+            data['items'] = self.items.export()
+
         if len(self.properties) > 0:
             data['properties'] = {}
             for item in self.properties:
                 data['properties'][item.name] = item.export()
+
+        if self.type == 'string' and self.format == 'date-time':
+            data['example'] = timezone.now().strftime(get_avishan_config().DATETIME_STRING_FORMAT)
+        if self.type == 'string' and self.format == 'date':
+            data['example'] = timezone.now().strftime(get_avishan_config().DATE_STRING_FORMAT)
 
         return data
 
@@ -343,13 +349,14 @@ class Operation:
         if len(api_method.args) == 0:
             return None
         content = Content(schema=Schema.create_object_from_args(api_method.args, request_body_related=True))
-        content.schema = Schema(
-            type='object',
-            properties=[Property(
-                name=api_method.request_json_key,
-                schema=content.schema
-            )]
-        )
+        if not api_method.dismiss_request_json_key:
+            content.schema = Schema(
+                type='object',
+                properties=[Property(
+                    name=api_method.request_json_key,
+                    schema=content.schema
+                )]
+            )
         return RequestBody(content=content)
 
     @staticmethod
@@ -357,13 +364,14 @@ class Operation:
         responses = []
         for item in api_method.responses:
             content = Content.create_from_attribute(item.returns)
-            content.schema = Schema(
-                type='object',
-                properties=[Property(
-                    name=api_method.response_json_key,
-                    schema=content.schema
-                )]
-            )
+            if not api_method.dismiss_response_json_key:
+                content.schema = Schema(
+                    type='object',
+                    properties=[Property(
+                        name=api_method.response_json_key,
+                        schema=content.schema
+                    )]
+                )
             responses.append(Response(
                 status_code=item.status_code,
                 description=item.description,

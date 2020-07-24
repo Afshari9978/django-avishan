@@ -70,6 +70,18 @@ class AvishanConfigFather:
     AVISHAN_URLS_START = 'api/av1'
     JWT_KEY: str = None
     USE_JALALI_DATETIME: bool = False
+
+    """
+    Using datetime dict or string formatted dicts
+    """
+    USE_DATETIME_DICT: bool = True
+
+    """
+    Date & Datetime string formats
+    """
+    DATE_STRING_FORMAT = '%Y-%m-%d'
+    DATETIME_STRING_FORMAT = '%Y-%m-%dT%H:%M:%S.%f'
+
     LANGUAGE = LANGUAGES.EN
     NEW_USERS_LANGUAGE = None
     ASYNC_AVAILABLE: bool = False
@@ -205,9 +217,8 @@ class AvishanConfigFather:
 
     @classmethod
     def get_openapi_ignored_path_models(cls) -> List[str]:
-        return ['Activity', 'BaseUser', 'EmailPasswordAuthenticate', 'EmailVerification', 'PhoneOtpAuthenticate',
-                'PhonePasswordAuthenticate', 'PhoneVerification', 'RequestTrackException', 'RequestTrack',
-                'TranslatableChar', 'VisitorKey']
+        return ['Activity', 'BaseUser', 'UserUserGroup', 'RequestTrackException', 'RequestTrack',
+                'TranslatableChar', 'VisitorKey', 'EmailVerification', 'PhoneVerification']
 
 
 def get_avishan_config() -> Union[Type[AvishanConfigFather]]:

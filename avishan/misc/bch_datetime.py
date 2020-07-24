@@ -279,6 +279,7 @@ class BchDatetime(object):
 
     @staticmethod
     def now():
+        raise NotImplementedError('BchDatetime Deprecation')
         return BchDatetime.from_jalali_datetime(JalaliDatetime.now())
 
     def get_interval_timedelta_from(self, sooner):
