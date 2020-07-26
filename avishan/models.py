@@ -1624,4 +1624,50 @@ class Country(AvishanModel):
     region = models.CharField(max_length=255)
     native_name = models.CharField(max_length=255, blank=True, null=True)
     numeric_code = models.CharField(max_length=255, unique=True)
-    flag_url = models.CharField(max_length=255)
+    flag_url = models.CharField(max_length=255, blank=True, null=True)
+
+    # noinspection PyPep8Naming
+    @classmethod
+    def create(cls,
+               numericCode: str,
+               name: str,
+               alpha2Code: str,
+               alpha3Code: str,
+               region: str,
+               nativeName: str = None,
+               flag: str = None,
+               **kwargs
+               ):
+        return super().create(
+            numeric_code=numericCode,
+            name=name,
+            alpha_2_code=alpha2Code,
+            alpha_3_code=alpha3Code,
+            region=region,
+            native_name=nativeName,
+            flag_url=flag
+        )
+
+    # noinspection PyPep8Naming
+    def update(self,
+               name: str,
+               alpha2Code: str,
+               alpha3Code: str,
+               region: str,
+               nativeName: str = None,
+               flag: str = None,
+               **kwargs
+               ):
+        return super().update(
+            name=name,
+            alpha_2_code=alpha2Code,
+            alpha_3_code=alpha3Code,
+            region=region,
+            native_name=nativeName,
+            flag_url=flag
+        )
+
+    @classmethod
+    def class_plural_name(cls) -> str:
+        return 'Countries'
+
