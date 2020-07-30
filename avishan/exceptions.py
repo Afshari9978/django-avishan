@@ -74,13 +74,18 @@ class AuthException(AvishanException):
         FA='توکن غیرفعال شده است، دوباره وارد شوید'
     )
     MULTIPLE_CONNECTED_ACCOUNTS = 13, AvishanTranslatable(
-        EN='Multiple Accounts found with this identifier, Choose user group in url parameter',
-        FA='چند حساب با این شناسه پیدا شد، گروه کاربری را در پارامتر url مشخص کنید'
+        EN='Multiple Accounts found with this identifier.',
+        FA='چند حساب با این شناسه پیدا شد'
     )
 
     METHOD_NOT_DIRECT_CALLABLE = 14, AvishanTranslatable(
         EN='Method is not callable direct to model',
         FA='تابع به طور مستقیم قابل صدا زدن نیست'
+    )
+
+    PASSWORD_NOT_FOUND = 15, AvishanTranslatable(
+        EN='Password not found for user account',
+        FA='رمز برای این کاربری تنظیم نشده است'
     )
 
     def __init__(self, error_kind: tuple = NOT_DEFINED):
