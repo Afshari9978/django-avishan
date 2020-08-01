@@ -113,12 +113,17 @@ class AvishanConfigFather:
     PHONE_VERIFICATION_TRIES_COUNT = 3
     PHONE_VERIFICATION_CODE_LENGTH = 4
     PHONE_VERIFICATION_VALID_SECONDS = 10 * 60
+    PHONE_VERIFICATION_BODY_STRING = 'Your code is {code}'
 
     # Email Verification
     EMAIL_VERIFICATION_GAP_SECONDS = 4 * 60
     EMAIL_VERIFICATION_TRIES_COUNT = 3
     EMAIL_VERIFICATION_CODE_LENGTH = 6
     EMAIL_VERIFICATION_VALID_SECONDS = 30 * 60
+    EMAIL_VERIFICATION_SUBJECT = 'Email Verification'
+    """Only one of these two must be not-null"""
+    EMAIL_VERIFICATION_BODY_STRING = 'Your code is {code}'
+    EMAIL_VERIFICATION_BODY_HTML = '<h1>Email Verification</h1><p>Your code is {code}</p>'
 
     # Email Key Value Authentication
     EMAIL_KEY_VALUE_AUTHENTICATION_VERIFICATION_REQUIRED: bool = True

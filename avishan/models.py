@@ -943,6 +943,8 @@ class KeyValueAuthentication(AuthenticationType):
         if not getattr(get_avishan_config(),
                        self.key_name().upper() + '_KEY_VALUE_AUTHENTICATION_VERIFICATION_REQUIRED'):
             return
+        self.is_verified = False
+        self.save()
 
     def check_verification(self, code: str):
         raise NotImplementedError()
@@ -999,6 +1001,9 @@ class KeyValueAuthentication(AuthenticationType):
         import bcrypt
         return bcrypt.checkpw(password.encode('utf8'), self.hashed_password.encode('utf8'))
 
+    def _send_verification_code(self):
+        raise NotImplementedError()
+
     @classmethod
     def key_name(cls) -> str:
         raise NotImplementedError()
@@ -1006,6 +1011,19 @@ class KeyValueAuthentication(AuthenticationType):
 
 class EmailKeyValueAuthentication(KeyValueAuthentication):
     key = models.ForeignKey(Email, on_delete=models.CASCADE, related_name='key_value_authentications')
+
+    def _send_verification_code(self):
+        message = get_avishan_config().EMAIL_VERIFICATION_BODY_STRING
+        html_message = get_avishan_config().EMAIL_VERIFICATION_BODY_HTML
+        if message:
+            message = message.format(code=self.verification.code)
+        elif html_message:
+            html_message = html_message.format(code=self.verification.code)
+        self.key.send_mail(
+            subject=get_avishan_config().EMAIL_VERIFICATION_SUBJECT,
+            message=message,
+            html_message=html_message
+        )
 
     @classmethod
     def key_name(cls) -> str:
@@ -1024,9 +1042,7 @@ class OtpAuthentication(AuthenticationType):
     class Meta:
         abstract = True
 
-    code = models.CharField(max_length=255, blank=True, null=True)
-    date_sent = models.DateTimeField(blank=True, null=True)
-    tried_codes = models.TextField(blank=True, null=True)  # separate by |
+    verification = models.OneToOneField(AuthenticationVerification, on_delete=models.SET_NULL, null=True, blank=True)
 
 
 class EmailOtpAuthentication(OtpAuthentication):
