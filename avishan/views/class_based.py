@@ -260,7 +260,7 @@ class AvishanModelApiView(AvishanApiView):
         else:
             data = request.data[self.direct_callable.request_json_key]
 
-        # data = self.parse_request_data(**data)
+        data = self.parse_request_data(**data)
         result = self.model_function(**data)
         self.response[self.direct_callable.response_json_key] = self.parse_returned_data(result)
 
@@ -319,7 +319,7 @@ class AvishanModelApiView(AvishanApiView):
             return function_attribute.type_of.get(
                 id=int(target_dict['id'])
             )
-        return function_attribute.type_of(**target_dict)
+        return function_attribute.type_of._get_object_from_dict(target_dict)
 
 
 class PasswordHash(AvishanApiView):

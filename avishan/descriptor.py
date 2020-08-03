@@ -343,7 +343,7 @@ class Attribute:
             if isinstance(entry, _Union):
                 for item in entry.__args__:
                     return Attribute.type_finder(item)
-        except ImportError():
+        except ImportError:
             pass
 
         for target, pool in Attribute._TYPE_POOL.items():

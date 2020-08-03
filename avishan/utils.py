@@ -205,18 +205,13 @@ def add_token_to_response(rendered_response: HttpResponse):
     """
     if current_request['json_unsafe']:
         return
-    if not current_request['add_token']:
-        delete_token_from_request(rendered_response)
-
-    if not current_request['authentication_object']:
+    if not current_request['add_token'] or not current_request['authentication_object']:
         delete_token_from_request(rendered_response)
     else:
         token = encode_token(current_request['authentication_object'])
 
         if current_request['is_api']:
-            # todo 0.2.0: where should be?
             current_request['response']['token'] = token
-
         else:
             rendered_response.set_cookie('token', token)
 
@@ -294,7 +289,7 @@ def find_and_check_user():
             or authentication_type_object.last_logout:
         raise AuthException(AuthException.DEACTIVATED_TOKEN)
 
-    authentication_type_object.populate_current_request()
+    authentication_type_object._populate_current_request()
 
 
 def create_avishan_config_file(app_name: str = None):

@@ -141,8 +141,6 @@ class AvishanConfigFather:
     PHONE_KEY_VALUE_AUTHENTICATION_VERIFICATION_CODE_GAP_SECONDS: int = 2 * 60 - 10
     PHONE_KEY_VALUE_AUTHENTICATION_VERIFICATION_CODE_TRIES_COUNT: int = 4
 
-
-
     # Phone OTP
     POA_VERIFICATION_CODE_LENGTH = 4
     POA_VERIFICATION_VALID_SECONDS = 10 * 60
@@ -241,7 +239,39 @@ class AvishanConfigFather:
     @classmethod
     def get_openapi_ignored_path_models(cls) -> List[str]:
         return ['Activity', 'BaseUser', 'UserUserGroup', 'RequestTrackException', 'RequestTrack',
-                'TranslatableChar', 'VisitorKey', 'EmailVerification', 'PhoneVerification']
+                'TranslatableChar', 'AuthenticationVerification']
+
+    @classmethod
+    def email_key_value_authentication_verification_subject(cls, target=None):
+        return 'Email Verification'
+
+    @classmethod
+    def email_key_value_authentication_verification_body(cls, target=None):
+        return 'Your code is {code}'
+
+    @classmethod
+    def email_key_value_authentication_verification_html_body(cls, target=None):
+        return '<h1>Email Verification</h1><p>Your code is {code}</p>'
+
+    @classmethod
+    def phone_key_value_authentication_verification_body(cls, target=None):
+        return 'Your code is {code}'
+
+    @classmethod
+    def email_otp_authentication_verification_subject(cls, target=None):
+        return 'Email Verification'
+
+    @classmethod
+    def email_otp_authentication_verification_body(cls, target=None):
+        return 'Your code is {code}'
+
+    @classmethod
+    def email_otp_authentication_verification_html_body(cls, target=None):
+        return '<h1>Email Verification</h1><p>Your code is {code}</p>'
+
+    @classmethod
+    def phone_otp_authentication_verification_body(cls, target=None):
+        return 'Your code is {code}'
 
 
 def get_avishan_config() -> Union[Type[AvishanConfigFather]]:

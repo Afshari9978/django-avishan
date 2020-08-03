@@ -21,7 +21,6 @@ class AuthenticationType(AvishanModel):
 
     @classmethod
     def direct_callable_methods(cls):
-
         return super().direct_callable_methods() + [
             DirectCallable(
                 model=cls,
