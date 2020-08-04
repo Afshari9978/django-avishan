@@ -70,7 +70,8 @@ class AvishanModel(
                 model=cls,
                 target_name='get',
                 response_json_key=cls.class_snake_case_name(),
-                url='/{id}'
+                url='/{id}',
+                is_class_method=False
             ),
             DirectCallable(
                 model=cls,

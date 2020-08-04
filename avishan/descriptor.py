@@ -100,8 +100,6 @@ class Function:
         self.long_description: Optional[str] = None
         self.args: List[Attribute] = self.load_args_from_signature(self.target)
         self.returns: Optional[Attribute] = None
-        if self.name == 'login':
-            a = 1
         self._doc = docstring_parser.parse(target.__doc__)
         if self.__class__ == Function:
             self.load_from_doc()
@@ -132,6 +130,7 @@ class Method(Function):
     def __init__(self, target):
         super().__init__(target)
         self.target_class = self.get_class_that_defined_method(target)
+        self.is_class_method = inspect.ismethod(target)
         if self.__class__ == Method:
             self.load_from_doc()
 
@@ -210,7 +209,8 @@ class DirectCallable(ApiMethod):
                  authenticate: bool = True,
                  dismiss_request_json_key: bool = False,
                  dismiss_response_json_key: bool = False,
-                 hide_in_redoc: bool = False
+                 hide_in_redoc: bool = False,
+                 is_class_method: bool = None
                  ):
         from avishan.configure import get_avishan_config
         from avishan.models import AvishanModel
@@ -221,7 +221,10 @@ class DirectCallable(ApiMethod):
             request_json_key = model.class_snake_case_name()
 
         if url is None:
+            auto_set_url = True
             url = f'/{target_name}'
+        else:
+            auto_set_url = False
 
         super().__init__(
             target=getattr(model, target_name),
@@ -241,6 +244,12 @@ class DirectCallable(ApiMethod):
         self.dismiss_response_json_key = dismiss_response_json_key
         self.authenticate = authenticate
         self.hide_in_redoc = hide_in_redoc
+        if is_class_method is not None:
+            self.is_class_method = is_class_method
+
+        if not self.is_class_method and auto_set_url:
+            self.url = '/' + get_avishan_config().AVISHAN_URLS_START + f'/{model.class_plural_snake_case_name()}/' \
+                       + '{id}' + url
 
 
 class Attribute:
