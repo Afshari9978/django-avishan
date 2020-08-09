@@ -285,17 +285,33 @@ class AvishanModelApiView(AvishanApiView):
             return returned
 
     def parse_request_data(self, **kwargs):
+        """Parse Request Body
+
+        Request body consists of multiple items, some have primitive data, like name:str or price:float. But for
+        relational objects like birth_place:City, we should convert json-acceptable data to specific python objects. In
+        this case we should get corresponding object from database.
+        """
+
         cleaned = {}
         for function_attribute in self.direct_callable.args:
             function_attribute: FunctionAttribute
+
+            """Errors for required data before python raises exception for function params"""
             if function_attribute.is_required and function_attribute.name not in kwargs.keys():
                 raise ErrorMessageException(f'field "{function_attribute.name}" is required')
 
+            """Optional field not provided"""
+            if function_attribute.name not in kwargs.keys():
+                continue
+
+            """Objects and array of objects should convert to db objects"""
             if function_attribute.type is function_attribute.TYPE.OBJECT:
                 cleaned[function_attribute.name] = self._parse_request_object(
                     function_attribute=function_attribute, target_dict=kwargs[function_attribute.name]
                 )
-            elif function_attribute.type is function_attribute.TYPE.ARRAY:
+            elif function_attribute.type is function_attribute.TYPE.ARRAY and \
+                    inspect.isclass(function_attribute.type_of) and \
+                    issubclass(function_attribute.type_of, AvishanModel):
                 cleaned[function_attribute.name] = [
                     self._parse_request_object(
                         function_attribute=function_attribute, target_dict=item
@@ -304,6 +320,7 @@ class AvishanModelApiView(AvishanApiView):
             elif function_attribute.type is function_attribute.TYPE.FILE:
                 raise NotImplementedError()
             else:
+                """Casts primitive data here"""
                 cleaned[function_attribute.name] = function_attribute.type_caster(
                     entry=kwargs[function_attribute.name],
                     target_type=function_attribute.type
@@ -313,13 +330,20 @@ class AvishanModelApiView(AvishanApiView):
 
     @staticmethod
     def _parse_request_object(function_attribute: FunctionAttribute, target_dict: dict):
-        if function_attribute.type is function_attribute.TYPE.OBJECT and not isinstance(target_dict, dict):
-            raise ErrorMessageException(f'value for "{function_attribute.name}" must be dict')
-        if 'id' in target_dict.keys():
-            return function_attribute.type_of.get(
-                id=int(target_dict['id'])
-            )
-        return function_attribute.type_of._get_object_from_dict(target_dict)
+        """Parse object
+
+        Get objects from database
+
+        :param FunctionAttribute function_attribute: corresponding attribute data
+        :param dict target_dict: request data
+        :return: cleaned object
+        """
+
+        if not isinstance(target_dict, dict):
+            raise ErrorMessageException(f'value for "{function_attribute.name}" must be dict consist of id or other '
+                                        f'unique values so that db can find corresponding object')
+
+        return function_attribute.type_of.get_from_dict(target_dict)
 
 
 class PasswordHash(AvishanApiView):

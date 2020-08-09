@@ -403,14 +403,14 @@ class AvishanModel(
                                 fa = 'NOT TRANSLATED'
                             base_kwargs[field.name] = TranslatableChar.create(en=en, fa=fa)
                         else:
-                            base_kwargs[field.name] = field.related_model._get_object_from_dict(kwargs[field.name])
+                            base_kwargs[field.name] = field.related_model.get_from_dict(kwargs[field.name])
             elif isinstance(field, models.ManyToManyField):
                 many_to_many_kwargs[field.name] = []
                 for input_item in kwargs[field.name]:
                     if isinstance(input_item, models.Model):
                         item_object = input_item
                     else:
-                        item_object = field.related_model._get_object_from_dict(input_item)
+                        item_object = field.related_model.get_from_dict(input_item)
                     many_to_many_kwargs[field.name].append(item_object)
             else:
                 base_kwargs[field.name] = cls.cast_field_data(kwargs[field.name], field)
@@ -473,16 +473,10 @@ class AvishanModel(
 
     @classmethod
     def cast_field_data(cls, data, field: models.Field):
-        """
-        Cast data to it's appropriate form
-        :param data: entered data
-        :param field: target field
-        :return: after cast data
-        """
-        from khayyam import JalaliDatetime
 
         if data is None:
             return None
+
         if isinstance(field, (models.CharField, models.TextField)):
             cast_class = str
         elif isinstance(field, (models.IntegerField, models.AutoField)):
@@ -491,68 +485,68 @@ class AvishanModel(
             cast_class = float
         elif isinstance(field, models.TimeField):
             raise NotImplementedError('AvishanModel.cast_field_data for models.TimeField')
-        elif isinstance(field, models.DateTimeField):
-            if not isinstance(data, datetime.datetime):
-                cast_class = datetime.datetime
-            else:
-                cast_class = None
-        elif isinstance(field, models.DateField):
-            if not isinstance(data, datetime.date):
-                cast_class = datetime.date
-            else:
-                cast_class = None
+        elif isinstance(field, models.DateTimeField) and not isinstance(data, datetime.datetime):
+            cast_class = datetime.datetime
+        elif isinstance(field, models.DateField) and not isinstance(data, datetime.date):
+            cast_class = datetime.date
         elif isinstance(field, models.BooleanField):
             cast_class = bool
-        elif isinstance(field, models.ManyToManyField):
-            cast_class = field.related_model
-        elif isinstance(field, models.ForeignKey):
+        elif isinstance(field, (models.ManyToManyField, models.ForeignKey)):
             cast_class = field.related_model
         else:
             return data
 
-        if cast_class is None:
-            return data
+        return cls.cast_type_data(cast_class, data)
+
+    @classmethod
+    def cast_type_data(cls, cast_class, data):
+        from khayyam import JalaliDatetime
+
+        format_string = get_avishan_config().DATETIME_STRING_FORMAT if \
+            cast_class is datetime.datetime else \
+            get_avishan_config().DATE_STRING_FORMAT
+
         if isinstance(cast_class, AvishanModel):
             if not isinstance(data, dict):
-                raise ValueError('ForeignKey or ManyToMany relation should contain dict with id')
-            output = cast_class.objects.get(id=int(data['id']))
-        elif cast_class is datetime.datetime:
+                raise ValueError('Relational args should contain dict with id or other unique values so that db can '
+                                 'find corresponding object')
+            output = cast_class.get_from_dict(data)
+        elif cast_class in [datetime.datetime, datetime.date]:
             if isinstance(data, dict):
                 if get_avishan_config().USE_JALALI_DATETIME:
-                    output = JalaliDatetime(**data).todatetime()
+                    output = JalaliDatetime(**data).todatetime() if \
+                        cast_class is datetime.datetime else \
+                        JalaliDatetime(**data).todate()
                 else:
                     output = datetime.datetime(**data)
+                    if cast_class is datetime.date:
+                        output = output.date()
             elif isinstance(data, str):
                 if get_avishan_config().USE_JALALI_DATETIME:
-                    output = JalaliDatetime.strptime(data, get_avishan_config().DATETIME_STRING_FORMAT).todatetime()
+                    output = JalaliDatetime.strptime(data, format_string).todatetime()
+                    if cast_class is datetime.date:
+                        output = output.date()
                 else:
-                    output = datetime.datetime.strptime(data, get_avishan_config().DATETIME_STRING_FORMAT)
+                    output = datetime.datetime.strptime(data, format_string)
+                    if cast_class is datetime.date:
+                        output = output.date()
             else:
                 raise ValueError('Cannot parse datetime, supported types are dict (containing year, month, .etc) or str'
-                                 f' (with format "{get_avishan_config().DATETIME_STRING_FORMAT}")')
-        elif cast_class is datetime.date:
-            if isinstance(data, dict):
-                if get_avishan_config().USE_JALALI_DATETIME:
-                    output = JalaliDatetime(**data).todate()
-                else:
-                    output = datetime.datetime(**data).date()
-            elif isinstance(data, str):
-                if get_avishan_config().USE_JALALI_DATETIME:
-                    output = JalaliDatetime.strptime(data, get_avishan_config().DATE_STRING_FORMAT).todatetime().date()
-                else:
-                    output = datetime.datetime.strptime(data, get_avishan_config().DATE_STRING_FORMAT).date()
-            else:
-                raise ValueError('Cannot parse date, supported types are dict (containing year, month, .etc) or str'
-                                 f' (with format "{get_avishan_config().DATE_STRING_FORMAT}")')
+                                 f' (with format "{format_string}")')
         else:
             output = cast_class(data)
 
         return output
 
     @classmethod
-    def _get_object_from_dict(cls, input_dict: dict) -> 'AvishanModel':
+    def get_from_dict(cls, input_dict: dict) -> 'AvishanModel':
+        """Converts dict object to Model"""
+
+        """Shortcut for id"""
         if 'id' in input_dict.keys():
             return cls.get(id=input_dict['id'])
+
+        """Usually when unique or one-to-one relations provided, this can help"""
         return cls.get(**input_dict)
 
     # todo 0.2.2: check None amount for choice added fields
@@ -1312,6 +1306,12 @@ class KeyValueAuthentication(VerifiableAuthenticationType):
             raise AuthException(error_kind=AuthException.PASSWORD_NOT_FOUND)
         import bcrypt
         return bcrypt.checkpw(password.encode('utf8'), self.hashed_password.encode('utf8'))
+
+    @classmethod
+    def _login_before_submit_actions(cls, data: dict):
+        super()._login_before_submit_actions(data)
+        if not data['found_object']._check_password(data['password']):
+            raise AuthException(AuthException.INCORRECT_PASSWORD)
 
 
 class EmailKeyValueAuthentication(KeyValueAuthentication):

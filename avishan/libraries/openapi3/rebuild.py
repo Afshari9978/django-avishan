@@ -4,7 +4,7 @@ from django.db.models.base import ModelBase
 from django.utils import timezone
 
 from avishan.configure import get_avishan_config
-from avishan.descriptor import Attribute, ApiMethod, Model, DjangoModel, DirectCallable
+from avishan.descriptor import Attribute, ApiMethod, Model, DjangoModel, DirectCallable, FunctionAttribute
 
 
 # todo tags
@@ -149,16 +149,26 @@ class Parameter:
 
 
 class Property:
-    def __init__(self, name: str, schema: 'Schema'):
+
+    def __init__(self, name: str, schema: 'Schema', required: bool = True, default=Attribute.NO_DEFAULT):
         self.name = name
         self.schema = schema
+        self.required = required
+        self.default = default
 
     @classmethod
     def create_from_attribute(cls, attribute: Attribute, request_body_related: bool = False) -> 'Property':
-        return Property(
+        required = True
+        if isinstance(attribute, FunctionAttribute):
+            required = attribute.is_required
+        created = Property(
             name=attribute.name,
-            schema=Schema.create_from_attribute(attribute, request_body_related)
+            schema=Schema.create_from_attribute(attribute, request_body_related),
+            required=required,
+            default=attribute.default
         )
+        created.schema.default = created.default
+        return created
 
     def export(self) -> dict:
         return self.schema.export()
@@ -180,7 +190,7 @@ class Schema:
                  name: str = None,
                  type: str = None,
                  format: str = None,
-                 default: str = None,
+                 default=Attribute.NO_DEFAULT,
                  items: 'Schema' = None,
                  properties: List[Property] = None,
                  description: str = None
@@ -254,6 +264,8 @@ class Schema:
         }
         if self.format:
             data['format'] = self.format
+        if self.default is not Attribute.NO_DEFAULT:
+            data['default'] = self.default
         if self.description:
             data['description'] = self.description
         if self.items:
@@ -261,8 +273,13 @@ class Schema:
 
         if len(self.properties) > 0:
             data['properties'] = {}
+            data['required'] = []
             for item in self.properties:
+                if item.required:
+                    data['required'].append(item.name)
                 data['properties'][item.name] = item.export()
+            if len(data['required']) == 0:
+                del data['required']
 
         if self.type == 'string' and self.format == 'date-time':
             data['example'] = timezone.now().strftime(get_avishan_config().DATETIME_STRING_FORMAT)

@@ -288,11 +288,13 @@ class Attribute:
         TYPE.FILE: (models.FileField,),
     }
 
+    NO_DEFAULT = 'NO_DESCRIPTOR_DEFAULT'
+
     def __init__(self,
                  name: str,
                  type: 'Attribute.TYPE',
                  type_of: type = None,
-                 default=None,
+                 default=NO_DEFAULT,
                  description: str = None,
                  example: str = None,
                  ):
@@ -388,22 +390,27 @@ class Attribute:
 
     @staticmethod
     def type_caster(entry, target_type: 'Attribute.TYPE'):
+        from avishan.models import AvishanModel
+
+        if entry is None:
+            return None
+
         if target_type is Attribute.TYPE.STRING:
-            return str(entry)
-        if target_type is Attribute.TYPE.INT:
-            return int(entry)
-        if target_type is Attribute.TYPE.FLOAT:
-            return float(entry)
-        if target_type is Attribute.TYPE.DATE:
-            return datetime.date(entry)
-        if target_type is Attribute.TYPE.DATETIME:
-            return datetime.datetime(entry)
-        if target_type is Attribute.TYPE.BOOLEAN:
-            return bool(entry)
-        if target_type is Attribute.TYPE.ARRAY:
-            if not isinstance(entry, list):
-                return list(entry)
+            cast_class = str
+        elif target_type is Attribute.TYPE.INT:
+            cast_class = int
+        elif target_type is Attribute.TYPE.FLOAT:
+            cast_class = float
+        elif target_type is Attribute.TYPE.DATETIME:
+            cast_class = datetime.datetime
+        elif target_type is Attribute.TYPE.DATE:
+            cast_class = datetime.date
+        elif target_type is Attribute.TYPE.BOOLEAN:
+            cast_class = bool
+        else:
             return entry
+
+        return AvishanModel.cast_type_data(cast_class, entry)
 
     def __str__(self):
         return self.name
@@ -413,10 +420,14 @@ class DjangoFieldAttribute(Attribute):
 
     # todo default
     def __init__(self, target: models.Field):
+        default = self.NO_DEFAULT
+        if target.has_default():
+            default = target.get_default()
         super().__init__(
             name=target.name,
             type=self.define_representation_type(target),
-            description=target.help_text
+            description=target.help_text,
+            default=default
         )
         if self.type is Attribute.TYPE.OBJECT:
             if isinstance(target, (models.OneToOneField, models.ForeignKey)):
@@ -457,9 +468,13 @@ class FunctionAttribute(Attribute):
         if parameter is inspect.Parameter.empty or parameter.name in ['self', 'cls']:
             raise ValueError
 
+        default = self.NO_DEFAULT
+        if parameter.default is not inspect.Parameter.empty:
+            default = parameter.default
         super().__init__(
             name=parameter.name,
-            type=self.define_representation_type(parameter)
+            type=self.define_representation_type(parameter),
+            default=default
         )
         temp = parameter.annotation
         if self.type is Attribute.TYPE.OBJECT:
