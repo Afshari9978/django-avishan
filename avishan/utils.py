@@ -285,10 +285,13 @@ def find_and_check_user():
         raise AuthException(AuthException.GROUP_ACCOUNT_NOT_ACTIVE)
     if not user_user_group.base_user.is_active:
         raise AuthException(AuthException.ACCOUNT_NOT_ACTIVE)
-    if authentication_type_object.last_login.timestamp() != current_request['decoded_token']['lgn'] \
+    if authentication_type_object.last_login is None or \
+            authentication_type_object.last_login.timestamp() != current_request['decoded_token']['lgn'] \
             or authentication_type_object.last_logout:
         raise AuthException(AuthException.DEACTIVATED_TOKEN)
 
+    authentication_type_object.last_used = timezone.now()
+    authentication_type_object.save()
     authentication_type_object._populate_current_request()
 
 
