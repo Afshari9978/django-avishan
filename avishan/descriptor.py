@@ -297,6 +297,7 @@ class Attribute:
                  default=NO_DEFAULT,
                  description: str = None,
                  example: str = None,
+                 is_required: bool = True
                  ):
         self.name = name
         self.type: Attribute.TYPE = type
@@ -307,6 +308,7 @@ class Attribute:
         self.default = default
         self.description = description
         self.example = example
+        self.is_required = is_required
         self._doc = None
 
     @classmethod
@@ -315,16 +317,16 @@ class Attribute:
             name=doc_param.arg_name,
             type=Attribute.create_type_from_doc_param(doc_param.type_name),
             type_of=Attribute.create_type_of_from_doc_param(doc_param.type_name),
-            description=doc_param.description
+            description=doc_param.description,
+            is_required=not doc_param.is_optional,
+            default=doc_param.default
         )
 
     @classmethod
     def create_type_from_doc_param(cls, type_string: str) -> 'Attribute.TYPE':
-        try:
-            if type_string.find('[') > 0:
-                return Attribute.type_finder(entry=type_string[:type_string.find('[')])
-        except AttributeError as e:
-            a = 1
+        if type_string.find('[') > 0:
+            return Attribute.type_finder(entry=type_string[:type_string.find('[')])
+
         return Attribute.type_finder(entry=type_string)
 
     @classmethod
@@ -427,7 +429,8 @@ class DjangoFieldAttribute(Attribute):
             name=target.name,
             type=self.define_representation_type(target),
             description=target.help_text,
-            default=default
+            default=default,
+            is_required=self.check_is_required(target)
         )
         if self.type is Attribute.TYPE.OBJECT:
             if isinstance(target, (models.OneToOneField, models.ForeignKey)):
@@ -440,14 +443,14 @@ class DjangoFieldAttribute(Attribute):
             self.type = Attribute.TYPE.STRING
         self.target = target
 
-    @property
-    def is_required(self) -> bool:
+    @classmethod
+    def check_is_required(cls, target) -> bool:
         """
         Checks if field is required
         """
-        if hasattr(self.target.model, 'is_field_required'):
-            assert isinstance(self.target.model.is_field_required, Callable)
-            return self.target.model.is_field_required(self.target)
+        if hasattr(target.model, 'is_field_required'):
+            assert isinstance(target.model.is_field_required, Callable)
+            return target.model.is_field_required(target)
         raise NotImplementedError()
 
     @staticmethod
