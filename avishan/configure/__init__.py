@@ -184,6 +184,12 @@ class AvishanConfigFather:
         This method will be called anytime server starts. But just the method from get_avishan_config() result.
         """
 
+        """Run Descriptor to find any error in startup"""
+        from avishan.models import AvishanModel
+        for model in AvishanModel.get_models():
+            model: AvishanModel
+            model.direct_callable_methods()
+
     @classmethod
     def on_request(cls):
         """
