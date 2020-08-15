@@ -829,12 +829,12 @@ class Phone(Identifier):
                 EN='SMS Provider not found. Enable in "SMS Providers" avishan config section'
             ))
 
-    def send_verification_sms(self, code: str):
+    def send_verification_sms(self, code: str, template: str = get_avishan_config().KAVENEGAR_DEFAULT_TEMPLATE):
         from avishan.exceptions import ErrorMessageException
 
         if get_avishan_config().KAVENEGAR_SMS_ENABLE:
             self.send_sms(
-                template=get_avishan_config().KAVENEGAR_DEFAULT_TEMPLATE,
+                template=template,
                 token=code
             )
         else:
@@ -975,7 +975,7 @@ class AuthenticationType(AvishanModel):
         raise NotImplementedError()
 
     @classmethod
-    def _find_target_item(cls, key: Union[Email, Phone, str], user_group: UserGroup) -> Optional[Union[
+    def find(cls, key: Union[Email, Phone, str], user_group: UserGroup) -> Optional[Union[
         'EmailKeyValueAuthentication',
         'PhoneKeyValueAuthentication',
         'EmailOtpAuthentication',
@@ -1018,7 +1018,7 @@ class AuthenticationType(AvishanModel):
             except cls._related_key_model().DoesNotExist:
                 key = cls._related_key_model().create(key)
 
-        if cls._find_target_item(key, user_user_group.user_group):
+        if cls.find(key, user_user_group.user_group):
             raise AuthException(AuthException.DUPLICATE_AUTHENTICATION_IDENTIFIER)
 
         creation_dict = {
@@ -1047,7 +1047,7 @@ class AuthenticationType(AvishanModel):
             'EmailOtpAuthentication',
             'PhoneOtpAuthentication',
             'VisitorKeyAuthentication'
-        ] = cls._find_target_item(key, user_group)
+        ] = cls.find(key, user_group)
         if not found_object:
             raise AuthException(AuthException.ACCOUNT_NOT_FOUND)
 
@@ -1129,6 +1129,8 @@ class VerifiableAuthenticationType(AuthenticationType):
         return self.date_verified is not None
 
     def start_verification(self):
+        self: Union[
+            EmailKeyValueAuthentication, PhoneKeyValueAuthentication, EmailOtpAuthentication, PhoneOtpAuthentication]
         if not getattr(get_avishan_config(), stringcase.constcase(self.class_name()) + '_VERIFICATION_REQUIRED'):
             return
         if self.verification:
@@ -1142,7 +1144,7 @@ class VerifiableAuthenticationType(AuthenticationType):
                 self.verification.remove()
 
         self.date_verified = None
-        self.verification: AuthenticationVerification = AuthenticationVerification.create(
+        self.verification = AuthenticationVerification.create(
             code_length=getattr(get_avishan_config(),
                                 stringcase.constcase(self.class_name()) + '_VERIFICATION_CODE_LENGTH'),
             code_domain=getattr(get_avishan_config(),
@@ -1235,9 +1237,11 @@ class KeyValueAuthentication(VerifiableAuthenticationType):
         abstract = True
 
     hashed_password = models.CharField(max_length=255, blank=True, null=True)
+    change_password_token = models.CharField(max_length=255, blank=True, null=True, default=None)
+    change_password_date = models.DateTimeField(max_length=255, blank=True, null=True, default=True)
 
     to_dict_private_fields = [hashed_password, 'verification', 'last_used', 'last_login', 'last_logout', 'date_created',
-                              'is_active']
+                              'is_active', change_password_token, change_password_date]
 
     @classmethod
     def register(cls, key: Union[Email, Phone], user_user_group: UserUserGroup, password: str = None,
@@ -1271,20 +1275,100 @@ class KeyValueAuthentication(VerifiableAuthenticationType):
         return cls._login(key=key, user_group=user_group, password=password)
 
     @classmethod
-    def _find_target_item(cls, key: Union[Email, Phone], user_group: UserGroup) \
+    def find(cls, key: Union[Email, Phone], user_group: UserGroup) \
             -> Optional[Union['EmailKeyValueAuthentication', 'PhoneKeyValueAuthentication']]:
-        return super()._find_target_item(key, user_group)
+        return super().find(key, user_group)
 
     def set_password(self, password: str):
         self.hashed_password = self._hash_password(password)
         self.save()
 
-    def _change_password(self, old_password: str, new_password: str):
+    def change_password(self, old_password: str, new_password: str):
         if not self.hashed_password:
             raise AuthException(error_kind=AuthException.PASSWORD_NOT_FOUND)
         if not self._check_password(old_password):
             raise AuthException(error_kind=AuthException.INCORRECT_PASSWORD)
         self.set_password(new_password)
+
+    @classmethod
+    def reset_password_start(cls, key: Union[Email, Phone], user_group: UserGroup):
+        found = cls.find(key=key, user_group=user_group)
+
+        """Account not found"""
+        if not found:
+            raise AuthException(AuthException.ACCOUNT_NOT_FOUND)
+
+        """Check for gap seconds"""
+        if found.change_password_token and (timezone.now() - found.change_password_date).total_seconds() < getattr(
+                get_avishan_config(), stringcase.constcase(cls.class_name()) + '_RESET_PASSWORD_GAP_SECONDS'):
+            raise ErrorMessageException('Reset password applied recently, please try later')
+
+        """Do routine"""
+        found._reset_password()
+
+        """Sending Part"""
+        if found._related_key_model() is Email:
+            message = getattr(get_avishan_config(), stringcase.constcase(cls.class_name()) +
+                              '_RESET_PASSWORD_BODY')
+            html_message = getattr(get_avishan_config(), stringcase.constcase(cls.class_name()) +
+                                   '_RESET_PASSWORD_HTML_BODY')
+            if message:
+                message = message.format(token=found.change_password_token)
+            elif html_message:
+                html_message = html_message.format(code=found.change_password_token)
+            found.key.send_mail(
+                subject=getattr(get_avishan_config(), stringcase.constcase(cls.class_name()) +
+                                '_RESET_PASSWORD_SUBJECT'),
+                message=message,
+                html_message=html_message
+            )
+        elif found._related_key_model() is Phone:
+            found.key.send_verification_sms(
+                code=found.change_password_token,
+                template=getattr(
+                    get_avishan_config(), stringcase.constcase(cls.class_name()) + '_RESET_PASSWORD_SMS_TEMPLATE'
+                )
+            )
+        else:
+            raise NotImplementedError()
+
+    @classmethod
+    def reset_password_check(cls, key: Union[Email, Phone], user_group: UserGroup, token: str) -> bool:
+        found = cls.find(key=key, user_group=user_group)
+
+        """Account not found"""
+        if not found:
+            raise AuthException(AuthException.ACCOUNT_NOT_FOUND)
+
+        if (timezone.now() - found.change_password_date).total_seconds() > getattr(
+                get_avishan_config(), stringcase.constcase(cls.class_name()) + '_RESET_PASSWORD_VALID_SECONDS'
+        ):
+            raise ErrorMessageException('Reset password code expired, apply for a new one')
+
+        return found.change_password_token == token
+
+    @classmethod
+    def reset_password_complete(cls, key: Union[Email, Phone], user_group: UserGroup, token: str, password: str):
+        if not cls.reset_password_check(key, user_group, token):
+            raise ErrorMessageException('Incorrect reset password code')
+        found = cls.find(key, user_group)
+        found._apply_reset_password(password)
+
+    def _reset_password(self):
+        self.hashed_password = None
+        self.change_password_token = ''.join(
+            random.choice(getattr(get_avishan_config(), stringcase.constcase(self.class_name()) +
+                                  '_RESET_PASSWORD_TOKEN_DOMAIN')) for _ in
+            range(getattr(get_avishan_config(), stringcase.constcase(self.class_name()) +
+                          '_RESET_PASSWORD_TOKEN_LENGTH')))
+        self.change_password_date = timezone.now()
+        self.save()
+
+    def _apply_reset_password(self, password: str):
+        self.set_password(password)
+        self.change_password_token = None
+        self.change_password_date = None
+        self.save()
 
     @staticmethod
     def _hash_password(password: str) -> str:
@@ -1402,7 +1486,7 @@ class KeyAuthentication(AuthenticationType):
     def login(cls, key: str, user_group: UserGroup):
         from avishan.exceptions import AuthException
 
-        found_object: KeyAuthentication = cls._find_target_item(key, user_group)
+        found_object: KeyAuthentication = cls.find(key, user_group)
         if not found_object:
             raise AuthException(AuthException.ACCOUNT_NOT_FOUND)
 

@@ -123,7 +123,7 @@ class AvishanConfigFather:
     EMAIL_VERIFICATION_SUBJECT = 'Email Verification'
     """Only one of these two must be not-null"""
     EMAIL_VERIFICATION_BODY_STRING = 'Your code is {code}'
-    EMAIL_VERIFICATION_BODY_HTML = '<h1>Email Verification</h1><p>Your code is {code}</p>'
+    EMAIL_VERIFICATION_BODY_HTML = None
 
     # Email Key Value Authentication
     EMAIL_KEY_VALUE_AUTHENTICATION_VERIFICATION_REQUIRED: bool = True
@@ -132,6 +132,13 @@ class AvishanConfigFather:
     EMAIL_KEY_VALUE_AUTHENTICATION_VERIFICATION_CODE_VALID_SECONDS: int = 2 * 60 * 60
     EMAIL_KEY_VALUE_AUTHENTICATION_VERIFICATION_CODE_GAP_SECONDS: int = 2 * 60 - 10
     EMAIL_KEY_VALUE_AUTHENTICATION_VERIFICATION_CODE_TRIES_COUNT: int = 8
+    EMAIL_KEY_VALUE_AUTHENTICATION_RESET_PASSWORD_GAP_SECONDS: int = 2 * 60 - 10
+    EMAIL_KEY_VALUE_AUTHENTICATION_RESET_PASSWORD_VALID_SECONDS: int = 2 * 60 * 60 - 10
+    EMAIL_KEY_VALUE_AUTHENTICATION_RESET_PASSWORD_TOKEN_LENGTH: int = 4
+    EMAIL_KEY_VALUE_AUTHENTICATION_RESET_PASSWORD_TOKEN_DOMAIN: str = '1234567890'
+    EMAIL_KEY_VALUE_AUTHENTICATION_RESET_PASSWORD_SUBJECT: str = 'Email Verification Reset Password'
+    EMAIL_KEY_VALUE_AUTHENTICATION_RESET_PASSWORD_BODY: str = 'Reset password token is {token}'
+    EMAIL_KEY_VALUE_AUTHENTICATION_RESET_PASSWORD_HTML_BODY: str = None
 
     # Phone Key Value Authentication
     PHONE_KEY_VALUE_AUTHENTICATION_VERIFICATION_REQUIRED: bool = True
@@ -140,6 +147,11 @@ class AvishanConfigFather:
     PHONE_KEY_VALUE_AUTHENTICATION_VERIFICATION_CODE_VALID_SECONDS: int = 15 * 60
     PHONE_KEY_VALUE_AUTHENTICATION_VERIFICATION_CODE_GAP_SECONDS: int = 2 * 60 - 10
     PHONE_KEY_VALUE_AUTHENTICATION_VERIFICATION_CODE_TRIES_COUNT: int = 4
+    PHONE_KEY_VALUE_AUTHENTICATION_RESET_PASSWORD_GAP_SECONDS: int = 2 * 60 - 10
+    PHONE_KEY_VALUE_AUTHENTICATION_RESET_PASSWORD_VALID_SECONDS: int = 15 * 60 - 10
+    PHONE_KEY_VALUE_AUTHENTICATION_RESET_PASSWORD_TOKEN_LENGTH: int = 4
+    PHONE_KEY_VALUE_AUTHENTICATION_RESET_PASSWORD_TOKEN_DOMAIN: str = '1234567890'
+    PHONE_KEY_VALUE_AUTHENTICATION_RESET_PASSWORD_SMS_TEMPLATE: str = None
 
     # Phone OTP
     POA_VERIFICATION_CODE_LENGTH = 4
@@ -257,7 +269,7 @@ class AvishanConfigFather:
 
     @classmethod
     def email_key_value_authentication_verification_html_body(cls, target=None):
-        return '<h1>Email Verification</h1><p>Your code is {code}</p>'
+        return None
 
     @classmethod
     def phone_key_value_authentication_verification_body(cls, target=None):
@@ -273,7 +285,7 @@ class AvishanConfigFather:
 
     @classmethod
     def email_otp_authentication_verification_html_body(cls, target=None):
-        return '<h1>Email Verification</h1><p>Your code is {code}</p>'
+        return None
 
     @classmethod
     def phone_otp_authentication_verification_body(cls, target=None):
