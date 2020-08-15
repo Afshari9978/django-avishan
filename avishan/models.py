@@ -1249,7 +1249,7 @@ class KeyValueAuthentication(VerifiableAuthenticationType):
 
     hashed_password = models.CharField(max_length=255, blank=True, null=True)
     change_password_token = models.CharField(max_length=255, blank=True, null=True, default=None)
-    change_password_date = models.DateTimeField(max_length=255, blank=True, null=True, default=True)
+    change_password_date = models.DateTimeField(max_length=255, blank=True, null=True, default=None)
 
     to_dict_private_fields = [hashed_password, 'verification', 'last_used', 'last_login', 'last_logout', 'date_created',
                               'is_active', change_password_token, change_password_date]
@@ -1652,6 +1652,9 @@ class RequestTrack(AvishanModel):
         if not self.start_time:
             return self.start_time
         return self.start_time.strftime("%d/%m/%y %H:%M:%S.%f")
+
+    def clean_url(self) -> str:
+        return re.sub(r'(?x)/\d+.*', '/{id}', self.url)
 
     def __str__(self):
         return self.view_name
