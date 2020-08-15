@@ -5,6 +5,8 @@ import stringcase
 from django.db import models
 from django.db.models import NOT_PROVIDED, QuerySet, Field
 
+from avishan.descriptor import FunctionAttribute, DjangoFieldAttribute
+
 
 class AvishanModelDjangoAdminExtension:
     django_admin_date_hierarchy: Optional[str] = None
@@ -168,6 +170,16 @@ class AvishanModelModelDetailsExtension:
         from avishan.models import AvishanModel
         return set(parent_class.__subclasses__()).union(
             [s for c in parent_class.__subclasses__() for s in AvishanModel.all_subclasses(c)])
+
+    @classmethod
+    def _create_default_args(cls) -> List[FunctionAttribute]:
+        from avishan.models import AvishanModel
+        cls: AvishanModel
+        return [DjangoFieldAttribute(target=item) for item in cls._meta.fields]
+
+    @classmethod
+    def _update_default_args(cls) -> List[FunctionAttribute]:
+        return cls._create_default_args()
 
 
 class AvishanModelFilterExtension:

@@ -4,7 +4,9 @@ import string
 from inspect import Parameter
 from typing import List, Type, Union, Tuple, Dict
 
+import pytz
 import stringcase
+from django.conf import settings
 from django.core.files.uploadedfile import InMemoryUploadedFile
 from django.utils import timezone
 
@@ -64,7 +66,8 @@ class AvishanModel(
                 target_name='create',
                 response_json_key=cls.class_snake_case_name(),
                 method=DirectCallable.METHOD.POST,
-                url=''
+                url='',
+                on_empty_args=cls._create_default_args()
             ),
             DirectCallable(
                 model=cls,
@@ -79,7 +82,8 @@ class AvishanModel(
                 response_json_key=cls.class_snake_case_name(),
                 request_json_key=cls.class_snake_case_name(),
                 url='/{id}',
-                method=DirectCallable.METHOD.PUT
+                method=DirectCallable.METHOD.PUT,
+                on_empty_args=cls._update_default_args()
             ),
             DirectCallable(
                 model=cls,
@@ -513,6 +517,9 @@ class AvishanModel(
             output = cast_class.get_from_dict(data)
         elif cast_class in [datetime.datetime, datetime.date]:
             if isinstance(data, dict):
+                if settings.USE_TZ:
+                    data['tzinfo'] = pytz.timezone(settings.TIME_ZONE)
+
                 if get_avishan_config().USE_JALALI_DATETIME:
                     output = JalaliDatetime(**data).todatetime() if \
                         cast_class is datetime.datetime else \
@@ -524,10 +531,14 @@ class AvishanModel(
             elif isinstance(data, str):
                 if get_avishan_config().USE_JALALI_DATETIME:
                     output = JalaliDatetime.strptime(data, format_string).todatetime()
+                    if settings.USE_TZ:
+                        output = output.replace(tzinfo=pytz.timezone(settings.TIME_ZONE))
                     if cast_class is datetime.date:
                         output = output.date()
                 else:
                     output = datetime.datetime.strptime(data, format_string)
+                    if settings.USE_TZ:
+                        output = output.replace(tzinfo=pytz.timezone(settings.TIME_ZONE))
                     if cast_class is datetime.date:
                         output = output.date()
             else:

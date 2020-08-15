@@ -28,18 +28,6 @@ class AvishanView(View):
     track_it: bool = False
     is_api: bool = None
 
-    # todo can override http_method_not_allowed method
-    # todo implement time logs here
-    search: List[str] = None
-    filter: List[dict] = []
-    # todo add gte lte ... to filter
-    sort: List[str] = []
-    page: int = 0
-    page_size: int = 20
-    page_offset: int = 0
-
-    # todo if page is not 0, send page, page size, items count, next, prev
-
     def setup(self, request, *args, **kwargs):
         super().setup(request, *args, **kwargs)
         self.response: dict = current_request['response']
@@ -61,18 +49,6 @@ class AvishanView(View):
                     self.__setattr__(kwarg_key, parsed)
                 else:
                     self.__setattr__(kwarg_key, self.cast_data(kwarg_key, data[0]))
-
-            if kwarg_key.startswith('filter_'):
-                data = request.GET.getlist(kwarg_key)
-                if len(data) == 1:
-                    data = data[0]
-                self.filter.append({kwarg_key[7:]: data})
-
-            if kwarg_key.startswith('sort_'):
-                data = request.GET.getlist(kwarg_key)
-                if len(data) == 1:
-                    data = data[0]
-                self.filter.append({kwarg_key[5:]: data})
 
         self.current_request = current_request
         self.current_request['view_name'] = self.__class__.__name__

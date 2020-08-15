@@ -210,7 +210,8 @@ class DirectCallable(ApiMethod):
                  dismiss_request_json_key: bool = False,
                  dismiss_response_json_key: bool = False,
                  hide_in_redoc: bool = False,
-                 is_class_method: bool = None
+                 is_class_method: bool = None,
+                 on_empty_args: List['FunctionAttribute'] = None
                  ):
         from avishan.configure import get_avishan_config
         from avishan.models import AvishanModel
@@ -250,6 +251,9 @@ class DirectCallable(ApiMethod):
         if not self.is_class_method and auto_set_url:
             self.url = '/' + get_avishan_config().AVISHAN_URLS_START + f'/{model.class_plural_snake_case_name()}/' \
                        + '{id}' + url
+
+        if len(self.args) == 0 and on_empty_args:
+            self.args = on_empty_args
 
 
 class Attribute:
