@@ -782,7 +782,7 @@ class Identifier(AvishanModel):
 
     @staticmethod
     def validate_signature(key: str) -> str:
-        return key  # todo
+        return key
 
     def __str__(self):
         return self.key
@@ -810,6 +810,10 @@ class Email(Identifier):
             send_mail(subject, message, get_avishan_config().DJANGO_SMTP_SENDER_ADDRESS, recipient_list, html_message)
         else:
             send_mail(subject, message, get_avishan_config().DJANGO_SMTP_SENDER_ADDRESS, recipient_list)
+
+    @staticmethod
+    def validate_signature(key: str) -> str:
+        return key.lower().strip()
 
 
 class Phone(Identifier):
