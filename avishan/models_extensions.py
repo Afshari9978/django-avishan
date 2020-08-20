@@ -175,7 +175,7 @@ class AvishanModelModelDetailsExtension:
     def _create_default_args(cls) -> List[FunctionAttribute]:
         from avishan.models import AvishanModel
         cls: AvishanModel
-        return [DjangoFieldAttribute(target=item) for item in cls._meta.fields]
+        return [DjangoFieldAttribute(target=item) for item in cls._meta.fields if not cls.is_field_readonly(field=item)]
 
     @classmethod
     def _update_default_args(cls) -> List[FunctionAttribute]:
