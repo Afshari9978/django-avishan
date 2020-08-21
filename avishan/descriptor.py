@@ -428,7 +428,10 @@ class DjangoFieldAttribute(Attribute):
     def __init__(self, target: models.Field):
         default = self.NO_DEFAULT
         if target.has_default():
-            default = target.get_default()
+            if isinstance(target.get_default(), Enum):
+                default = target.get_default().value
+            else:
+                default = target.get_default()
         super().__init__(
             name=target.name,
             type=self.define_representation_type(target),
