@@ -7,6 +7,7 @@ from django.core.handlers.wsgi import WSGIRequest
 from django.db import models
 from django.db.models import QuerySet
 from django.http import JsonResponse
+from django.http.response import HttpResponseBase
 from django.utils import timezone
 from django.views import View
 
@@ -124,7 +125,9 @@ class AvishanApiView(AvishanView):
                 current_request['request'].data = {}
 
         super().dispatch(request, *args, **kwargs)
-        return JsonResponse(self.response)
+        if current_request['can_touch_response']:
+            return JsonResponse(self.response)
+        return self.response
 
 
 class AvishanTemplateView(AvishanView):
@@ -228,7 +231,11 @@ class AvishanModelApiView(AvishanApiView):
 
             if isinstance(result, QuerySet):
                 result = self.model.queryset_handler(request.GET, queryset=result)
-        self.response[self.direct_callable.response_json_key] = self.parse_returned_data(result)
+        response = self.parse_returned_data(result)
+        if current_request['can_touch_response']:
+            self.response[self.direct_callable.response_json_key] = response
+        else:
+            self.response = response
 
     def post(self, request, *args, **kwargs):
         if self.direct_callable.dismiss_request_json_key:
@@ -238,17 +245,28 @@ class AvishanModelApiView(AvishanApiView):
 
         data = self.parse_request_data(**data)
         result = self.model_function(**data)
-        self.response[self.direct_callable.response_json_key] = self.parse_returned_data(result)
+        response = self.parse_returned_data(result)
+        if current_request['can_touch_response']:
+            self.response[self.direct_callable.response_json_key] = response
+        else:
+            self.response = response
 
     def put(self, request, *args, **kwargs):
         self.post(request, *args, **kwargs)
 
     def delete(self, request, *args, **kwargs):
         result = self.model_function()
-        self.response[self.direct_callable.response_json_key] = self.parse_returned_data(result)
+        response = self.parse_returned_data(result)
+        if current_request['can_touch_response']:
+            self.response[self.direct_callable.response_json_key] = response
+        else:
+            self.response = response
 
     @staticmethod
     def parse_returned_data(returned):
+        if isinstance(returned, HttpResponseBase):
+            current_request['can_touch_response'] = False
+            return returned
         if isinstance(returned, QuerySet):
             return [item.to_dict() for item in returned]
         elif isinstance(returned, list):

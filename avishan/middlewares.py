@@ -1,7 +1,5 @@
-import datetime
 import json
 import sys
-from typing import Type
 
 from django.contrib import messages
 from django.core.handlers.wsgi import WSGIRequest
@@ -61,6 +59,8 @@ class Wrapper:
         """Send request object to the next layer and wait for response"""
         try:
             response = self.get_response(current_request['request'])
+            if not current_request['can_touch_response']:
+                return response
         except AvishanException:
             pass
         except Exception as e:
@@ -104,6 +104,7 @@ class Wrapper:
         current_request.clear()
         current_request['request'] = None
         current_request['response'] = {}
+        current_request['can_touch_response'] = True
         current_request['is_tracked'] = False
 
         """If not checked "None", then switches between api & template"""
