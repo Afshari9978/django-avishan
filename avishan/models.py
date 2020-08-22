@@ -784,6 +784,12 @@ class Identifier(AvishanModel):
     def validate_signature(key: str) -> str:
         return key
 
+    @classmethod
+    def get_from_dict(cls, input_dict: dict) -> 'AvishanModel':
+        if 'key' in input_dict.keys():
+            return cls.get_or_create(key=input_dict['key'])
+        return super().get_from_dict(input_dict)
+
     def __str__(self):
         return self.key
 
