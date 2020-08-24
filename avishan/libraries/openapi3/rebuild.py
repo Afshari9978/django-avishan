@@ -1,5 +1,6 @@
 from typing import Tuple, List, Optional, Union
 
+import yaml
 from django.db.models.base import ModelBase
 from django.utils import timezone
 
@@ -127,7 +128,6 @@ class OpenApi:
         return {}
 
     def export_yaml(self) -> str:
-        import yaml
         return yaml.dump(self.export())
 
 

@@ -87,14 +87,14 @@ class AvishanConfigFather:
     ASYNC_AVAILABLE: bool = False
 
     # Email Providers
-    DJANGO_SMTP_EMAIL_ENABLE = False
+    DJANGO_EMAIL_ENABLE = False
     MAILGUN_EMAIL_ENABLE = False
 
     # SMS Providers
     KAVENEGAR_SMS_ENABLE = False
 
     # Django SMTP
-    DJANGO_SMTP_SENDER_ADDRESS: str = None
+    DJANGO_SENDER_ADDRESS: str = None
 
     # Mailgun
     MAILGUN_DOMAIN_NAME: str = None

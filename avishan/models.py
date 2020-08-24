@@ -802,7 +802,7 @@ class Email(Identifier):
 
         if get_avishan_config().MAILGUN_EMAIL_ENABLE:
             mailgun_send_mail(recipient_list=[self.key], subject=subject, message=message)
-        elif get_avishan_config().DJANGO_SMTP_EMAIL_ENABLE:
+        elif get_avishan_config().DJANGO_EMAIL_ENABLE:
             self.send_bulk_mail(subject, message, [self.key], html_message)
         else:
             raise ErrorMessageException(AvishanTranslatable(
@@ -813,9 +813,9 @@ class Email(Identifier):
     def send_bulk_mail(subject: str, message: str, recipient_list: List[str], html_message: str = None):
         from django.core.mail import send_mail
         if html_message is not None:
-            send_mail(subject, message, get_avishan_config().DJANGO_SMTP_SENDER_ADDRESS, recipient_list, html_message)
+            send_mail(subject, message, get_avishan_config().DJANGO_SENDER_ADDRESS, recipient_list, html_message)
         else:
-            send_mail(subject, message, get_avishan_config().DJANGO_SMTP_SENDER_ADDRESS, recipient_list)
+            send_mail(subject, message, get_avishan_config().DJANGO_SENDER_ADDRESS, recipient_list)
 
     @staticmethod
     def validate_signature(key: str) -> str:
@@ -1212,6 +1212,7 @@ class VerifiableAuthenticationType(AuthenticationType):
                 EN='Incorrect Code',
                 FA='کد اشتباه'
             ))
+        self.verification = None
         self.date_verified = timezone.now()
         self.save()
 
@@ -1274,7 +1275,7 @@ class KeyValueAuthentication(VerifiableAuthenticationType):
             user_user_group=user_user_group
         )
 
-        if len(password.strip()) == 0:
+        if password is not None and len(password.strip()) == 0:
             password = None
         if password:
             created.set_password(password)
@@ -1786,6 +1787,8 @@ class Country(AvishanModel):
     numeric_code = models.CharField(max_length=255, unique=True)
     flag_url = models.CharField(max_length=255, blank=True, null=True)
 
+    django_admin_search_fields = [name, alpha_2_code, alpha_3_code, native_name, numeric_code]
+
     # noinspection PyPep8Naming
     @classmethod
     def create(cls,
@@ -1830,3 +1833,6 @@ class Country(AvishanModel):
     @classmethod
     def class_plural_name(cls) -> str:
         return 'Countries'
+
+    def __str__(self):
+        return self.name
