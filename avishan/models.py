@@ -8,6 +8,7 @@ import pytz
 import stringcase
 from django.conf import settings
 from django.core.files.uploadedfile import InMemoryUploadedFile
+from django.template.loader import render_to_string
 from django.utils import timezone
 
 from avishan import current_request
@@ -560,18 +561,7 @@ class AvishanModel(
         """Usually when unique or one-to-one relations provided, this can help"""
         return cls.get(**input_dict)
 
-    # todo 0.2.2: check None amount for choice added fields
     def get_data_from_field(self, field: models.Field):
-        from avishan.exceptions import ErrorMessageException
-        if field.choices is not None:
-            for k, v in field.choices:
-                if k == self.__getattribute__(field.name):
-                    return v
-            raise ErrorMessageException(AvishanTranslatable(
-                EN=f'Incorrect Data entered for field {field.name} in model {self.class_name()}',
-                FA=f'اطلاعات نامعتبر برای فیلد {field.name} مدل {self.class_name()}'
-            ))
-
         if isinstance(field, models.ManyToManyField):
             return self.__getattribute__(field.name).all()
 
@@ -1332,12 +1322,16 @@ class KeyValueAuthentication(VerifiableAuthenticationType):
         if found._related_key_model() is Email:
             message = getattr(get_avishan_config(), stringcase.constcase(cls.class_name()) +
                               '_RESET_PASSWORD_BODY')
-            html_message = getattr(get_avishan_config(), stringcase.constcase(cls.class_name()) +
-                                   '_RESET_PASSWORD_HTML_BODY')
+            html_message = render_to_string(
+                template_name=getattr(get_avishan_config(), stringcase.constcase(cls.class_name()) +
+                                      '_RESET_PASSWORD_HTML_BODY_TEMPLATE_NAME'),
+                context={'token': found.change_password_token}
+            ) \
+                if getattr(get_avishan_config(), stringcase.constcase(cls.class_name()) +
+                           '_RESET_PASSWORD_HTML_BODY_TEMPLATE_NAME') \
+                else None
             if message:
                 message = message.format(token=found.change_password_token)
-            elif html_message:
-                html_message = html_message.format(code=found.change_password_token)
             found.key.send_mail(
                 subject=getattr(get_avishan_config(), stringcase.constcase(cls.class_name()) +
                                 '_RESET_PASSWORD_SUBJECT'),

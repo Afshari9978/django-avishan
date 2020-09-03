@@ -85,7 +85,7 @@ class AuthException(AvishanException):
 
     PASSWORD_NOT_FOUND = 15, AvishanTranslatable(
         EN='Password not found for user account',
-        FA='رمز برای این کاربری تنظیم نشده است'
+        FA='رمز برای این کاربر تنظیم نشده است'
     )
 
     def __init__(self, error_kind: tuple = NOT_DEFINED):

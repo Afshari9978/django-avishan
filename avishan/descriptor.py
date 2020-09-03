@@ -301,7 +301,8 @@ class Attribute:
                  default=NO_DEFAULT,
                  description: str = None,
                  example: str = None,
-                 is_required: bool = True
+                 is_required: bool = True,
+                 choices: List[str] = None
                  ):
         self.name = name
         self.type: Attribute.TYPE = type
@@ -313,6 +314,7 @@ class Attribute:
         self.description = description
         self.example = example
         self.is_required = is_required
+        self.choices = choices
         self._doc = None
 
     @classmethod
@@ -432,12 +434,20 @@ class DjangoFieldAttribute(Attribute):
                 default = target.get_default().value
             else:
                 default = target.get_default()
+
+        choices = None
+        if target.choices:
+            choices = []
+            for value, label in target.choices:
+                choices.append(label)
+
         super().__init__(
             name=target.name,
             type=self.define_representation_type(target),
             description=target.help_text,
             default=default,
-            is_required=self.check_is_required(target)
+            is_required=self.check_is_required(target),
+            choices=choices
         )
         if self.type is Attribute.TYPE.OBJECT:
             if isinstance(target, (models.OneToOneField, models.ForeignKey)):

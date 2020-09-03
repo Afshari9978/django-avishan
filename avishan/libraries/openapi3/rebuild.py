@@ -193,7 +193,8 @@ class Schema:
                  default=Attribute.NO_DEFAULT,
                  items: 'Schema' = None,
                  properties: List[Property] = None,
-                 description: str = None
+                 description: str = None,
+                 enum: List[str] = None
                  ):
         if properties is None:
             properties = []
@@ -205,6 +206,7 @@ class Schema:
         self.items = items
         self.properties = properties
         self.description = description
+        self.enum = enum
 
     @classmethod
     def create_from_attribute(cls, attribute: Attribute, request_body_related: bool = False) -> 'Schema':
@@ -224,7 +226,8 @@ class Schema:
         create_kwargs = {
             'type': cls.type_exchange(attribute.type)[0],
             'format': cls.type_exchange(attribute.type)[1],
-            'description': attribute.description
+            'description': attribute.description,
+            'enum': attribute.choices
         }
         if attribute.type is Attribute.TYPE.ARRAY:
             create_kwargs['items'] = cls.type_exchange(attribute.type_of)
@@ -260,7 +263,8 @@ class Schema:
                 "$ref": f"#/components/schemas/{self.name}"
             }
         data = {
-            'type': self.type
+            'type': self.type,
+            'description': ""
         }
         if self.format:
             data['format'] = self.format
@@ -270,6 +274,14 @@ class Schema:
             data['description'] = self.description
         if self.items:
             data['items'] = self.items.export()
+        if self.enum:
+            enum = 'Enum: '
+            for item in self.enum:
+                enum += f"`{item}`, "
+            data['description'] = enum[:-2] + "." + data['description']
+
+        if len(data['description']) == 0:
+            del data['description']
 
         if len(self.properties) > 0:
             data['properties'] = {}
