@@ -1371,7 +1371,6 @@ class KeyValueAuthentication(VerifiableAuthenticationType):
         found._apply_reset_password(password)
 
     def _reset_password(self):
-        self.hashed_password = None
         self.change_password_token = ''.join(
             random.choice(getattr(get_avishan_config(), stringcase.constcase(self.class_name()) +
                                   '_RESET_PASSWORD_TOKEN_DOMAIN')) for _ in
