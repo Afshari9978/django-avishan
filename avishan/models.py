@@ -561,6 +561,10 @@ class AvishanModel(
         """Usually when unique or one-to-one relations provided, this can help"""
         return cls.get(**input_dict)
 
+    @classmethod
+    def request_arg_get_from_dict(cls, input_dict: dict) -> 'AvishanModel':
+        return cls.get_from_dict(input_dict)
+
     def get_data_from_field(self, field: models.Field):
         if isinstance(field, models.ManyToManyField):
             return self.__getattribute__(field.name).all()

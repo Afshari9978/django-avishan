@@ -337,7 +337,7 @@ class AvishanModelApiView(AvishanApiView):
             raise ErrorMessageException(f'value for "{function_attribute.name}" must be dict consist of id or other '
                                         f'unique values so that db can find corresponding object')
 
-        return function_attribute.type_of.get_from_dict(target_dict)
+        return function_attribute.type_of.request_arg_get_from_dict(target_dict)
 
 
 class PasswordHash(AvishanApiView):
