@@ -11,10 +11,10 @@ def distance_matrix(origins: List[Tuple[float, float]], destinations: List[Tuple
         raise ValueError('length of entered lists can\'t be 0')
     origins_text = ''
     for item in origins:
-        origins_text += f'|{item[0]},{item[1]}'
+        origins_text += f'%7C{item[0]},{item[1]}'
     destinations_text = ''
     for item in destinations:
-        destinations_text += f'|{item[0]},{item[1]}'
+        destinations_text += f'%7C{item[0]},{item[1]}'
 
     url = f'https://api.neshan.org/v1/distance-matrix?' \
           f'origins={origins_text[1:]}&destinations={destinations_text[1:]}'
