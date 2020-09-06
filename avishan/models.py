@@ -795,9 +795,9 @@ class Email(Identifier):
         from avishan.libraries.mailgun.functions import send_mail as mailgun_send_mail
 
         if get_avishan_config().MAILGUN_EMAIL_ENABLE:
-            mailgun_send_mail(recipient_list=[self.key], subject=subject, message=message)
+            return mailgun_send_mail(recipient_list=[self.key], subject=subject, message=message)
         elif get_avishan_config().DJANGO_EMAIL_ENABLE:
-            self.send_bulk_mail(subject, message, [self.key], html_message)
+            return self.send_bulk_mail(subject, message, [self.key], html_message)
         else:
             raise ErrorMessageException(AvishanTranslatable(
                 EN='Email Provider not found. Enable in "Email Providers" avishan config section'
@@ -807,9 +807,9 @@ class Email(Identifier):
     def send_bulk_mail(subject: str, message: str, recipient_list: List[str], html_message: str = None):
         from django.core.mail import send_mail
         if html_message is not None:
-            send_mail(subject, message, get_avishan_config().DJANGO_SENDER_ADDRESS, recipient_list, html_message)
+            return send_mail(subject, message, get_avishan_config().DJANGO_SENDER_ADDRESS, recipient_list, html_message)
         else:
-            send_mail(subject, message, get_avishan_config().DJANGO_SENDER_ADDRESS, recipient_list)
+            return send_mail(subject, message, get_avishan_config().DJANGO_SENDER_ADDRESS, recipient_list)
 
     @staticmethod
     def validate_signature(key: str) -> str:
@@ -1218,10 +1218,8 @@ class VerifiableAuthenticationType(AuthenticationType):
         found_object: cls = data['found_object']
         if getattr(get_avishan_config(), stringcase.constcase(cls.class_name()) + '_VERIFICATION_REQUIRED') \
                 and found_object.date_verified is None:
-            raise ErrorMessageException(AvishanTranslatable(
-                EN='Account not verified',
-                FA='حساب تایید نشده است'
-            ))
+            data['submit_login'] = False
+            current_request['status_code'] = status.HTTP_401_UNAUTHORIZED
 
     def _successful_verification_post_actions(self):
         """If successful verification"""
