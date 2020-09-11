@@ -17,7 +17,7 @@ def distance_matrix(origins: List[Tuple[float, float]], destinations: List[Tuple
         destinations_text += f'%7C{item[0]},{item[1]}'
 
     url = f'https://api.neshan.org/v1/distance-matrix?' \
-          f'origins={origins_text[1:]}&destinations={destinations_text[1:]}'
+          f'origins={origins_text[3:]}&destinations={destinations_text[3:]}'
     response = requests.get(
         url=url,
         headers={'Api-Key': get_avishan_config().NESHAN_API_KEY}
