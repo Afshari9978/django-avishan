@@ -19,7 +19,7 @@ class AvishanViewDecorator:
     def __call__(self, view_function):
 
         def wrapper(*args, **kwargs):
-            current_request['view_name'] = view_function.__name__
+            current_request['view_class'] = view_function
             current_request['request_track_exec'] = [
                 {'title': 'begin', 'now': timezone.now()}
             ]

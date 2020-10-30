@@ -77,6 +77,8 @@ class Wrapper:
                 current_request['response']['messages'] = current_request['messages']
             else:
                 self.fill_messages_framework(current_request)
+                if current_request['on_error_view_class'] and response.status_code == 500:
+                    response = current_request['on_error_view_class'].render()
                 # todo fix problem on template: not showing thrown exception message
 
         add_token_to_response(response)
@@ -93,14 +95,16 @@ class Wrapper:
 
         if is_api:
             return JsonResponse(response, status=status_code, safe=json_safe)
-        elif response.status_code == 200 and status_code != 200:
-            response.status_code = status_code
 
+        """Do not change redirection status codes"""
+        if response.status_code // 100 != 3:
+            response.status_code = status_code
         return response
 
     @staticmethod
     def initialize_request_storage(current_request):
         from avishan.models import RequestTrack
+        # todo convert this to object, instead of dictionary style
         current_request.clear()
         current_request['request'] = None
         current_request['response'] = {}
@@ -111,7 +115,8 @@ class Wrapper:
         current_request['is_api'] = None
 
         current_request['add_token'] = False
-        current_request['view_name'] = "NOT_AVAILABLE"
+        current_request['view_class'] = None
+        current_request['on_error_view_class'] = None
         current_request['start_time'] = None
         current_request['end_time'] = None
         current_request['view_start_time'] = None
@@ -180,6 +185,11 @@ class Wrapper:
         for key in current_request['request'].FILES.keys():
             request_headers += f'FILE({key})\n'
 
+        from avishan.views.class_based import AvishanView
+        view_name = current_request['view_class'].__class__.__name__ \
+            if isinstance(current_request['view_class'], AvishanView) \
+            else current_request['view_class'].__name__
+
         try:
             response_data = json.dumps(current_request['response'], indent=2)
         except:
@@ -188,7 +198,7 @@ class Wrapper:
 
         try:
             created = current_request['request_track_object'].update(
-                view_name=current_request['view_name'],
+                view_name=view_name,
                 url=current_request['request'].get_full_path(),
                 status_code=current_request['status_code'],
                 method=current_request['request'].method,

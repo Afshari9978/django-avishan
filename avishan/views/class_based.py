@@ -52,7 +52,8 @@ class AvishanView(View):
                     self.__setattr__(kwarg_key, self.cast_data(kwarg_key, data[0]))
 
         self.current_request = current_request
-        self.current_request['view_name'] = self.__class__.__name__
+        self.current_request['view_class'] = self
+        self.current_request['on_error_view_class'] = self
         self.current_request['request_track_exec'] = [
             {'title': 'begin', 'now': timezone.now()}
         ]
