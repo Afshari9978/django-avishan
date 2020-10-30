@@ -334,6 +334,8 @@ class AvishanModelApiView(AvishanApiView):
         """
 
         if not isinstance(target_dict, dict):
+            if target_dict is None:
+                return None
             raise ErrorMessageException(f'value for "{function_attribute.name}" must be dict consist of id or other '
                                         f'unique values so that db can find corresponding object')
 
