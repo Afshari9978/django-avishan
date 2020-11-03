@@ -30,7 +30,10 @@ class Wrapper:
         """Checks for avoid-touch requests"""
         if discard_monitor(current_request['request'].get_full_path()):
             print(f"NOT_MONITORED: {current_request['request'].get_full_path()}")
-            return self.get_response(current_request['request'])
+            response = self.get_response(request)
+            if 'token' in request.COOKIES.keys():
+                response.set_cookie('token', request.COOKIES['token'])
+            return response
 
         current_request['start_time'] = start_time
 
@@ -77,6 +80,7 @@ class Wrapper:
                 current_request['response']['messages'] = current_request['messages']
             else:
                 self.fill_messages_framework(current_request)
+                print(current_request)
                 if current_request['on_error_view_class'] and response.status_code == 500:
                     response = current_request['on_error_view_class'].render()
                 # todo fix problem on template: not showing thrown exception message
@@ -186,9 +190,12 @@ class Wrapper:
             request_headers += f'FILE({key})\n'
 
         from avishan.views.class_based import AvishanView
-        view_name = current_request['view_class'].__class__.__name__ \
-            if isinstance(current_request['view_class'], AvishanView) \
-            else current_request['view_class'].__name__
+        if current_request['view_class']:
+            view_name = current_request['view_class'].__class__.__name__ \
+                if isinstance(current_request['view_class'], AvishanView) \
+                else current_request['view_class'].__name__
+        else:
+            view_name = None
 
         try:
             response_data = json.dumps(current_request['response'], indent=2)

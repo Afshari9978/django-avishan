@@ -223,7 +223,8 @@ def delete_token_from_request(rendered_response=None):
         except KeyError:
             pass
     else:
-        rendered_response.delete_cookie('token')
+        # rendered_response.delete_cookie('token')
+        a = 1  # todo removed for ajax in astra project
 
 
 def encode_token(authentication_object: 'AuthenticationType') -> Optional[str]:
