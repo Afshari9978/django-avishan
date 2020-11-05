@@ -6,15 +6,16 @@ from typing import List, Type, Union, Tuple, Dict
 
 import pytz
 import stringcase
+from crum import get_current_request
 from django.conf import settings
 from django.core.files.uploadedfile import InMemoryUploadedFile
 from django.template.loader import render_to_string
 from django.utils import timezone
 
-from avishan import current_request
 from avishan.configure import get_avishan_config, AvishanConfigFather
 from avishan.exceptions import AuthException, ErrorMessageException
 from avishan.libraries.faker import AvishanFaker
+from avishan.middlewares import AvishanRequestStorage
 from avishan.misc import status
 from avishan.misc.translation import AvishanTranslatable
 from avishan.descriptor import DirectCallable
@@ -148,11 +149,11 @@ class AvishanModel(
         # todo show filterable fields on doc
         # todo use django-filter for on-url filter
 
-        if 'request' in current_request.keys():
-            for item in current_request['request'].GET.keys():
+        if get_current_request():
+            for item in get_current_request().GET.keys():
                 if item.startswith('filter_'):
                     field = cls.get_field(item[7:])
-                    kwargs[field.name] = field.related_model.get(id=current_request['request'].GET[item])
+                    kwargs[field.name] = field.related_model.get(id=get_current_request().GET[item])
 
         if len(kwargs.items()) > 0:
             return cls.objects.filter(**kwargs)
@@ -372,7 +373,7 @@ class AvishanModel(
         base_kwargs = {}
         many_to_many_kwargs = {}
 
-        if 'is_api' in current_request.keys() and not current_request['is_api']:
+        if not get_current_request().avishan.is_api:
             kwargs = cls._clean_form_post(kwargs)
 
         for field in cls.get_full_fields():
@@ -1100,16 +1101,18 @@ class AuthenticationType(AvishanModel):
     def _submit_logout(self):
         self.last_logout = timezone.now()
         self.save()
-        current_request['add_token'] = False
+        get_current_request().avishan.add_token = False
 
     def _populate_current_request(self):
-        current_request['base_user'] = self.user_user_group.base_user
-        current_request['user_group'] = self.user_user_group.user_group
-        current_request['user_user_group'] = self.user_user_group
-        current_request['authentication_object'] = self
-        if current_request['language'] is None:
-            current_request['language'] = self.user_user_group.base_user.language
-        current_request['add_token'] = True
+        request = get_current_request()
+        request.avishan: AvishanRequestStorage
+        request.avishan.base_user = self.user_user_group.base_user
+        request.avishan.user_group = self.user_user_group.user_group
+        request.avishan.user_user_group = self.user_user_group
+        request.avishan.authentication_object = self
+        if request.avishan.language is None:
+            request.avishan.language = self.user_user_group.base_user.language
+        request.avishan.add_token = True
 
 
 class VerifiableAuthenticationType(AuthenticationType):
@@ -1219,7 +1222,7 @@ class VerifiableAuthenticationType(AuthenticationType):
         if getattr(get_avishan_config(), stringcase.constcase(cls.class_name()) + '_VERIFICATION_REQUIRED') \
                 and found_object.date_verified is None:
             data['submit_login'] = False
-            current_request['status_code'] = status.HTTP_401_UNAUTHORIZED
+            get_current_request().avishan.status_code = status.HTTP_401_UNAUTHORIZED
 
     def _successful_verification_post_actions(self):
         """If successful verification"""
@@ -1601,7 +1604,7 @@ class Image(AvishanModel):
             ))
 
         created = Image.create(
-            base_user=current_request['base_user']
+            base_user=get_current_request().avishan.base_user
         )
         created.file.save("uploaded_images/" + file.name, file, save=True)
         created.save()
@@ -1617,7 +1620,7 @@ class Image(AvishanModel):
         :param str? name: key in multipart form data
         :response Image 200: Saved
         """
-        return cls.image_from_in_memory_upload(file=current_request['request'].FILES.get(name))
+        return cls.image_from_in_memory_upload(file=get_current_request().FILES.get(name))
 
 
 class RequestTrack(AvishanModel):
@@ -1709,7 +1712,7 @@ class TranslatableChar(AvishanModel):
         return super().create(en=en, fa=fa)
 
     def to_dict(self, exclude_list: List[Union[models.Field, str]] = ()) -> Union[str, dict]:
-        if current_request['language'] == 'all':
+        if get_current_request().avishan.language == 'all':
             return {
                 'en': self.en,
                 'fa': self.fa
@@ -1718,7 +1721,7 @@ class TranslatableChar(AvishanModel):
 
     def __str__(self):
         try:
-            return self.__getattribute__(current_request['language'].lower())
+            return self.__getattribute__(get_current_request().avishan.language.lower())
         except:
             return self.__getattribute__(get_avishan_config().LANGUAGE.lower())
 
@@ -1752,8 +1755,8 @@ class Activity(AvishanModel):
         :param str data: notes about activity, defaults to None
         :return Activity: created activity
         """
-        request_track = current_request['request_track_object']
-        user_user_group = current_request['user_user_group']
+        request_track = get_current_request().avishan.request_track_object
+        user_user_group = get_current_request().avishan.user_user_group
         if not request_track and not user_user_group:
             return
         return super().create(

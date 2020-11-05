@@ -1,25 +1,21 @@
-import datetime
 import inspect
 import json
 from typing import List, get_type_hints, Type, Callable, Optional, Union
 
 from django.core.handlers.wsgi import WSGIRequest
-from django.db import models
 from django.db.models import QuerySet
 from django.http import JsonResponse
 from django.http.response import HttpResponseBase
 from django.utils import timezone
 from django.views import View
 
-from avishan import current_request
 from avishan.configure import get_avishan_config
 from avishan.descriptor import DirectCallable, FunctionAttribute
 from avishan.exceptions import ErrorMessageException, AvishanException, AuthException
-from avishan.libraries.openapi3.classes import ApiDocumentation, Path, PathGetMethod, PathResponseGroup, \
-    PathResponse, Content, Schema, PathPostMethod, PathRequest, PathPutMethod, PathDeleteMethod
 from avishan.misc import status
 from avishan.misc.translation import AvishanTranslatable
 from avishan.models import AvishanModel, RequestTrack
+from avishan.middlewares import AvishanRequestStorage
 
 
 # todo fix cors motherfucker
@@ -30,8 +26,11 @@ class AvishanView(View):
     is_api: bool = None
 
     def setup(self, request, *args, **kwargs):
+        # noinspection PyTypeHints
+        request.avishan: AvishanRequestStorage
+
         super().setup(request, *args, **kwargs)
-        self.response: dict = current_request['response']
+        self.response: dict = request.avishan.response
         self.request: WSGIRequest
         self.class_attributes_type = get_type_hints(self.__class__)
 
@@ -51,19 +50,19 @@ class AvishanView(View):
                 else:
                     self.__setattr__(kwarg_key, self.cast_data(kwarg_key, data[0]))
 
-        self.current_request = current_request
-        self.current_request['view_class'] = self
-        self.current_request['on_error_view_class'] = self
-        self.current_request['request_track_exec'] = [
-            {'title': 'begin', 'now': timezone.now()}
-        ]
-        self.current_request['is_api'] = self.is_api
-        if self.track_it and not self.current_request['is_tracked']:
-            self.current_request['is_tracked'] = True
-            self.current_request['request_track_object'] = RequestTrack.objects.create()
+        request.avishan.view_class = self
+        request.avishan.on_error_view_class = self
+
+        request.avishan.is_api = self.is_api
+        if self.track_it and not request.avishan.is_tracked:
+            request.avishan.is_tracked = True
+            request.avishan.request_track_object = RequestTrack.objects.create()
 
     def http_method_not_allowed(self, request, *args, **kwargs):
-        self.current_request['status_code'] = status.HTTP_405_METHOD_NOT_ALLOWED
+        # noinspection PyTypeHints
+        request.avishan: AvishanRequestStorage
+
+        request.avishan.status_code = status.HTTP_405_METHOD_NOT_ALLOWED
         self.response['allowed_methods'] = self.get_allowed_methods()
         return super().http_method_not_allowed(request, *args, **kwargs)
 
@@ -75,31 +74,34 @@ class AvishanView(View):
         return allowed
 
     def dispatch(self, request, *args, **kwargs):
-        if self.current_request['exception']:
+        # noinspection PyTypeHints
+        request.avishan: AvishanRequestStorage
+
+        if request.avishan.exception:
             return
 
         try:
-            if self.authenticate and not self.is_authenticated():
+            if self.authenticate and not self.is_authenticated(request):
                 raise AuthException(AuthException.TOKEN_NOT_FOUND)
-            self.current_request['view_start_time'] = timezone.now()
+            request.avishan.view_start_time = timezone.now()
             result = super().dispatch(request, *args, **kwargs)
-            self.current_request['view_end_time'] = timezone.now()
+            request.avishan.view_end_time = timezone.now()
 
         except AvishanException as e:
             raise e
         except Exception as e:
             AvishanException(wrap_exception=e)
             raise e
-        if current_request['exception']:
+        if request.avishan.exception:
             return
         return result
 
-    def is_authenticated(self) -> bool:
+    def is_authenticated(self, request) -> bool:
         """
-        Checks for user available in current_request storage
+        Checks for user available in storage
         :return: true if authenticated
         """
-        if not self.current_request['authentication_object']:
+        if not request.avishan.authentication_object:
             return False
         return True
 
@@ -116,17 +118,20 @@ class AvishanApiView(AvishanView):
     authenticate = True
 
     def dispatch(self, request, *args, **kwargs):
-        if self.current_request['request'].method not in ['GET', 'DELETE']:
+        # noinspection PyTypeHints
+        request.avishan: AvishanRequestStorage
+
+        if request.method not in ['GET', 'DELETE']:
             try:
-                if len(current_request['request'].body) > 0:
-                    current_request['request'].data = json.loads(current_request['request'].body.decode('utf-8'))
+                if len(request.body) > 0:
+                    request.data = json.loads(request.body.decode('utf-8'))
                 else:
-                    current_request['request'].data = {}
+                    request.data = {}
             except:
-                current_request['request'].data = {}
+                request.data = {}
 
         super().dispatch(request, *args, **kwargs)
-        if current_request['can_touch_response']:
+        if request.avishan.can_touch_response:
             return JsonResponse(self.response)
         return self.response
 
@@ -142,29 +147,32 @@ class AvishanTemplateView(AvishanView):
         self.context = {
             **self.context,
             **{
-                'CURRENT_REQUEST': self.current_request,
+                'CURRENT_REQUEST': request,
                 'AVISHAN_CONFIG': get_avishan_config(),
                 'self': self
             }
         }
 
     def dispatch(self, request, *args, **kwargs):
-        self.parse_request_post_to_data()
+        self.parse_request_post_to_data(request)
 
         return super().dispatch(request, *args, **kwargs)
 
-    def parse_request_post_to_data(self):
-        if self.current_request['request'].method in ['POST', 'PUT']:
+    def parse_request_post_to_data(self, request):
+        # noinspection PyTypeHints
+        request.avishan: AvishanRequestStorage
+
+        if request.method in ['POST', 'PUT']:
             try:
-                if len(self.current_request['request'].body) > 0:
-                    self.current_request['request'].data = dict(self.current_request['request'].POST)
-                    for key, value in self.current_request['request'].data.items():
+                if len(request.body) > 0:
+                    request.data = dict(request.POST)
+                    for key, value in request.data.items():
                         if len(value) == 1:
-                            self.current_request['request'].data[key] = value[0]
+                            request.data[key] = value[0]
                 else:
-                    self.current_request['request'].data = {}
+                    request.data = {}
             except:
-                self.current_request['request'].data = {}
+                request.data = {}
 
     def render(self):
         from django.shortcuts import render as django_render
@@ -225,6 +233,9 @@ class AvishanModelApiView(AvishanApiView):
                 ))
 
     def get(self, request, *args, **kwargs):
+        # noinspection PyTypeHints
+        request.avishan: AvishanRequestStorage
+
         if self.model_function_name == 'get':
             result = self.model_item
         else:
@@ -233,12 +244,15 @@ class AvishanModelApiView(AvishanApiView):
             if isinstance(result, QuerySet):
                 result = self.model.queryset_handler(request.GET, queryset=result)
         response = self.parse_returned_data(result)
-        if current_request['can_touch_response']:
+        if request.avishan.can_touch_response:
             self.response[self.direct_callable.response_json_key] = response
         else:
             self.response = response
 
     def post(self, request, *args, **kwargs):
+        # noinspection PyTypeHints
+        request.avishan: AvishanRequestStorage
+
         if self.direct_callable.dismiss_request_json_key:
             data = request.data
         else:
@@ -247,7 +261,7 @@ class AvishanModelApiView(AvishanApiView):
         data = self.parse_request_data(**data)
         result = self.model_function(**data)
         response = self.parse_returned_data(result)
-        if current_request['can_touch_response']:
+        if request.avishan.can_touch_response:
             self.response[self.direct_callable.response_json_key] = response
         else:
             self.response = response
@@ -256,17 +270,23 @@ class AvishanModelApiView(AvishanApiView):
         self.post(request, *args, **kwargs)
 
     def delete(self, request, *args, **kwargs):
+        # noinspection PyTypeHints
+        request.avishan: AvishanRequestStorage
+
         result = self.model_function()
-        response = self.parse_returned_data(result)
-        if current_request['can_touch_response']:
+        response = self.parse_returned_data(request, result)
+        if request.avishan.can_touch_response:
             self.response[self.direct_callable.response_json_key] = response
         else:
             self.response = response
 
     @staticmethod
-    def parse_returned_data(returned):
+    def parse_returned_data(request, returned):
+        # noinspection PyTypeHints
+        request.avishan: AvishanRequestStorage
+
         if isinstance(returned, HttpResponseBase):
-            current_request['can_touch_response'] = False
+            request.avishan.can_touch_response = False
             return returned
         if isinstance(returned, QuerySet):
             return [item.to_dict() for item in returned]
@@ -348,6 +368,9 @@ class PasswordHash(AvishanApiView):
 
     def get(self, request, *args, **kwargs):
         import bcrypt
-        current_request['response']['hashed'] = bcrypt.hashpw(kwargs['password'].encode('utf8'),
-                                                              bcrypt.gensalt()).decode('utf8')
-        return JsonResponse(current_request['response'])
+        # noinspection PyTypeHints
+        request.avishan: AvishanRequestStorage
+
+        request.avishan.response['hashed'] = bcrypt.hashpw(kwargs['password'].encode('utf8'),
+                                                           bcrypt.gensalt()).decode('utf8')
+        return JsonResponse(request.avishan.response)

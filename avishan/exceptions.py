@@ -1,20 +1,9 @@
 from typing import Optional, Union, List
 
-from . import current_request
 from .misc import status
 from .misc.translation import AvishanTranslatable
+from crum import get_current_request
 
-"""
-try:
-    b = json.dumps(a, default=lambda o: o.__dict__, indent=2)
-except Exception as e:
-    c = 1
-current_request['locals'] = json.dumps(exc_value.__traceback__.tb_frame.f_locals, default=lambda o: o.__dict__,
-                                       indent=2)                                      
-"""
-
-
-# todo save locals too
 
 class AvishanException(Exception):
     def __init__(
@@ -23,6 +12,7 @@ class AvishanException(Exception):
             status_code: int = status.HTTP_400_BAD_REQUEST
     ):
         save_traceback()
+        request = get_current_request()
         if wrap_exception:
             if isinstance(wrap_exception, KeyError):
                 body = f'field {wrap_exception.args[0]} not found in data and its required'
@@ -33,14 +23,14 @@ class AvishanException(Exception):
                     body = str(wrap_exception.args[0])
                 else:
                     body = str(wrap_exception.args)[1:-1]
-            current_request['exception'] = wrap_exception
-            current_request['status_code'] = status.HTTP_418_IM_TEAPOT
+            request.avishan.exception = wrap_exception
+            request.avishan.status_code = status.HTTP_418_IM_TEAPOT
             add_error_message_to_response(
                 body=body,
             )
         else:
-            current_request['exception'] = self
-            current_request['status_code'] = status_code
+            request.avishan.exception = self
+            request.avishan.status_code = status_code
 
 
 class AuthException(AvishanException):
@@ -141,7 +131,7 @@ def add_debug_message_to_response(body: str = None, title: str = None):
         debug['body'] = body
     if title is not None:
         debug['title'] = title
-    current_request['messages']['debug'].append(debug)
+    get_current_request().avishan.messages['debug'].append(debug)
 
 
 def add_info_message_to_response(body: str = None, title: str = None):
@@ -150,7 +140,7 @@ def add_info_message_to_response(body: str = None, title: str = None):
         info['body'] = body
     if title is not None:
         info['title'] = title
-    current_request['messages']['info'].append(info)
+    get_current_request().avishan.messages['info'].append(info)
 
 
 def add_success_message_to_response(body: str = None, title: str = None):
@@ -159,7 +149,7 @@ def add_success_message_to_response(body: str = None, title: str = None):
         success['body'] = body
     if title is not None:
         success['title'] = title
-    current_request['messages']['success'].append(success)
+    get_current_request().avishan.messages['success'].append(success)
 
 
 def add_warning_message_to_response(body: str = None, title: str = None):
@@ -168,12 +158,10 @@ def add_warning_message_to_response(body: str = None, title: str = None):
         warning['body'] = body
     if title is not None:
         warning['title'] = title
-    current_request['messages']['warning'].append(warning)
+    get_current_request().avishan.messages['warning'].append(warning)
 
 
 def add_error_message_to_response(body: str = None, title: str = None, code=None):
-    if 'messages' not in current_request.keys():
-        return
     error = {}
     if body is not None:
         error['body'] = body
@@ -181,12 +169,13 @@ def add_error_message_to_response(body: str = None, title: str = None, code=None
         error['title'] = title
     if code is not None:
         error['code'] = code
-    current_request['messages']['error'].append(error)
+    get_current_request().avishan.messages['error'].append(error)
 
 
 def save_traceback():
+    request = get_current_request()
     try:
-        if current_request['traceback'] is not None:
+        if request.avishan.traceback is not None:
             return
     except KeyError:
         return
@@ -196,9 +185,6 @@ def save_traceback():
         exc_type, exc_value, exc_tb,
     )
     if tbe.exc_traceback is not None:
-        current_request['traceback'] = ''.join(tbe.format())
-        if current_request['DEBUG']:
-            print(current_request['traceback'])
-        if current_request['exception_record']:
-            current_request['exception_record'].traceback = current_request['traceback']
-            current_request['exception_record'].save()
+        request.avishan.traceback = ''.join(tbe.format())
+        if request.avishan.debug:
+            print(request.avishan.traceback)

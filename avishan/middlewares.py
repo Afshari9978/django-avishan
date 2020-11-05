@@ -1,41 +1,39 @@
+import datetime
 import json
 import sys
+from typing import Optional, Union
 
 from django.contrib import messages
 from django.core.handlers.wsgi import WSGIRequest
 from django.http import JsonResponse
 from django.utils import timezone
 
-from avishan.configure import get_avishan_config
-from avishan.exceptions import AvishanException, save_traceback
-
 
 class Wrapper:
     """this middleware creates "current_request" storage for each incoming request"""
 
     def __init__(self, get_response):
+        from avishan.configure import get_avishan_config
+
         self.get_response = get_response
         get_avishan_config().on_startup()
 
     def __call__(self, request: WSGIRequest):
         from avishan.utils import discard_monitor, find_token, decode_token, add_token_to_response, find_and_check_user
-        from avishan import current_request
+        from avishan.exceptions import AvishanException
+        from avishan.exceptions import save_traceback
+        from avishan.configure import get_avishan_config
 
-        start_time = timezone.now()
-
-        self.initialize_request_storage(current_request)
-        current_request['request'] = request
-        current_request['language'] = request.GET.get('language', current_request['language'])
+        request.avishan = AvishanRequestStorage(request)
 
         """Checks for avoid-touch requests"""
-        if discard_monitor(current_request['request'].get_full_path()):
-            print(f"NOT_MONITORED: {current_request['request'].get_full_path()}")
+        if discard_monitor(request.get_full_path()):
+            print(f"NOT_MONITORED: {request.get_full_path()}")
             response = self.get_response(request)
             if 'token' in request.COOKIES.keys():
                 response.set_cookie('token', request.COOKIES['token'])
+            del request.avishan
             return response
-
-        current_request['start_time'] = start_time
 
         """Find token and parse it"""
         """
@@ -53,16 +51,14 @@ class Wrapper:
             save_traceback()
             AvishanException(e)
 
-        if current_request['language'] is None:
-            current_request['language'] = get_avishan_config().LANGUAGE
-
         get_avishan_config().on_request()
 
         # todo 0.2.2 check for 'avishan_' in request bodies
         """Send request object to the next layer and wait for response"""
         try:
-            response = self.get_response(current_request['request'])
-            if not current_request['can_touch_response']:
+            response = self.get_response(request)
+            if not request.avishan.can_touch_response:
+                del request.avishan
                 return response
         except AvishanException:
             pass
@@ -71,31 +67,29 @@ class Wrapper:
             AvishanException(e)
 
         """messages"""
-        if current_request['messages']['debug'] or current_request['messages']['info'] or \
-                current_request['messages']['success'] or current_request['messages']['warning'] or \
-                current_request['messages']['error']:
+        if request.avishan.have_message():
             # todo 0.2.3: check for debug=True
 
-            if current_request['is_api']:
-                current_request['response']['messages'] = current_request['messages']
+            if request.avishan.is_api:
+                request.avishan.response['messages'] = request.avishan.messages
             else:
-                self.fill_messages_framework(current_request)
-                print(current_request)
-                if current_request['on_error_view_class'] and response.status_code == 500:
-                    response = current_request['on_error_view_class'].render()
+                # noinspection PyTypeChecker
+                self.fill_messages_framework(request)
+                if request.avishan.on_error_view_class and response.status_code == 500:
+                    response = request.avishan.on_error_view_class.render()
                 # todo fix problem on template: not showing thrown exception message
 
         add_token_to_response(response)
-        status_code = current_request['status_code']
-        is_api = current_request['is_api']
-        json_safe = not current_request['json_unsafe']
-        if current_request['is_api']:
-            response = current_request['response'].copy()
+        status_code = request.avishan.status_code
+        is_api = request.avishan.is_api
+        json_safe = not request.avishan.json_unsafe
+        if is_api:
+            response = request.avishan.response.copy()
 
-        if current_request['is_tracked'] or current_request['exception'] is not None:
-            self.save_request_track(current_request)
+        if request.avishan.is_tracked or request.avishan.exception is not None:
+            self.save_request_track(request)
 
-        self.initialize_request_storage(current_request)
+        del request.avishan
 
         if is_api:
             return JsonResponse(response, status=status_code, safe=json_safe)
@@ -106,134 +100,154 @@ class Wrapper:
         return response
 
     @staticmethod
-    def initialize_request_storage(current_request):
-        from avishan.models import RequestTrack
-        # todo convert this to object, instead of dictionary style
-        current_request.clear()
-        current_request['request'] = None
-        current_request['response'] = {}
-        current_request['can_touch_response'] = True
-        current_request['is_tracked'] = False
-
-        """If not checked "None", then switches between api & template"""
-        current_request['is_api'] = None
-
-        current_request['add_token'] = False
-        current_request['view_class'] = None
-        current_request['on_error_view_class'] = None
-        current_request['start_time'] = None
-        current_request['end_time'] = None
-        current_request['view_start_time'] = None
-        current_request['view_end_time'] = None
-        current_request['json_unsafe'] = False
-        current_request['base_user'] = None
-        current_request['user_group'] = None
-        current_request['user_user_group'] = None
-        current_request['authentication_object'] = None
-        current_request['exception_record'] = None
-        current_request['token'] = None
-        current_request['decoded_token'] = None
-        current_request['status_code'] = 200
-        current_request['exception'] = None
-        current_request['traceback'] = None
-        current_request['language'] = None
-        current_request['request_track_object'] = RequestTrack()
-        current_request['context'] = {}
-        current_request['messages'] = {
-            'debug': [], 'info': [], 'success': [], 'warning': [], 'error': []
-        }
-        current_request['DEBUG'] = False
+    def fill_messages_framework(request):
+        for item in request.avishan.messages['debug']:
+            messages.debug(request, item['body'])
+        for item in request.avishan.messages['info']:
+            messages.info(request, item['body'])
+        for item in request.avishan.messages['success']:
+            messages.success(request, item['body'])
+        for item in request.avishan.messages['warning']:
+            messages.warning(request, item['body'])
+        for item in request.avishan.messages['error']:
+            messages.error(request, item['body'])
 
     @staticmethod
-    def fill_messages_framework(current_request):
-        for item in current_request['messages']['debug']:
-            messages.debug(current_request['request'], item['body'])
-        for item in current_request['messages']['info']:
-            messages.info(current_request['request'], item['body'])
-        for item in current_request['messages']['success']:
-            messages.success(current_request['request'], item['body'])
-        for item in current_request['messages']['warning']:
-            messages.warning(current_request['request'], item['body'])
-        for item in current_request['messages']['error']:
-            messages.error(current_request['request'], item['body'])
-
-    @staticmethod
-    def save_request_track(current_request):
+    def save_request_track(request: WSGIRequest):
+        from avishan.configure import get_avishan_config
+        # noinspection PyTypeHints
+        request.avishan: AvishanRequestStorage
         from avishan.models import RequestTrackException
         for ignore in get_avishan_config().IGNORE_TRACKING_STARTS:
-            if current_request['request'].get_full_path().startswith(ignore) and \
-                    current_request['request_track_object']:
-                current_request['request_track_object'].delete()
+            if request.get_full_path().startswith(ignore) and \
+                    request.avishan.request_track_object:
+                request.avishan.request_track_object.delete()
                 return
-        current_request['end_time'] = timezone.now()
+        request.avishan.end_time = timezone.now()
 
         authentication_type_class_title = "NOT_AVAILABLE"
         authentication_type_object_id = 0
-        if current_request['authentication_object']:
-            authentication_type_class_title = current_request['authentication_object'].__class__.__name__
-            authentication_type_object_id = current_request['authentication_object'].id
+        if request.avishan.authentication_object:
+            authentication_type_class_title = request.avishan.authentication_object.__class__.__name__
+            authentication_type_object_id = request.avishan.authentication_object.id
 
         request_data = "NOT_AVAILABLE"
         request_data_size = -1
-        if current_request['request'].method in ['POST', 'PUT']:
+        if request.method in ['POST', 'PUT']:
             try:
-                request_data = json.dumps(current_request['request'].data, indent=2)
-                request_data_size = sys.getsizeof(json.dumps(current_request['request'].data))
+                request_data = json.dumps(request.avishan.parsed_data, indent=2)
+                request_data_size = sys.getsizeof(json.dumps(request.avishan.parsed_data))
             except:
                 print("*DEBUG* request parse error")
 
         request_headers = ""
-        for key, value in current_request['request'].META.items():
+        for key, value in request.META.items():
             if key.startswith('HTTP_'):
                 request_headers += f'{key[5:]}={value}\n'
-        for key in current_request['request'].FILES.keys():
+        for key in request.FILES.keys():
             request_headers += f'FILE({key})\n'
 
         from avishan.views.class_based import AvishanView
-        if current_request['view_class']:
-            view_name = current_request['view_class'].__class__.__name__ \
-                if isinstance(current_request['view_class'], AvishanView) \
-                else current_request['view_class'].__name__
+        if request.avishan.view_class:
+            view_name = request.avishan.view_class.__class__.__name__ \
+                if isinstance(request.avishan.view_class, AvishanView) \
+                else request.avishan.view_class.__name__
         else:
             view_name = None
 
         try:
-            response_data = json.dumps(current_request['response'], indent=2)
+            response_data = json.dumps(request.avishan.response, indent=2)
         except:
-            print("*DEBUG* response parse error:", current_request['response'])
+            print("*DEBUG* response parse error:", request.avishan.response)
             response_data = 'NOT_AVAILABLE'
 
         try:
-            created = current_request['request_track_object'].update(
+            created = request.avishan.request_track_object.update(
                 view_name=view_name,
-                url=current_request['request'].get_full_path(),
-                status_code=current_request['status_code'],
-                method=current_request['request'].method,
-                json_unsafe=current_request['json_unsafe'],
-                is_api=current_request['is_api'],
-                add_token=current_request['add_token'],
-                user_user_group=current_request['user_user_group'],
+                url=request.get_full_path(),
+                status_code=request.avishan.status_code,
+                method=request.method,
+                json_unsafe=request.avishan.json_unsafe,
+                is_api=request.avishan.is_api,
+                add_token=request.avishan.add_token,
+                user_user_group=request.avishan.user_user_group,
                 request_data=request_data,
                 request_data_size=request_data_size,
                 request_headers=request_headers,
                 response_data=response_data,
                 response_data_size=sys.getsizeof(response_data),
-                start_time=current_request['start_time'],
-                end_time=current_request['end_time'],
-                total_execution_milliseconds=int((current_request['end_time'] - current_request[
-                    'start_time']).total_seconds() * 1000),
-                view_execution_milliseconds=int((current_request['view_end_time'] - current_request[
-                    'view_start_time']).total_seconds() * 1000) if current_request['view_end_time'] else 0,
+                start_time=request.avishan.start_time,
+                end_time=request.avishan.end_time,
+                total_execution_milliseconds=int(
+                    (request.avishan.end_time - request.avishan.start_time).total_seconds() * 1000),
+                view_execution_milliseconds=int(
+                    (request.avishan.view_end_time - request.avishan.view_start_time).total_seconds() * 1000)
+                if request.avishan.view_end_time else 0,
                 authentication_type_class_title=authentication_type_class_title,
                 authentication_type_object_id=authentication_type_object_id
             )
 
-            if current_request['exception'] is not None:
+            if request.avishan.exception is not None:
                 RequestTrackException.objects.create(
                     request_track=created,
-                    class_title=current_request['exception'].__class__.__name__,
-                    args=current_request['exception'].args,
-                    traceback=current_request['traceback']
+                    class_title=request.avishan.exception.__class__.__name__,
+                    args=request.avishan.exception.args,
+                    traceback=request.avishan.traceback
                 )
         except Exception as e:
             print('save_request_track_error:'.upper(), e)
+
+
+class AvishanRequestStorage:
+    def __init__(self, request: WSGIRequest):
+        from avishan.views.class_based import AvishanView, AvishanTemplateView
+        from avishan.models import BaseUser, UserGroup, UserUserGroup, EmailKeyValueAuthentication, \
+            PhoneKeyValueAuthentication, EmailOtpAuthentication, PhoneOtpAuthentication, VisitorKeyAuthentication, \
+            RequestTrack
+        from avishan.configure import get_avishan_config
+        from avishan.exceptions import AvishanException
+
+        self.request: WSGIRequest = request
+        self.response: dict = {}
+        self.parsed_data: Optional[dict] = None
+        self.language: str = request.GET.get('language') or request.GET.get('lng') or get_avishan_config().LANGUAGE
+        self.can_touch_response: bool = True
+        self.is_tracked: bool = True
+        self.add_token: bool = False
+
+        self.is_api: Optional[bool] = None
+        self.view_class: Optional[AvishanView] = None
+        self.on_error_view_class: Optional[AvishanTemplateView] = None
+        self.json_unsafe: bool = False
+        self.token: Optional[str] = None
+        self.decoded_token: Optional[dict] = None
+        self.status_code: int = 200
+        self.context: dict = {}
+        self.messages: dict = {
+            'debug': [], 'info': [], 'success': [], 'warning': [], 'error': []
+        }
+
+        self.start_time: datetime.datetime = timezone.now()
+        self.end_time: Optional[datetime.datetime] = None
+        self.view_start_time: Optional[datetime.datetime] = None
+        self.view_end_time: Optional[datetime.datetime] = None
+
+        self.base_user: Optional[BaseUser] = None
+        self.user_group: Optional[UserGroup] = None
+        self.user_user_group: Optional[UserUserGroup] = None
+        self.authentication_object: Optional[Union[
+            EmailKeyValueAuthentication,
+            PhoneKeyValueAuthentication,
+            EmailOtpAuthentication,
+            PhoneOtpAuthentication,
+            VisitorKeyAuthentication
+        ]] = None
+
+        self.request_track_object: RequestTrack = RequestTrack()
+        self.exception: Optional[AvishanException] = None
+        self.traceback: Optional[str] = None
+        self.debug: bool = False
+
+    def have_message(self) -> bool:
+        return self.messages['debug'] or self.messages['info'] or self.messages['success'] or \
+               self.messages['warning'] or self.messages['error']

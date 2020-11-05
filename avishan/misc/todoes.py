@@ -1,11 +1,5 @@
 # todo 0.2.3: can we count db calls with decorator?
-# todo 0.2.3: save request and it's data to db decorator
-# todo 0.2.2: check for avishan_* values in data
-# todo 0.2.1: Handle search, sort, filter, pagination params on middleware
 # todo 0.2.2: save user device on every request
-# todo 0.2.1: Return current_request response as response. Should decode response and encoded it again if discard used
-# todo 0.2.2: save traceback
-# todo 0.2.1: doc and comment for everywhere
 # todo 0.2.1: readme edit to latest
 # todo 0.2.2: app check function change to class. to use its parameters.
 # todo 0.2.2: AvishanWarning with color and text and usage
