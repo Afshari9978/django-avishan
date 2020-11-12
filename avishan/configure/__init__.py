@@ -1,5 +1,7 @@
 from typing import Union, Type, List
 
+from django.conf import settings
+from django.core.exceptions import ImproperlyConfigured
 from django.core.management import BaseCommand
 
 
@@ -64,8 +66,9 @@ class AvishanConfigFather:
         FA = 'FA'
         EN = 'EN'
 
+    PROJECT_NAME: str = None
     MONITORED_APPS_NAMES: List[str] = []
-    NOT_MONITORED_STARTS: List[str] = ['/admin', '/static', '/media', '/favicon.ico']
+    NOT_MONITORED_STARTS: List[str] = ['/admin', '/static', '/media', '/favicon.ico', '/api/av1/redoc']
     IGNORE_TRACKING_STARTS: List[str] = []
     AVISHAN_URLS_START = 'api/av1'
     JWT_KEY: str = None
@@ -197,13 +200,27 @@ class AvishanConfigFather:
         """
 
         """Run Descriptor to find any error in startup"""
-        from avishan.models import AvishanModel
-        for model in AvishanModel.get_models():
-            model: AvishanModel
-            model.direct_callable_methods()
+        from avishan.descriptor import Project
+        if cls.PROJECT_NAME is None:
+            raise ImproperlyConfigured("PROJECT_NAME must be set in AvishanConfigFather inherited class.")
+        Project(name=cls.PROJECT_NAME)
+
+        """Any checks needed"""
+        # todo
+        if 'avishan' not in settings.INSTALLED_APPS:
+            raise ImproperlyConfigured("'avishan' not added to INSTALLED_APPS")
+        if 'corsheaders' not in settings.INSTALLED_APPS:
+            raise ImproperlyConfigured("'corsheaders' not added to INSTALLED_APPS")
+        if 'corsheaders.middleware.CorsMiddleware' != settings.MIDDLEWARE[0]:
+            raise ImproperlyConfigured("'corsheaders.middleware.CorsMiddleware' must be in first index of MIDDLEWARE")
+        if 'avishan.middlewares.Wrapper' not in settings.MIDDLEWARE:
+            raise ImproperlyConfigured("'avishan.middlewares.Wrapper' not added to MIDDLEWARE (usually last item)")
+        if 'crum.CurrentRequestUserMiddleware' not in settings.MIDDLEWARE:
+            raise ImproperlyConfigured("'crum.CurrentRequestUserMiddleware' not added to MIDDLEWARE "
+                                       "(must be before 'avishan.middlewares.Wrapper')")
 
     @classmethod
-    def on_request(cls):
+    def on_request(cls, request):
         """
         This method called for any request, just before Avishan middleware starts calling get_response()
         """
@@ -249,10 +266,9 @@ class AvishanConfigFather:
         ]
 
     @classmethod
-    def get_openapi_schema_models(cls):
+    def get_redoc_schema_models(cls):
         from avishan.models import AvishanModel
-        from avishan.descriptor import DjangoAvishanModel
-        return [DjangoAvishanModel(target=item) for item in AvishanModel.get_non_abstract_models()]
+        return AvishanModel.get_non_abstract_models()
 
     @classmethod
     def get_openapi_ignored_path_models(cls) -> List[str]:
@@ -290,6 +306,19 @@ class AvishanConfigFather:
     @classmethod
     def phone_otp_authentication_verification_body(cls, target=None):
         return 'Your code is {code}'
+
+    @classmethod
+    def descriptor_ignored_installed_apps(cls) -> List[str]:
+        return [
+            'django.contrib.admin',
+            'django.contrib.auth',
+            'django.contrib.contenttypes',
+            'django.contrib.sessions',
+            'django.contrib.messages',
+            'django.contrib.staticfiles',
+            'corsheaders',
+            'dbbackup',
+        ]
 
 
 def get_avishan_config() -> Union[Type[AvishanConfigFather]]:

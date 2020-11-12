@@ -97,10 +97,6 @@ class AvishanModel(
         ]
 
     @classmethod
-    def openapi_documented_methods(cls):
-        return cls.direct_callable_methods()
-
-    @classmethod
     def openapi_documented_fields(cls) -> List[str]:
         """Returns list of field names should be visible by openapi documentation
 
@@ -259,13 +255,6 @@ class AvishanModel(
         :response %s 200: Deleted
         :return %s: Deleted object
         """
-
-    @classmethod
-    def update_properties(cls) -> Dict[str, Parameter]:
-        from avishan.libraries.openapi3 import get_functions_properties
-        data = dict(get_functions_properties(getattr(cls, 'update')))
-        del data['self']
-        return data
 
     @classmethod
     def search(cls, query_set: models.QuerySet, search_text: str = None) -> models.QuerySet:
@@ -596,7 +585,7 @@ class BaseUser(AvishanModel):
                                 help_text='Language for user, using 2 words ISO standard: EN, FA, AR')
     date_created = models.DateTimeField(auto_now_add=True, help_text='Date user joined system')
 
-    to_dict_private_fields = [date_created, 'id', is_active]
+    to_dict_private_fields = ['id', is_active]
 
     django_admin_list_display = ['__str__', 'id', is_active, language, date_created]
     django_admin_list_filter = [language, is_active]
@@ -989,6 +978,12 @@ class AuthenticationType(AvishanModel):
         'VisitorKeyAuthentication'
     ]:
         raise NotImplementedError()
+
+    @staticmethod
+    def logout():
+        request = get_current_request()
+        request.avishan: AvishanRequestStorage
+        request.avishan.authentication_object._submit_logout()
 
     @classmethod
     def find(cls, key: Union[Email, Phone, str], user_group: UserGroup) -> Optional[Union[
@@ -1533,6 +1528,51 @@ class File(AvishanModel):
 
     django_admin_list_display = [file, base_user, date_created]
     django_admin_raw_id_fields = [base_user]
+
+    @classmethod
+    def direct_callable_methods(cls) -> List[DirectCallable]:
+        total = []
+        for item in super().direct_callable_methods():
+            total.append(item)
+            if item.name == 'create':
+                item.hide_in_redoc = True
+
+        return total + [
+            DirectCallable(
+                model=cls,
+                target_name='file_from_multipart_form_data_request',
+                response_json_key='file',
+                method=DirectCallable.METHOD.POST,
+                dismiss_request_json_key=True
+            )]
+
+    @classmethod
+    def file_from_in_memory_upload(cls, file: InMemoryUploadedFile) -> 'File':
+        from avishan.exceptions import ErrorMessageException
+        if file is None:
+            raise ErrorMessageException(AvishanTranslatable(
+                EN='File not found',
+                FA='فایل ارسال نشده است'
+            ))
+
+        created = cls.create(
+            base_user=get_current_request().avishan.base_user
+        )
+        created.file.save("uploaded_files/" + file.name, file, save=True)
+        created.save()
+
+        return created
+
+    @classmethod
+    def file_from_multipart_form_data_request(cls, name: str = 'file') -> 'File':
+        """Upload File
+
+        Upload file to server using "multipart/form-data".
+
+        :param str? name: key in multipart form data
+        :response File 200: Saved
+        """
+        return cls.file_from_in_memory_upload(file=get_current_request().FILES.get(name))
 
     def to_dict(self, exclude_list: List[Union[models.Field, str]] = ()) -> dict:
         return {

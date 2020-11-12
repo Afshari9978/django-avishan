@@ -174,6 +174,9 @@ class AvishanTemplateView(AvishanView):
             except:
                 request.data = {}
 
+    def get(self, request, *args, **kwargs):
+        return self.render()
+
     def render(self):
         from django.shortcuts import render as django_render
         return django_render(self.request, self.template_file_address, self.context)
@@ -243,7 +246,7 @@ class AvishanModelApiView(AvishanApiView):
 
             if isinstance(result, QuerySet):
                 result = self.model.queryset_handler(request.GET, queryset=result)
-        response = self.parse_returned_data(result)
+        response = self.parse_returned_data(request, result)
         if request.avishan.can_touch_response:
             self.response[self.direct_callable.response_json_key] = response
         else:
@@ -260,7 +263,7 @@ class AvishanModelApiView(AvishanApiView):
 
         data = self.parse_request_data(**data)
         result = self.model_function(**data)
-        response = self.parse_returned_data(result)
+        response = self.parse_returned_data(request, result)
         if request.avishan.can_touch_response:
             self.response[self.direct_callable.response_json_key] = response
         else:
@@ -374,3 +377,23 @@ class PasswordHash(AvishanApiView):
         request.avishan.response['hashed'] = bcrypt.hashpw(kwargs['password'].encode('utf8'),
                                                            bcrypt.gensalt()).decode('utf8')
         return JsonResponse(request.avishan.response)
+
+
+class Redoc(AvishanTemplateView):
+    template_file_address = 'avishan/redoc.html'
+    authenticate = False
+
+    def get(self, request, *args, **kwargs):
+        from avishan.libraries.openapi3.__init__ import OpenApi
+
+        open_api_yaml = OpenApi(
+            application_title=get_avishan_config().OPENAPI_APPLICATION_TITLE,
+            application_description=get_avishan_config().OPENAPI_APPLICATION_DESCRIPTION,
+            application_version=get_avishan_config().OPENAPI_APPLICATION_VERSION,
+            application_servers=get_avishan_config().OPENAPI_APPLICATION_SERVERS
+        ).export_yaml()
+
+        text_file = open('static/openapi.yaml', 'w+')
+        text_file.write(open_api_yaml)
+        text_file.close()
+        return self.render()

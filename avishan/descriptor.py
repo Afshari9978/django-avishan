@@ -1,64 +1,73 @@
 import inspect
 import datetime
 from enum import Enum, auto
-from typing import List, Callable, Type, Union, Optional, Tuple
+from typing import List, Callable, Optional, Tuple
 
 import docstring_parser
-import stringcase as stringcase
+import stringcase
+from django.apps import apps
+from django.conf import settings
 from django.db import models
 from django.db.models.base import ModelBase
 from djmoney.models.fields import MoneyField
 from docstring_parser import DocstringMeta, DocstringParam
 
 
-class Model:
+class Project:
+    def __init__(self, name: str):
+        self.name: str = name
+        self.apps: List[DjangoApplication] = self.load_apps()
 
-    def __init__(self, target: Type[Union[models.Model, object]], name: str):
-        self.target = target
-        self.name = name
-        self.long_description = None
-        self.short_description = None
-        self._doc = docstring_parser.parse(target.__doc__)
-        self.attributes = []
-        self.methods = []
-        self.load_from_doc()
+        a = 1
 
-    def load_from_doc(self):
-        self.short_description = self._doc.short_description
-        self.long_description = self._doc.long_description
+    def load_apps(self) -> List['DjangoApplication']:
+        from avishan.configure import get_avishan_config
+        return [DjangoApplication(project=self, name=app_name) for app_name in settings.INSTALLED_APPS if
+                app_name not in get_avishan_config().descriptor_ignored_installed_apps()]
+
+    def models_pool(self) -> List['DjangoAvishanModel']:
+        total = []
+        for app in self.apps:
+            total.extend(app.models)
+        return total
 
     def __str__(self):
         return self.name
 
 
-class DjangoModel(Model):
+class DjangoApplication:
+    def __init__(self, project: Project, name: str):
+        self.project: Project = project
+        self.name: str = name
+        self.models: List[DjangoAvishanModel] = self.load_models()
 
-    def __init__(self, target: Type[Union[models.Model, object]]):
-        super().__init__(
-            target=target,
-            name=target._meta.object_name
-        )
-        self.attributes = self.extract_attributes()
+    def load_models(self) -> List['DjangoAvishanModel']:
+        from avishan.models import AvishanModel
 
-    def extract_attributes(self) -> List['DjangoFieldAttribute']:
-        """
-        Extracts fields from model and create DjangoFieldAttribute from them.
-        """
+        total = []
+        for model in apps.get_app_config(self.name).get_models():
+            total.append(DjangoAvishanModel(self, model))
+        return total
 
-        return [DjangoFieldAttribute(target=item) for item in self.target._meta.fields]
+    def __str__(self):
+        return self.name
 
 
-class DjangoAvishanModel(DjangoModel):
+# todo django model needed for raw models
+
+class DjangoAvishanModel:
     """
-    Model descriptor for django models. Not only AvishanModel inherited ones.
+    Model descriptor for django avishan models. Not tested for django models.
     """
 
-    def __init__(self, target: Type[models.Model]):
-        super().__init__(target=target)
-
-        self.prepare_docs()
+    def __init__(self, app: DjangoApplication, target):
+        from avishan.models import AvishanModel
+        self.target: AvishanModel = target
+        self.app: DjangoApplication = app
+        self.name: str = target._meta.object_name
         self.attributes = self.extract_attributes()
         self.methods = self.extract_methods()
+        self.prepare_docs()
 
     def prepare_docs(self):
         document_added_methods = []
@@ -88,7 +97,11 @@ class DjangoAvishanModel(DjangoModel):
         """
         Extracts methods from model and create Method from them.
         """
-        return self.target.openapi_documented_methods()
+        # todo extract methods here, not only apis
+        return self.target.direct_callable_methods()
+
+    def __str__(self):
+        return self.name
 
 
 class Function:
@@ -211,7 +224,8 @@ class DirectCallable(ApiMethod):
                  dismiss_response_json_key: bool = False,
                  hide_in_redoc: bool = False,
                  is_class_method: bool = None,
-                 on_empty_args: List['FunctionAttribute'] = None
+                 on_empty_args: List['FunctionAttribute'] = None,
+                 documentation: 'ApiDocumentation' = None
                  ):
         from avishan.configure import get_avishan_config
         from avishan.models import AvishanModel
@@ -245,6 +259,10 @@ class DirectCallable(ApiMethod):
         self.dismiss_response_json_key = dismiss_response_json_key
         self.authenticate = authenticate
         self.hide_in_redoc = hide_in_redoc
+        if documentation is None:
+            documentation = ApiDocumentation(target=self)
+        self.documentation = documentation
+        self.documentation.set_target(self)
         if is_class_method is not None:
             self.is_class_method = is_class_method
 
@@ -535,3 +553,40 @@ class FunctionAttribute(Attribute):
         if parameter.default is not inspect.Parameter.empty:
             return False
         return True
+
+
+class RequestBodyDocumentation:
+    pass
+
+
+class ResponseBodyDocumentation:
+    pass
+
+
+class ApiDocumentation:
+    def __init__(self,
+                 title: str = "NOT_SET",
+                 description: str = "NOT_SET",
+                 request_body: RequestBodyDocumentation = None,
+                 response_bodies: List[ResponseBodyDocumentation] = None,
+                 target: DirectCallable = None,
+                 ):
+        if response_bodies is None:
+            response_bodies = []
+
+        self.target = target
+        if self.target:
+            self.load_from_target()
+
+        self.title = title
+        self.description = description
+        self.request_body = request_body
+        self.response_bodies = response_bodies
+
+    def set_target(self, target: DirectCallable):
+        self.target = target
+        self.load_from_target()
+
+    def load_from_target(self):
+        # todo change NOT_SET to defaults
+        pass

@@ -51,7 +51,7 @@ class Wrapper:
             save_traceback()
             AvishanException(e)
 
-        get_avishan_config().on_request()
+        get_avishan_config().on_request(request)
 
         # todo 0.2.2 check for 'avishan_' in request bodies
         """Send request object to the next layer and wait for response"""
