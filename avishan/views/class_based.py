@@ -384,7 +384,7 @@ class Redoc(AvishanTemplateView):
     authenticate = False
 
     def get(self, request, *args, **kwargs):
-        from avishan.libraries.openapi3.__init__ import OpenApi
+        from avishan.libraries.openapi3.descriptor import OpenApi
 
         open_api_yaml = OpenApi(
             application_title=get_avishan_config().OPENAPI_APPLICATION_TITLE,

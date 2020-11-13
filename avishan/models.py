@@ -573,6 +573,10 @@ class AvishanModel(
     def chayi_ignore_serialize_field(cls, field: models.Field) -> bool:
         return cls.is_field_readonly(field)
 
+    @classmethod
+    def _model_description(cls) -> Optional[str]:
+        return None
+
 
 class BaseUser(AvishanModel):
     """

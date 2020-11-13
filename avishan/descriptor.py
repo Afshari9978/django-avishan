@@ -42,8 +42,6 @@ class DjangoApplication:
         self.models: List[DjangoAvishanModel] = self.load_models()
 
     def load_models(self) -> List['DjangoAvishanModel']:
-        from avishan.models import AvishanModel
-
         total = []
         for model in apps.get_app_config(self.name).get_models():
             total.append(DjangoAvishanModel(self, model))
@@ -67,7 +65,12 @@ class DjangoAvishanModel:
         self.name: str = target._meta.object_name
         self.attributes = self.extract_attributes()
         self.methods = self.extract_methods()
+        self.description = self.target._model_description()
         self.prepare_docs()
+
+    @property
+    def direct_callables(self) -> List['DirectCallable']:
+        return self.target.direct_callable_methods()
 
     def prepare_docs(self):
         document_added_methods = []
@@ -99,6 +102,9 @@ class DjangoAvishanModel:
         """
         # todo extract methods here, not only apis
         return self.target.direct_callable_methods()
+
+    def is_abstract(self) -> bool:
+        return self.target._meta.abstract
 
     def __str__(self):
         return self.name
@@ -590,3 +596,7 @@ class ApiDocumentation:
     def load_from_target(self):
         # todo change NOT_SET to defaults
         pass
+
+# todo path, not single api can have global params: https://github.com/OAI/OpenAPI-Specification/blob/master/versions/3.0.0.md#parameterObject
+# todo add tag for requests & tag description
+# todo can describe model itself. check pet_model in redoc example
