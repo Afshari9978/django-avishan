@@ -3,6 +3,7 @@ import json
 import sys
 from typing import Optional, Union
 
+from crum import get_current_request, set_current_request
 from django.contrib import messages
 from django.core.handlers.wsgi import WSGIRequest
 from django.http import JsonResponse
@@ -66,6 +67,12 @@ class Wrapper:
             save_traceback()
             AvishanException(e)
 
+        remove_from_crum = False
+        if get_current_request() is None:
+            remove_from_crum = True
+            set_current_request(request)
+
+
         """messages"""
         if request.avishan.have_message():
             # todo 0.2.3: check for debug=True
@@ -90,6 +97,8 @@ class Wrapper:
             self.save_request_track(request)
 
         del request.avishan
+        if remove_from_crum:
+            set_current_request(None)
 
         if is_api:
             return JsonResponse(response, status=status_code, safe=json_safe)
