@@ -144,8 +144,8 @@ class Wrapper:
         request_data_size = -1
         if request.method in ['POST', 'PUT']:
             try:
-                request_data = json.dumps(request.avishan.parsed_data, indent=2)
-                request_data_size = sys.getsizeof(json.dumps(request.avishan.parsed_data))
+                request_data = json.dumps(request.data, indent=2)
+                request_data_size = sys.getsizeof(json.dumps(request.data))
             except:
                 print("*DEBUG* request parse error")
 
