@@ -1,3 +1,0 @@
-# go to celery-beat folder
-python setup.py build
-python setup.py install

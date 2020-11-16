@@ -362,7 +362,7 @@ class AvishanModel(
         base_kwargs = {}
         many_to_many_kwargs = {}
 
-        if not get_current_request().avishan.is_api:
+        if get_current_request() and not get_current_request().avishan.is_api:
             kwargs = cls._clean_form_post(kwargs)
 
         for field in cls.get_full_fields():
@@ -1648,7 +1648,7 @@ class Image(AvishanModel):
             ))
 
         created = Image.create(
-            base_user=get_current_request().avishan.base_user
+            base_user=get_current_request().avishan.base_user if get_current_request() else None
         )
         created.file.save("uploaded_images/" + file.name, file, save=True)
         created.save()

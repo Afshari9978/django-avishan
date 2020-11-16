@@ -16,7 +16,7 @@ from docstring_parser import DocstringMeta, DocstringParam
 class Project:
     def __init__(self, name: str):
         self.name: str = name
-        self.apps: List[DjangoApplication] = self.load_apps()
+        # self.apps: List[DjangoApplication] = self.load_apps()
 
         a = 1
 
@@ -148,7 +148,7 @@ class Method(Function):
 
     def __init__(self, target):
         super().__init__(target)
-        self.target_class = self.get_class_that_defined_method(target)
+        self.model = self.get_class_that_defined_method(target)
         self.is_class_method = inspect.ismethod(target)
         if self.__class__ == Method:
             self.load_from_doc()
@@ -253,9 +253,9 @@ class DirectCallable(ApiMethod):
             method=method
         )
 
-        self.target_class = model
+        self.model = model
         if self.short_description is None:
-            self.short_description = stringcase.titlecase(self.target_class.class_name()) + " " + stringcase.titlecase(
+            self.short_description = stringcase.titlecase(self.model.class_name()) + " " + stringcase.titlecase(
                 self.name)
         self.response_json_key = response_json_key
         self.request_json_key = request_json_key
@@ -266,7 +266,7 @@ class DirectCallable(ApiMethod):
         self.authenticate = authenticate
         self.hide_in_redoc = hide_in_redoc
         if documentation is None:
-            documentation = ApiDocumentation(target=self)
+            documentation = ApiDocumentation(direct_callable=self)
         self.documentation = documentation
         self.documentation.set_target(self)
         if is_class_method is not None:
@@ -562,7 +562,34 @@ class FunctionAttribute(Attribute):
 
 
 class RequestBodyDocumentation:
-    pass
+    def __init__(self, type_of="NOT_SET", key: str = "NOT_SET", description: str = None, examples=None):
+        if examples is None:
+            examples = []
+
+        # todo if not_set, auto resolve
+        self.type_of = type_of
+        self.key = key
+        self.description = description
+        self.examples = examples
+
+    @classmethod
+    def create_from_api_documentation(cls, api_documentation: 'ApiDocumentation'):
+        a = 1
+        if api_documentation.direct_callable.method in [DirectCallable.METHOD.GET, DirectCallable.METHOD.DELETE]:
+            type_of = None
+        else:
+            if len(api_documentation.direct_callable.args) == 0:
+                # todo remove
+                type_of = None
+            else:
+                fields = []
+                for item in api_documentation.direct_callable.args:
+                    a = 1
+                a = 1
+        return RequestBodyDocumentation(
+            type_of=type_of,
+            key=api_documentation.direct_callable.request_json_key
+        )
 
 
 class ResponseBodyDocumentation:
@@ -573,24 +600,26 @@ class ApiDocumentation:
     def __init__(self,
                  title: str = "NOT_SET",
                  description: str = "NOT_SET",
-                 request_body: RequestBodyDocumentation = None,
+                 request_body: RequestBodyDocumentation = "NOT_SET",
                  response_bodies: List[ResponseBodyDocumentation] = None,
-                 target: DirectCallable = None,
+                 direct_callable: DirectCallable = None,
                  ):
         if response_bodies is None:
             response_bodies = []
 
-        self.target = target
-        if self.target:
+        self.direct_callable = direct_callable
+        if self.direct_callable:
             self.load_from_target()
 
         self.title = title
         self.description = description
+        if request_body == "NOT_SET":
+            request_body = RequestBodyDocumentation.create_from_api_documentation(self)
         self.request_body = request_body
         self.response_bodies = response_bodies
 
     def set_target(self, target: DirectCallable):
-        self.target = target
+        self.direct_callable = target
         self.load_from_target()
 
     def load_from_target(self):
