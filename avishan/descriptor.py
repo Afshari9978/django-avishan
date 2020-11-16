@@ -613,8 +613,8 @@ class ApiDocumentation:
 
         self.title = title
         self.description = description
-        if request_body == "NOT_SET":
-            request_body = RequestBodyDocumentation.create_from_api_documentation(self)
+        # if request_body == "NOT_SET":
+        #     request_body = RequestBodyDocumentation.create_from_api_documentation(self)
         self.request_body = request_body
         self.response_bodies = response_bodies
 
