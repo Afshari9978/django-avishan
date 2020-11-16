@@ -224,8 +224,7 @@ def delete_token_from_request(rendered_response=None):
         except KeyError:
             pass
     else:
-        # rendered_response.delete_cookie('token')
-        a = 1  # todo removed for ajax in astra project
+        rendered_response.delete_cookie('token')
 
 
 def encode_token(authentication_object: 'AuthenticationType') -> Optional[str]:
@@ -290,6 +289,7 @@ def find_and_check_user():
     if authentication_type_object.last_login is None or \
             authentication_type_object.last_login.timestamp() != get_current_request().avishan.decoded_token['lgn'] \
             or authentication_type_object.last_logout:
+        get_current_request().avishan.add_token = False
         raise AuthException(AuthException.DEACTIVATED_TOKEN)
 
     authentication_type_object.last_used = timezone.now()
