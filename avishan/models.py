@@ -18,7 +18,7 @@ from avishan.libraries.faker import AvishanFaker
 from avishan.middlewares import AvishanRequestStorage
 from avishan.misc import status
 from avishan.misc.translation import AvishanTranslatable
-from avishan.descriptor import DirectCallable
+from avishan.descriptor import DirectCallable, ApiDocumentation, ResponseBodyDocumentation
 
 import datetime
 from typing import Optional
@@ -61,7 +61,14 @@ class AvishanModel(
             DirectCallable(
                 model=cls,
                 target_name='all',
-                url=''
+                url='',
+                documentation=ApiDocumentation(
+                    title=cls.__all_documentation_title(),
+                    description=cls.__all_documentation_description(),
+                    response_bodies=cls.__all_documentation_response_bodies()
+
+
+                )
             ),
             DirectCallable(
                 model=cls,
@@ -165,12 +172,20 @@ class AvishanModel(
         return stringcase.titlecase(cls.class_plural_name()), cls.class_name(), cls.class_name()
 
     @classmethod
-    def _all_documentation_raw(cls):
-        return """Get %s
-        
-        :response List[%s] 200: Success
-        :return List[%s]: Items, usually ordered by id, acceding
-        """
+    def __all_documentation_title(cls):
+        return f'Get list of {cls.class_plural_name()}'
+
+    @classmethod
+    def __all_documentation_description(cls):
+        return None
+
+    @classmethod
+    def __all_documentation_response_bodies(cls) -> List[ResponseBodyDocumentation]:
+        return [
+            ResponseBodyDocumentation(
+                attributes=
+            )
+        ]
 
     @classmethod
     def create(cls, **kwargs):

@@ -1,7 +1,7 @@
 import inspect
 import datetime
 from enum import Enum, auto
-from typing import List, Callable, Optional, Tuple
+from typing import List, Callable, Optional, Tuple, Union
 
 import docstring_parser
 import stringcase
@@ -16,7 +16,7 @@ from docstring_parser import DocstringMeta, DocstringParam
 class Project:
     def __init__(self, name: str):
         self.name: str = name
-        # self.apps: List[DjangoApplication] = self.load_apps()
+        self.apps: List[DjangoApplication] = self.load_apps()
 
         a = 1
 
@@ -53,19 +53,33 @@ class DjangoApplication:
 
 # todo django model needed for raw models
 
-class DjangoAvishanModel:
+class DataModel:
+    def __init__(self,
+                 name: str,
+                 attributes: List['Attribute'],
+                 description: str = None
+                 ):
+        self.name = name
+        self.attributes = attributes
+        self.description = description
+
+
+class DjangoAvishanModel(DataModel):
     """
     Model descriptor for django avishan models. Not tested for django models.
     """
 
     def __init__(self, app: DjangoApplication, target):
         from avishan.models import AvishanModel
+
+        super().__init__(
+            name=target._meta.object_name,
+            attributes=self.extract_attributes(),
+            description=self.target._model_description()
+        )
         self.target: AvishanModel = target
         self.app: DjangoApplication = app
-        self.name: str = target._meta.object_name
-        self.attributes = self.extract_attributes()
         self.methods = self.extract_methods()
-        self.description = self.target._model_description()
         self.prepare_docs()
 
     @property
@@ -265,10 +279,6 @@ class DirectCallable(ApiMethod):
         self.dismiss_response_json_key = dismiss_response_json_key
         self.authenticate = authenticate
         self.hide_in_redoc = hide_in_redoc
-        if documentation is None:
-            documentation = ApiDocumentation(direct_callable=self)
-        self.documentation = documentation
-        self.documentation.set_target(self)
         if is_class_method is not None:
             self.is_class_method = is_class_method
 
@@ -276,8 +286,12 @@ class DirectCallable(ApiMethod):
             self.url = '/' + get_avishan_config().AVISHAN_URLS_START + f'/{model.class_plural_snake_case_name()}/' \
                        + '{id}' + url
 
-        if len(self.args) == 0 and on_empty_args:
-            self.args = on_empty_args
+        if documentation is None:
+            documentation = ApiDocumentation(direct_callable=self)
+        self.documentation = documentation
+
+    def __str__(self):
+        return f'{self.model.class_name()}.{self.name}'
 
 
 class Attribute:
@@ -299,6 +313,7 @@ class Attribute:
         OBJECT = auto()
         ARRAY = auto()
         FILE = auto()
+        DATA_MODEL = auto()
 
     """
     Type pool for checking targets
@@ -314,6 +329,7 @@ class Attribute:
         TYPE.OBJECT: (models.OneToOneField, models.ForeignKey),
         TYPE.ARRAY: (list, List, tuple, Tuple),
         TYPE.FILE: (models.FileField,),
+        TYPE.DATA_MODEL: ()
     }
 
     NO_DEFAULT = 'NO_DESCRIPTOR_DEFAULT'
@@ -321,7 +337,7 @@ class Attribute:
     def __init__(self,
                  name: str,
                  type: 'Attribute.TYPE',
-                 type_of: type = None,
+                 type_of: Union[type, DataModel] = None,
                  default=NO_DEFAULT,
                  description: str = None,
                  example: str = None,
@@ -562,70 +578,44 @@ class FunctionAttribute(Attribute):
 
 
 class RequestBodyDocumentation:
-    def __init__(self, type_of="NOT_SET", key: str = "NOT_SET", description: str = None, examples=None):
-        if examples is None:
-            examples = []
-
+    def __init__(self, attributes: List[Attribute] = "NOT_SET", description: str = None):
         # todo if not_set, auto resolve
-        self.type_of = type_of
-        self.key = key
+        self.attributes = attributes
         self.description = description
-        self.examples = examples
-
-    @classmethod
-    def create_from_api_documentation(cls, api_documentation: 'ApiDocumentation'):
-        a = 1
-        if api_documentation.direct_callable.method in [DirectCallable.METHOD.GET, DirectCallable.METHOD.DELETE]:
-            type_of = None
-        else:
-            if len(api_documentation.direct_callable.args) == 0:
-                # todo remove
-                type_of = None
-            else:
-                fields = []
-                for item in api_documentation.direct_callable.args:
-                    a = 1
-                a = 1
-        return RequestBodyDocumentation(
-            type_of=type_of,
-            key=api_documentation.direct_callable.request_json_key
-        )
 
 
 class ResponseBodyDocumentation:
-    pass
+
+    def __init__(self,
+                 status_code: int = 200,
+                 attributes: List[Attribute] = "NOT_SET",
+                 title: str = "NOT_SET",
+                 description: str = "NOT_SET"
+                 ):
+        self.status_code = status_code
+        self.attributes = attributes
+        self.title = title
+        self.description = description
 
 
 class ApiDocumentation:
     def __init__(self,
                  title: str = "NOT_SET",
-                 description: str = "NOT_SET",
+                 description: Optional[str] = "NOT_SET",
                  request_body: RequestBodyDocumentation = "NOT_SET",
-                 response_bodies: List[ResponseBodyDocumentation] = None,
+                 response_bodies: List[ResponseBodyDocumentation] = "NOT_SET",
                  direct_callable: DirectCallable = None,
                  ):
-        if response_bodies is None:
-            response_bodies = []
-
         self.direct_callable = direct_callable
-        if self.direct_callable:
-            self.load_from_target()
-
         self.title = title
         self.description = description
-        # if request_body == "NOT_SET":
-        #     request_body = RequestBodyDocumentation.create_from_api_documentation(self)
         self.request_body = request_body
         self.response_bodies = response_bodies
 
-    def set_target(self, target: DirectCallable):
-        self.direct_callable = target
-        self.load_from_target()
-
-    def load_from_target(self):
-        # todo change NOT_SET to defaults
-        pass
+    def __str__(self):
+        return str(self.direct_callable)
 
 # todo path, not single api can have global params: https://github.com/OAI/OpenAPI-Specification/blob/master/versions/3.0.0.md#parameterObject
 # todo add tag for requests & tag description
 # todo can describe model itself. check pet_model in redoc example
+# todo example for request data

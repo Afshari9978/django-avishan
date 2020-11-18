@@ -19,6 +19,10 @@ class Wrapper:
         self.get_response = get_response
         get_avishan_config().on_startup()
 
+        """Run Descriptor to find any error in startup and store project"""
+        from avishan.descriptor import Project
+        self.project = Project(name=get_avishan_config().PROJECT_NAME)
+
     def __call__(self, request: WSGIRequest):
         from avishan.utils import discard_monitor, find_token, decode_token, add_token_to_response, find_and_check_user
         from avishan.exceptions import AvishanException
@@ -26,6 +30,7 @@ class Wrapper:
         from avishan.configure import get_avishan_config
 
         request.avishan = AvishanRequestStorage(request)
+        request.avishan.project = self.project
 
         """Checks for avoid-touch requests"""
         if discard_monitor(request.get_full_path()):
@@ -71,7 +76,6 @@ class Wrapper:
         if get_current_request() is None:
             remove_from_crum = True
             set_current_request(request)
-
 
         """messages"""
         if request.avishan.have_message():
@@ -213,9 +217,11 @@ class AvishanRequestStorage:
         from avishan.models import BaseUser, UserGroup, UserUserGroup, EmailKeyValueAuthentication, \
             PhoneKeyValueAuthentication, EmailOtpAuthentication, PhoneOtpAuthentication, VisitorKeyAuthentication, \
             RequestTrack
+        from avishan.descriptor import Project
         from avishan.configure import get_avishan_config
         from avishan.exceptions import AvishanException
 
+        self.project: Optional[Project] = None
         self.request: WSGIRequest = request
         self.response: dict = {}
         self.parsed_data: Optional[dict] = None

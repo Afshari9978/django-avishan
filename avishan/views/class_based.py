@@ -382,6 +382,7 @@ class PasswordHash(AvishanApiView):
 class Redoc(AvishanTemplateView):
     template_file_address = 'avishan/redoc.html'
     authenticate = False
+    track_it = False
 
     def get(self, request, *args, **kwargs):
         from avishan.libraries.openapi3.descriptor import OpenApi

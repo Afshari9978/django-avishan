@@ -199,14 +199,10 @@ class AvishanConfigFather:
         This method will be called anytime server starts. But just the method from get_avishan_config() result.
         """
 
-        """Run Descriptor to find any error in startup"""
-        from avishan.descriptor import Project
-        if cls.PROJECT_NAME is None:
-            raise ImproperlyConfigured("PROJECT_NAME must be set in AvishanConfigFather inherited class.")
-        Project(name=cls.PROJECT_NAME)
-
         """Any checks needed"""
         # todo
+        if cls.PROJECT_NAME is None:
+            raise ImproperlyConfigured("PROJECT_NAME must be set in AvishanConfigFather inherited class.")
         if 'avishan' not in settings.INSTALLED_APPS:
             raise ImproperlyConfigured("'avishan' not added to INSTALLED_APPS")
         if 'corsheaders' not in settings.INSTALLED_APPS:
