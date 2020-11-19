@@ -5,7 +5,8 @@ import stringcase
 from django.db import models
 from django.db.models import NOT_PROVIDED, QuerySet, Field
 
-from avishan.descriptor import FunctionAttribute, DjangoFieldAttribute
+from avishan.descriptor import FunctionAttribute, DjangoFieldAttribute, ResponseBodyDocumentation, Attribute, \
+    RequestBodyDocumentation, DataModel, Function
 
 
 class AvishanModelDjangoAdminExtension:
@@ -171,16 +172,6 @@ class AvishanModelModelDetailsExtension:
         return set(parent_class.__subclasses__()).union(
             [s for c in parent_class.__subclasses__() for s in AvishanModel.all_subclasses(c)])
 
-    @classmethod
-    def _create_default_args(cls) -> List[FunctionAttribute]:
-        from avishan.models import AvishanModel
-        cls: AvishanModel
-        return [DjangoFieldAttribute(target=item) for item in cls._meta.fields if not cls.is_field_readonly(field=item)]
-
-    @classmethod
-    def _update_default_args(cls) -> List[FunctionAttribute]:
-        return cls._create_default_args()
-
 
 class AvishanModelFilterExtension:
 
@@ -307,3 +298,202 @@ class AvishanModelFilterExtension:
             data[field.name] = django_filters.IsoDateTimeFromToRangeFilter(field_name=field.name)
 
         return data
+
+
+class AvishanModelDescriptorExtension:
+
+    @classmethod
+    def _create_default_args(cls) -> List[Union[FunctionAttribute, DjangoFieldAttribute]]:
+        from avishan.models import AvishanModel
+        cls: AvishanModel
+        return [DjangoFieldAttribute(target=item) for item in cls._meta.fields if not cls.is_field_readonly(field=item)]
+
+    @classmethod
+    def _update_default_args(cls) -> List[FunctionAttribute]:
+        return cls._create_default_args()
+
+    @classmethod
+    def openapi_documented_fields(cls) -> List[str]:
+        """Returns list of field names should be visible by openapi documentation
+
+        :return: list of document visible fields
+        :rtype: List[str]
+        """
+        from avishan.models import AvishanModel
+        cls: AvishanModel
+        total = list(cls._meta.fields + cls._meta.many_to_many)
+        privates = []
+        for item in cls.to_dict_private_fields:
+            if not isinstance(item, str):
+                privates.append(item.name)
+            else:
+                privates.append(item)
+
+        return [field.name for field in total if field.name not in privates]
+
+    @classmethod
+    def _get_documentation_title(cls):
+        from avishan.models import AvishanModel
+        cls: AvishanModel
+        return f'Get item of {cls.class_name()}'
+
+    @classmethod
+    def _get_documentation_description(cls):
+        return None
+
+    @classmethod
+    def _get_documentation_response_bodies(cls) -> List[ResponseBodyDocumentation]:
+        from avishan.models import AvishanModel
+        cls: AvishanModel
+        return [
+            ResponseBodyDocumentation(
+                title='Success',
+                attributes=[Attribute(
+                    name=stringcase.snakecase(cls.class_name()),
+                    type=Attribute.TYPE.OBJECT,
+                    type_of=cls
+                )]
+            )
+        ]
+
+    @classmethod
+    def _all_documentation_title(cls):
+        from avishan.models import AvishanModel
+        cls: AvishanModel
+        return f'Get list of {cls.class_plural_name()}'
+
+    @classmethod
+    def _all_documentation_description(cls):
+        return None
+
+    @classmethod
+    def _all_documentation_response_bodies(cls) -> List[ResponseBodyDocumentation]:
+        from avishan.models import AvishanModel
+        cls: AvishanModel
+        return [
+            ResponseBodyDocumentation(
+                title='Success',
+                attributes=[Attribute(
+                    name=stringcase.snakecase(cls.class_plural_name()),
+                    type=Attribute.TYPE.ARRAY,
+                    type_of=cls
+                )]
+            )
+        ]
+
+    @classmethod
+    def _create_documentation_title(cls):
+        from avishan.models import AvishanModel
+        cls: AvishanModel
+        return f'Create {cls.class_name()}'
+
+    @classmethod
+    def _create_documentation_description(cls):
+        return None
+
+    @classmethod
+    def _create_documentation_request_body_description(cls) -> Optional[str]:
+        return None
+
+    @classmethod
+    def _create_documentation_request_body(cls) -> RequestBodyDocumentation:
+        from avishan.models import AvishanModel
+        cls: AvishanModel
+        return RequestBodyDocumentation(
+            attributes=[Attribute(
+                name=stringcase.snakecase(cls.class_name()),
+                type=Attribute.TYPE.DATA_MODEL,
+                type_of=DataModel(
+                    name=stringcase.snakecase(cls.class_name()),
+                    attributes=Function.load_args_from_signature(getattr(cls, 'create')),
+                    description=cls._create_documentation_request_body_description()
+                )
+            )],
+            description=cls._create_documentation_request_body_description()
+        )
+
+    @classmethod
+    def _create_documentation_response_bodies(cls) -> List[ResponseBodyDocumentation]:
+        from avishan.models import AvishanModel
+        cls: AvishanModel
+        return [
+            ResponseBodyDocumentation(
+                title='Created',
+                attributes=[Attribute(
+                    name=stringcase.snakecase(cls.class_name()),
+                    type=Attribute.TYPE.OBJECT,
+                    type_of=cls
+                )]
+            )
+        ]
+
+    @classmethod
+    def _update_documentation_title(cls):
+        from avishan.models import AvishanModel
+        cls: AvishanModel
+        return f'Update {cls.class_name()}'
+
+    @classmethod
+    def _update_documentation_description(cls):
+        return None
+
+    @classmethod
+    def _update_documentation_request_body_description(cls) -> Optional[str]:
+        return None
+
+    @classmethod
+    def _update_documentation_request_body(cls) -> RequestBodyDocumentation:
+        from avishan.models import AvishanModel
+        cls: AvishanModel
+        return RequestBodyDocumentation(
+            attributes=[Attribute(
+                name=stringcase.snakecase(cls.class_name()),
+                type=Attribute.TYPE.DATA_MODEL,
+                type_of=DataModel(
+                    name=stringcase.snakecase(cls.class_name()),
+                    attributes=cls._update_default_args(),
+                    description=cls._update_documentation_request_body_description()
+                )
+            )],
+            description=cls._update_documentation_request_body_description()
+        )
+
+    @classmethod
+    def _update_documentation_response_bodies(cls) -> List[ResponseBodyDocumentation]:
+        from avishan.models import AvishanModel
+        cls: AvishanModel
+        return [
+            ResponseBodyDocumentation(
+                title='Updated',
+                attributes=[Attribute(
+                    name=stringcase.snakecase(cls.class_name()),
+                    type=Attribute.TYPE.OBJECT,
+                    type_of=cls
+                )]
+            )
+        ]
+
+    @classmethod
+    def _remove_documentation_title(cls):
+        from avishan.models import AvishanModel
+        cls: AvishanModel
+        return f'Remove item of {cls.class_name()}'
+
+    @classmethod
+    def _remove_documentation_description(cls):
+        return "Returns deleted object."
+
+    @classmethod
+    def _remove_documentation_response_bodies(cls) -> List[ResponseBodyDocumentation]:
+        from avishan.models import AvishanModel
+        cls: AvishanModel
+        return [
+            ResponseBodyDocumentation(
+                title='Success',
+                attributes=[Attribute(
+                    name=stringcase.snakecase(cls.class_name()),
+                    type=Attribute.TYPE.OBJECT,
+                    type_of=cls
+                )]
+            )
+        ]

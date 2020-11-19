@@ -1,5 +1,6 @@
 from typing import Union, Type, List
 
+from avishan.descriptor import Project
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from django.core.management import BaseCommand
@@ -66,6 +67,7 @@ class AvishanConfigFather:
         FA = 'FA'
         EN = 'EN'
 
+    PROJECT: Project = None
     PROJECT_NAME: str = None
     MONITORED_APPS_NAMES: List[str] = []
     NOT_MONITORED_STARTS: List[str] = ['/admin', '/static', '/media', '/favicon.ico', '/api/av1/redoc']
@@ -268,8 +270,7 @@ class AvishanConfigFather:
 
     @classmethod
     def get_openapi_ignored_path_models(cls) -> List[str]:
-        return ['Activity', 'BaseUser', 'UserUserGroup', 'RequestTrackException', 'RequestTrack',
-                'TranslatableChar', 'AuthenticationVerification']
+        return ['RequestTrackException', 'RequestTrack']
 
     @classmethod
     def email_key_value_authentication_verification_subject(cls, target=None):

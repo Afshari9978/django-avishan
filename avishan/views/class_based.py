@@ -385,14 +385,9 @@ class Redoc(AvishanTemplateView):
     track_it = False
 
     def get(self, request, *args, **kwargs):
-        from avishan.libraries.openapi3.descriptor import OpenApi
+        from avishan.libraries.openapi3 import OpenApi
 
-        open_api_yaml = OpenApi(
-            application_title=get_avishan_config().OPENAPI_APPLICATION_TITLE,
-            application_description=get_avishan_config().OPENAPI_APPLICATION_DESCRIPTION,
-            application_version=get_avishan_config().OPENAPI_APPLICATION_VERSION,
-            application_servers=get_avishan_config().OPENAPI_APPLICATION_SERVERS
-        ).export_yaml()
+        open_api_yaml = OpenApi().export_yaml()
 
         text_file = open('static/openapi.yaml', 'w+')
         text_file.write(open_api_yaml)

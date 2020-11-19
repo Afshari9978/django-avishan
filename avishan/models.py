@@ -1,7 +1,6 @@
 import random
 import re
 import string
-from inspect import Parameter
 from typing import List, Type, Union, Tuple, Dict
 
 import pytz
@@ -18,7 +17,7 @@ from avishan.libraries.faker import AvishanFaker
 from avishan.middlewares import AvishanRequestStorage
 from avishan.misc import status
 from avishan.misc.translation import AvishanTranslatable
-from avishan.descriptor import DirectCallable, ApiDocumentation, ResponseBodyDocumentation
+from avishan.descriptor import DirectCallable, ApiDocumentation, ResponseBodyDocumentation, Attribute
 
 import datetime
 from typing import Optional
@@ -28,7 +27,7 @@ from django.db import models
 # todo related name on abstracts
 # todo app name needed for models
 from avishan.models_extensions import AvishanModelDjangoAdminExtension, AvishanModelModelDetailsExtension, \
-    AvishanModelFilterExtension
+    AvishanModelFilterExtension, AvishanModelDescriptorExtension
 
 
 class AvishanModel(
@@ -36,7 +35,8 @@ class AvishanModel(
     AvishanFaker,
     AvishanModelDjangoAdminExtension,
     AvishanModelModelDetailsExtension,
-    AvishanModelFilterExtension
+    AvishanModelFilterExtension,
+    AvishanModelDescriptorExtension,
 ):
     # todo 0.2.1: use manager or simply create functions here?
     # todo 0.2.0 relation on_delete will call our remove() ?
@@ -52,73 +52,63 @@ class AvishanModel(
 
     @classmethod
     def direct_callable_methods(cls) -> List[DirectCallable]:
-        """
-        method name, response json key, (request json key)
-        :return:
-        :rtype: DirectCallable
-        """
         return [
             DirectCallable(
                 model=cls,
                 target_name='all',
                 url='',
                 documentation=ApiDocumentation(
-                    title=cls.__all_documentation_title(),
-                    description=cls.__all_documentation_description(),
-                    response_bodies=cls.__all_documentation_response_bodies()
-
-
+                    title=cls._all_documentation_title(),
+                    description=cls._all_documentation_description(),
+                    response_bodies=cls._all_documentation_response_bodies()
+                )
+            ),
+            DirectCallable(
+                model=cls,
+                target_name='get',
+                url='/{id}',
+                documentation=ApiDocumentation(
+                    title=cls._get_documentation_title(),
+                    description=cls._get_documentation_description(),
+                    response_bodies=cls._get_documentation_response_bodies()
                 )
             ),
             DirectCallable(
                 model=cls,
                 target_name='create',
-                response_json_key=cls.class_snake_case_name(),
-                method=DirectCallable.METHOD.POST,
                 url='',
-                on_empty_args=cls._create_default_args()
-            ),
-            DirectCallable(
-                model=cls,
-                target_name='get',
-                response_json_key=cls.class_snake_case_name(),
-                url='/{id}',
-                is_class_method=False
+                method=DirectCallable.METHOD.POST,
+                documentation=ApiDocumentation(
+                    title=cls._create_documentation_title(),
+                    description=cls._create_documentation_description(),
+                    request_body=cls._create_documentation_request_body(),
+                    response_bodies=cls._create_documentation_response_bodies()
+                )
             ),
             DirectCallable(
                 model=cls,
                 target_name='update',
-                response_json_key=cls.class_snake_case_name(),
-                request_json_key=cls.class_snake_case_name(),
                 url='/{id}',
                 method=DirectCallable.METHOD.PUT,
-                on_empty_args=cls._update_default_args()
+                documentation=ApiDocumentation(
+                    title=cls._update_documentation_title(),
+                    description=cls._update_documentation_description(),
+                    request_body=cls._update_documentation_request_body(),
+                    response_bodies=cls._update_documentation_response_bodies()
+                )
             ),
             DirectCallable(
                 model=cls,
                 target_name='remove',
-                response_json_key=cls.class_snake_case_name(),
                 url='/{id}',
-                method=DirectCallable.METHOD.DELETE
-            )
+                method=DirectCallable.METHOD.DELETE,
+                documentation=ApiDocumentation(
+                    title=cls._remove_documentation_title(),
+                    description=cls._remove_documentation_description(),
+                    response_bodies=cls._remove_documentation_response_bodies()
+                )
+            ),
         ]
-
-    @classmethod
-    def openapi_documented_fields(cls) -> List[str]:
-        """Returns list of field names should be visible by openapi documentation
-
-        :return: list of document visible fields
-        :rtype: List[str]
-        """
-        total = list(cls._meta.fields + cls._meta.many_to_many)
-        privates = []
-        for item in cls.to_dict_private_fields:
-            if not isinstance(item, str):
-                privates.append(item.name)
-            else:
-                privates.append(item)
-
-        return [field.name for field in total if field.name not in privates]
 
     @classmethod
     def get(cls, avishan_raise_400: bool = False,
@@ -134,18 +124,6 @@ class AvishanModel(
                     FA=f"{cls.__name__} انتخاب شده موجود نیست"
                 ))
             raise e
-
-    @classmethod
-    def _get_documentation_params(cls):
-        return stringcase.titlecase(cls.class_name()), cls.class_name(), cls.class_name()
-
-    @classmethod
-    def _get_documentation_raw(cls):
-        return """Get %s item
-
-        :response %s 200: Success
-        :return %s: Item
-        """
 
     @classmethod
     def filter(cls, **kwargs):
@@ -168,26 +146,6 @@ class AvishanModel(
         return cls.filter()
 
     @classmethod
-    def _all_documentation_params(cls):
-        return stringcase.titlecase(cls.class_plural_name()), cls.class_name(), cls.class_name()
-
-    @classmethod
-    def __all_documentation_title(cls):
-        return f'Get list of {cls.class_plural_name()}'
-
-    @classmethod
-    def __all_documentation_description(cls):
-        return None
-
-    @classmethod
-    def __all_documentation_response_bodies(cls) -> List[ResponseBodyDocumentation]:
-        return [
-            ResponseBodyDocumentation(
-                attributes=
-            )
-        ]
-
-    @classmethod
     def create(cls, **kwargs):
 
         create_kwargs, many_to_many_objects, after_creation = cls._clean_model_data_kwargs(**kwargs)
@@ -205,18 +163,6 @@ class AvishanModel(
                     **target_object
                 })
         return created
-
-    @classmethod
-    def _create_documentation_params(cls):
-        return stringcase.titlecase(cls.class_name()), cls.class_name(), cls.class_name()
-
-    @classmethod
-    def _create_documentation_raw(cls):
-        return """Create %s
-
-        :response %s 200: Created
-        :return %s: Current created object
-        """
 
     def update(self, **kwargs):
 
@@ -242,34 +188,10 @@ class AvishanModel(
         self.save()
         return self
 
-    @classmethod
-    def _update_documentation_params(cls):
-        return stringcase.titlecase(cls.class_name()), cls.class_name(), cls.class_name()
-
-    @classmethod
-    def _update_documentation_raw(cls):
-        return """Edit %s
-
-        :response %s 200: Edited
-        :return %s: Current edited object
-        """
-
     def remove(self) -> dict:
         temp = self.to_dict()
         self.delete()
         return temp
-
-    @classmethod
-    def _remove_documentation_params(cls):
-        return stringcase.titlecase(cls.class_name()), cls.class_name(), cls.class_name()
-
-    @classmethod
-    def _remove_documentation_raw(cls):
-        return """Delete %s
-
-        :response %s 200: Deleted
-        :return %s: Deleted object
-        """
 
     @classmethod
     def search(cls, query_set: models.QuerySet, search_text: str = None) -> models.QuerySet:
@@ -965,14 +887,12 @@ class AuthenticationType(AvishanModel):
             DirectCallable(
                 model=cls,
                 target_name='login',
-                response_json_key=cls.class_snake_case_name(),
                 method=DirectCallable.METHOD.POST,
                 authenticate=False
             ),
             DirectCallable(
                 model=cls,
                 target_name='register',
-                response_json_key=cls.class_snake_case_name(),
                 method=DirectCallable.METHOD.POST,
                 authenticate=False
             )
@@ -1151,7 +1071,6 @@ class VerifiableAuthenticationType(AuthenticationType):
                 target_name='check_verification',
                 authenticate=False,
                 method=DirectCallable.METHOD.POST,
-                dismiss_request_json_key=True
             )
         ]
 
@@ -1560,9 +1479,7 @@ class File(AvishanModel):
             DirectCallable(
                 model=cls,
                 target_name='file_from_multipart_form_data_request',
-                response_json_key='file',
                 method=DirectCallable.METHOD.POST,
-                dismiss_request_json_key=True
             )]
 
     @classmethod
@@ -1628,9 +1545,7 @@ class Image(AvishanModel):
             DirectCallable(
                 model=cls,
                 target_name='image_from_multipart_form_data_request',
-                response_json_key='image',
                 method=DirectCallable.METHOD.POST,
-                dismiss_request_json_key=True
             )]
 
     @staticmethod
@@ -1893,3 +1808,13 @@ class Country(AvishanModel):
 
     def __str__(self):
         return self.name
+
+
+class Province(AvishanModel):
+    title = models.CharField(max_length=255)
+    country = models.ForeignKey(Country, on_delete=models.CASCADE, related_name='provinces')
+
+
+class City(AvishanModel):
+    title = models.CharField(max_length=255)
+    province = models.ForeignKey(Province, on_delete=models.CASCADE, related_name='cities')

@@ -22,6 +22,7 @@ class Wrapper:
         """Run Descriptor to find any error in startup and store project"""
         from avishan.descriptor import Project
         self.project = Project(name=get_avishan_config().PROJECT_NAME)
+        get_avishan_config().PROJECT = self.project
 
     def __call__(self, request: WSGIRequest):
         from avishan.utils import discard_monitor, find_token, decode_token, add_token_to_response, find_and_check_user
@@ -30,7 +31,6 @@ class Wrapper:
         from avishan.configure import get_avishan_config
 
         request.avishan = AvishanRequestStorage(request)
-        request.avishan.project = self.project
 
         """Checks for avoid-touch requests"""
         if discard_monitor(request.get_full_path()):

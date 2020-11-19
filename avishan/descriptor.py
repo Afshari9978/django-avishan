@@ -4,7 +4,6 @@ from enum import Enum, auto
 from typing import List, Callable, Optional, Tuple, Union
 
 import docstring_parser
-import stringcase
 from django.apps import apps
 from django.conf import settings
 from django.db import models
@@ -72,12 +71,12 @@ class DjangoAvishanModel(DataModel):
     def __init__(self, app: DjangoApplication, target):
         from avishan.models import AvishanModel
 
+        self.target: AvishanModel = target
         super().__init__(
             name=target._meta.object_name,
             attributes=self.extract_attributes(),
             description=self.target._model_description()
         )
-        self.target: AvishanModel = target
         self.app: DjangoApplication = app
         self.methods = self.extract_methods()
         self.prepare_docs()
@@ -235,25 +234,16 @@ class DirectCallable(ApiMethod):
     def __init__(self,
                  model: type,
                  target_name: str,
-                 response_json_key: str = None,
-                 request_json_key: str = None,
                  url: str = None,
                  method: ApiMethod.METHOD = ApiMethod.METHOD.GET,
                  authenticate: bool = True,
-                 dismiss_request_json_key: bool = False,
-                 dismiss_response_json_key: bool = False,
                  hide_in_redoc: bool = False,
                  is_class_method: bool = None,
-                 on_empty_args: List['FunctionAttribute'] = None,
                  documentation: 'ApiDocumentation' = None
                  ):
         from avishan.configure import get_avishan_config
         from avishan.models import AvishanModel
         model: AvishanModel
-        if response_json_key is None:
-            response_json_key = model.class_plural_snake_case_name()
-        if request_json_key is None:
-            request_json_key = model.class_snake_case_name()
 
         if url is None:
             auto_set_url = True
@@ -268,15 +258,6 @@ class DirectCallable(ApiMethod):
         )
 
         self.model = model
-        if self.short_description is None:
-            self.short_description = stringcase.titlecase(self.model.class_name()) + " " + stringcase.titlecase(
-                self.name)
-        self.response_json_key = response_json_key
-        self.request_json_key = request_json_key
-        self.dismiss_request_json_key = dismiss_request_json_key if \
-            method not in [ApiMethod.METHOD.GET, ApiMethod.METHOD.DELETE] else \
-            True
-        self.dismiss_response_json_key = dismiss_response_json_key
         self.authenticate = authenticate
         self.hide_in_redoc = hide_in_redoc
         if is_class_method is not None:
@@ -286,8 +267,6 @@ class DirectCallable(ApiMethod):
             self.url = '/' + get_avishan_config().AVISHAN_URLS_START + f'/{model.class_plural_snake_case_name()}/' \
                        + '{id}' + url
 
-        if documentation is None:
-            documentation = ApiDocumentation(direct_callable=self)
         self.documentation = documentation
 
     def __str__(self):
@@ -337,7 +316,7 @@ class Attribute:
     def __init__(self,
                  name: str,
                  type: 'Attribute.TYPE',
-                 type_of: Union[type, DataModel] = None,
+                 type_of: Union[type, DataModel, 'AvishanModel'] = None,
                  default=NO_DEFAULT,
                  description: str = None,
                  example: str = None,
@@ -587,10 +566,10 @@ class RequestBodyDocumentation:
 class ResponseBodyDocumentation:
 
     def __init__(self,
+                 title: str,
                  status_code: int = 200,
                  attributes: List[Attribute] = "NOT_SET",
-                 title: str = "NOT_SET",
-                 description: str = "NOT_SET"
+                 description: str = None
                  ):
         self.status_code = status_code
         self.attributes = attributes
@@ -600,12 +579,14 @@ class ResponseBodyDocumentation:
 
 class ApiDocumentation:
     def __init__(self,
-                 title: str = "NOT_SET",
-                 description: Optional[str] = "NOT_SET",
-                 request_body: RequestBodyDocumentation = "NOT_SET",
-                 response_bodies: List[ResponseBodyDocumentation] = "NOT_SET",
+                 title: str,
+                 description: Optional[str] = None,
+                 request_body: RequestBodyDocumentation = None,
+                 response_bodies: List[ResponseBodyDocumentation] = None,
                  direct_callable: DirectCallable = None,
                  ):
+        if response_bodies is None:
+            response_bodies = []
         self.direct_callable = direct_callable
         self.title = title
         self.description = description
