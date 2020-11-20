@@ -1108,10 +1108,6 @@ class VerifiableAuthenticationType(AuthenticationType):
                               '_verification_body')(self)
             html_message = getattr(get_avishan_config(), stringcase.snakecase(self.class_name()) +
                                    '_verification_html_body')(self)
-            if message:
-                message = message.format(code=self.verification.code)
-            elif html_message:
-                html_message = html_message.format(code=self.verification.code)
             self.key.send_mail(
                 subject=getattr(get_avishan_config(), stringcase.snakecase(self.class_name()) +
                                 '_verification_subject')(self),
