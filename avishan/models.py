@@ -57,6 +57,7 @@ class AvishanModel(
                 model=cls,
                 target_name='all',
                 url='',
+                response_json_key=stringcase.snakecase(cls.class_plural_name()),
                 documentation=ApiDocumentation(
                     title=cls._all_documentation_title(),
                     description=cls._all_documentation_description(),
@@ -67,6 +68,7 @@ class AvishanModel(
                 model=cls,
                 target_name='get',
                 url='/{id}',
+                response_json_key=stringcase.snakecase(cls.class_name()),
                 documentation=ApiDocumentation(
                     title=cls._get_documentation_title(),
                     description=cls._get_documentation_description(),
@@ -78,6 +80,7 @@ class AvishanModel(
                 target_name='create',
                 url='',
                 method=DirectCallable.METHOD.POST,
+                response_json_key=stringcase.snakecase(cls.class_name()),
                 documentation=ApiDocumentation(
                     title=cls._create_documentation_title(),
                     description=cls._create_documentation_description(),
@@ -90,6 +93,7 @@ class AvishanModel(
                 target_name='update',
                 url='/{id}',
                 method=DirectCallable.METHOD.PUT,
+                response_json_key=stringcase.snakecase(cls.class_name()),
                 documentation=ApiDocumentation(
                     title=cls._update_documentation_title(),
                     description=cls._update_documentation_description(),
@@ -102,6 +106,7 @@ class AvishanModel(
                 target_name='remove',
                 url='/{id}',
                 method=DirectCallable.METHOD.DELETE,
+                response_json_key=stringcase.snakecase(cls.class_name()),
                 documentation=ApiDocumentation(
                     title=cls._remove_documentation_title(),
                     description=cls._remove_documentation_description(),
@@ -882,23 +887,6 @@ class AuthenticationType(AvishanModel):
     to_dict_private_fields = [last_used, last_login, last_logout, date_created, is_active]
 
     @classmethod
-    def direct_callable_methods(cls):
-        return super().direct_callable_methods() + [
-            DirectCallable(
-                model=cls,
-                target_name='login',
-                method=DirectCallable.METHOD.POST,
-                authenticate=False
-            ),
-            DirectCallable(
-                model=cls,
-                target_name='register',
-                method=DirectCallable.METHOD.POST,
-                authenticate=False
-            )
-        ]
-
-    @classmethod
     def register(cls, **kwargs) -> Union[
         'EmailKeyValueAuthentication',
         'PhoneKeyValueAuthentication',
@@ -1057,22 +1045,6 @@ class VerifiableAuthenticationType(AuthenticationType):
     verification = models.OneToOneField(AuthenticationVerification, on_delete=models.SET_NULL, null=True, blank=True)
 
     to_dict_private_fields = [verification, 'last_used', 'last_login', 'last_logout', 'date_created', 'is_active']
-
-    @classmethod
-    def direct_callable_methods(cls):
-        return super().direct_callable_methods() + [
-            DirectCallable(
-                model=cls,
-                target_name='start_verification',
-                authenticate=False
-            ),
-            DirectCallable(
-                model=cls,
-                target_name='check_verification',
-                authenticate=False,
-                method=DirectCallable.METHOD.POST,
-            )
-        ]
 
     def must_verify(self) -> bool:
         if getattr(get_avishan_config(), stringcase.constcase(self.class_name()) + '_VERIFICATION_REQUIRED'):
@@ -1476,6 +1448,7 @@ class File(AvishanModel):
                 model=cls,
                 target_name='file_from_multipart_form_data_request',
                 method=DirectCallable.METHOD.POST,
+                response_json_key=stringcase.snakecase(cls.class_name()),
             )]
 
     @classmethod
@@ -1542,6 +1515,7 @@ class Image(AvishanModel):
                 model=cls,
                 target_name='image_from_multipart_form_data_request',
                 method=DirectCallable.METHOD.POST,
+                response_json_key=stringcase.snakecase(cls.class_name()),
             )]
 
     @staticmethod
@@ -1814,3 +1788,9 @@ class Province(AvishanModel):
 class City(AvishanModel):
     title = models.CharField(max_length=255)
     province = models.ForeignKey(Province, on_delete=models.CASCADE, related_name='cities')
+
+    @classmethod
+    def class_plural_name(cls) -> str:
+        return 'Cities'
+
+

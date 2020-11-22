@@ -31,6 +31,7 @@ class Wrapper:
         from avishan.configure import get_avishan_config
 
         request.avishan = AvishanRequestStorage(request)
+        request.avishan.project = self.project
 
         """Checks for avoid-touch requests"""
         if discard_monitor(request.get_full_path()):

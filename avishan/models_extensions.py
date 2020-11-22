@@ -400,15 +400,7 @@ class AvishanModelDescriptorExtension:
         from avishan.models import AvishanModel
         cls: AvishanModel
         return RequestBodyDocumentation(
-            attributes=[Attribute(
-                name=stringcase.snakecase(cls.class_name()),
-                type=Attribute.TYPE.DATA_MODEL,
-                type_of=DataModel(
-                    name=stringcase.snakecase(cls.class_name()),
-                    attributes=Function.load_args_from_signature(getattr(cls, 'create')),
-                    description=cls._create_documentation_request_body_description()
-                )
-            )],
+            attributes=Function.load_args_from_signature(getattr(cls, 'create')),
             description=cls._create_documentation_request_body_description()
         )
 
@@ -446,15 +438,7 @@ class AvishanModelDescriptorExtension:
         from avishan.models import AvishanModel
         cls: AvishanModel
         return RequestBodyDocumentation(
-            attributes=[Attribute(
-                name=stringcase.snakecase(cls.class_name()),
-                type=Attribute.TYPE.DATA_MODEL,
-                type_of=DataModel(
-                    name=stringcase.snakecase(cls.class_name()),
-                    attributes=cls._update_default_args(),
-                    description=cls._update_documentation_request_body_description()
-                )
-            )],
+            attributes=cls._update_default_args(),
             description=cls._update_documentation_request_body_description()
         )
 

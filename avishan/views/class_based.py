@@ -10,7 +10,7 @@ from django.utils import timezone
 from django.views import View
 
 from avishan.configure import get_avishan_config
-from avishan.descriptor import DirectCallable, FunctionAttribute
+from avishan.descriptor import DirectCallable, FunctionAttribute, DjangoAvishanModel
 from avishan.exceptions import ErrorMessageException, AvishanException, AuthException
 from avishan.misc import status
 from avishan.misc.translation import AvishanTranslatable
@@ -188,19 +188,24 @@ class AvishanModelApiView(AvishanApiView):
     model_item: AvishanModel = None
     model_function: Callable = None  # todo these sends model not dict
     model_function_name: str = None
+    model_descripted: DjangoAvishanModel = None
     direct_callable: Optional[DirectCallable] = None
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
     def setup(self, request, *args, **kwargs):
+        # noinspection PyTypeHints
+        request.avishan: AvishanRequestStorage
+
         super().setup(request, *args, **kwargs)
         model_plural_name = kwargs.get('model_plural_name', None)
         model_item_id = kwargs.get('model_item_id', None)
         self.model_function_name = kwargs.get('model_function_name', None)
-        self.model: Union[AvishanModel, type] = AvishanModel.get_model_by_plural_snake_case_name(model_plural_name)
-        if not self.model:
+        self.model_descripted: DjangoAvishanModel = request.avishan.project.find_model(snake_case_plural_name=model_plural_name)
+        if not self.model_descripted:
             raise ErrorMessageException('Entered model name not found')
+        self.model = self.model_descripted.target
 
         if self.model_function_name is None:
             if request.method == 'GET':
@@ -218,7 +223,7 @@ class AvishanModelApiView(AvishanApiView):
         if model_item_id is not None:
             self.model_item = self.model.get(avishan_raise_400=True, id=int(model_item_id))
         if self.model_function_name is not None:
-            for direct_callable in self.model.direct_callable_methods():
+            for direct_callable in self.model_descripted.methods:
                 if self.model_function_name == direct_callable.name:
                     self.direct_callable = direct_callable
                     break
@@ -240,7 +245,7 @@ class AvishanModelApiView(AvishanApiView):
         request.avishan: AvishanRequestStorage
 
         if self.model_function_name == 'get':
-            result = self.model_item
+            result = self.model.get(id=self.model_item.id)
         else:
             result = self.model_function()
 
@@ -256,13 +261,8 @@ class AvishanModelApiView(AvishanApiView):
         # noinspection PyTypeHints
         request.avishan: AvishanRequestStorage
 
-        if self.direct_callable.dismiss_request_json_key:
-            data = request.data
-        else:
-            data = request.data[self.direct_callable.request_json_key]
-
-        data = self.parse_request_data(**data)
-        result = self.model_function(**data)
+        request_data = self.parse_request_data(**request.data)
+        result = self.model_function(**request_data)
         response = self.parse_returned_data(request, result)
         if request.avishan.can_touch_response:
             self.response[self.direct_callable.response_json_key] = response
@@ -364,20 +364,6 @@ class AvishanModelApiView(AvishanApiView):
                                         f'unique values so that db can find corresponding object')
 
         return function_attribute.type_of.request_arg_get_from_dict(target_dict)
-
-
-class PasswordHash(AvishanApiView):
-    authenticate = False
-
-    def get(self, request, *args, **kwargs):
-        import bcrypt
-        # noinspection PyTypeHints
-        request.avishan: AvishanRequestStorage
-
-        request.avishan.response['hashed'] = bcrypt.hashpw(kwargs['password'].encode('utf8'),
-                                                           bcrypt.gensalt()).decode('utf8')
-        return JsonResponse(request.avishan.response)
-
 
 class Redoc(AvishanTemplateView):
     template_file_address = 'avishan/redoc.html'

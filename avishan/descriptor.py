@@ -4,12 +4,15 @@ from enum import Enum, auto
 from typing import List, Callable, Optional, Tuple, Union
 
 import docstring_parser
+import stringcase
 from django.apps import apps
 from django.conf import settings
 from django.db import models
 from django.db.models.base import ModelBase
 from djmoney.models.fields import MoneyField
 from docstring_parser import DocstringMeta, DocstringParam
+
+from avishan.misc import status
 
 
 class Project:
@@ -29,6 +32,15 @@ class Project:
         for app in self.apps:
             total.extend(app.models)
         return total
+
+    def find_model(self, name: str = None, plural_name: str = None, snake_case_plural_name: str = None) -> Optional[
+        'DjangoAvishanModel']:
+        for model in self.models_pool():
+            if (name and model.name == name) or \
+                    (plural_name and model.target.class_plural_name() == plural_name) or \
+                    (snake_case_plural_name and model.target.class_plural_name() == stringcase.pascalcase(
+                        snake_case_plural_name)):
+                return model
 
     def __str__(self):
         return self.name
@@ -79,11 +91,12 @@ class DjangoAvishanModel(DataModel):
         )
         self.app: DjangoApplication = app
         self.methods = self.extract_methods()
+        self.parse_auto_resolves()
         self.prepare_docs()
 
     @property
     def direct_callables(self) -> List['DirectCallable']:
-        return self.target.direct_callable_methods()
+        return self.methods
 
     def prepare_docs(self):
         document_added_methods = []
@@ -115,6 +128,17 @@ class DjangoAvishanModel(DataModel):
         """
         # todo extract methods here, not only apis
         return self.target.direct_callable_methods()
+
+    def parse_auto_resolves(self):
+        """auto resolve request body"""
+
+        for item in self.methods:
+            if item.documentation is None:
+                continue
+            if item.documentation.request_body is not None \
+                    and isinstance(item.documentation.request_body.attributes,
+                                   RequestBodyDocumentation.AutoResolveRequestBody):
+                item.documentation.request_body.attributes = item.args
 
     def is_abstract(self) -> bool:
         return self.target._meta.abstract
@@ -234,6 +258,7 @@ class DirectCallable(ApiMethod):
     def __init__(self,
                  model: type,
                  target_name: str,
+                 response_json_key: str,
                  url: str = None,
                  method: ApiMethod.METHOD = ApiMethod.METHOD.GET,
                  authenticate: bool = True,
@@ -260,6 +285,7 @@ class DirectCallable(ApiMethod):
         self.model = model
         self.authenticate = authenticate
         self.hide_in_redoc = hide_in_redoc
+        self.response_json_key = response_json_key
         if is_class_method is not None:
             self.is_class_method = is_class_method
 
@@ -557,20 +583,30 @@ class FunctionAttribute(Attribute):
 
 
 class RequestBodyDocumentation:
-    def __init__(self, attributes: List[Attribute] = "NOT_SET", description: str = None):
-        # todo if not_set, auto resolve
+    class AutoResolveRequestBody:
+        pass
+
+    def __init__(self,
+                 attributes: Union[List[Attribute], AutoResolveRequestBody] = None,
+                 description: str = None):
+        if attributes is None:
+            attributes = []
         self.attributes = attributes
         self.description = description
 
 
 class ResponseBodyDocumentation:
+    class AutoResolveResponseBody:
+        pass
 
     def __init__(self,
                  title: str,
-                 status_code: int = 200,
-                 attributes: List[Attribute] = "NOT_SET",
+                 status_code: int = status.HTTP_200_OK,
+                 attributes: Union[List[Attribute], AutoResolveResponseBody] = None,
                  description: str = None
                  ):
+        if attributes is None:
+            attributes = []
         self.status_code = status_code
         self.attributes = attributes
         self.title = title

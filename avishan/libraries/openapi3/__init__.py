@@ -333,14 +333,17 @@ class Content:
 
     @classmethod
     def create_from_attributes(cls, attributes: List[Attribute]):
-        return Content(
-            Schema(
-                type='object',
-                properties=[
-                    Property(name=item.name, schema=Schema.create_from_attribute(item)) for item in attributes
-                ]
+        try:
+            return Content(
+                Schema(
+                    type='object',
+                    properties=[
+                        Property(name=item.name, schema=Schema.create_from_attribute(item)) for item in attributes
+                    ]
+                )
             )
-        )
+        except Exception as e:
+            a = 1
 
     def export(self) -> dict:
         data = {
@@ -407,23 +410,23 @@ class Operation:
     def extract_request_body_from_direct_callable(direct_callable: DirectCallable) -> Optional[RequestBody]:
         if direct_callable.documentation.request_body is None:
             return None
-        return RequestBody(content=Content(schema=Schema.create_object_from_args(
-            direct_callable.documentation.request_body.attributes,
-            request_body_related=True
-        )))
+        try:
+            return RequestBody(content=Content(schema=Schema.create_object_from_args(
+                direct_callable.documentation.request_body.attributes,
+                request_body_related=True
+            )))
+        except Exception as e:
+            a = 1
 
     @staticmethod
     def extract_responses_from_direct_callable(direct_callable: DirectCallable) -> List[Response]:
         responses = []
         for item in direct_callable.documentation.response_bodies:
-            try:
-                responses.append(Response(
-                    status_code=item.status_code,
-                    description=item.title,
-                    content=Content.create_from_attributes(item.attributes)
-                ))
-            except Exception as e:
-                a = 1
+            responses.append(Response(
+                status_code=item.status_code,
+                description=item.title,
+                content=Content.create_from_attributes(item.attributes)
+            ))
 
         return responses
 
