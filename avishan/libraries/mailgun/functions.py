@@ -9,7 +9,7 @@ def send_mail(recipient_list: List[str], subject: str, message: str, html_messag
               "to": recipient_list,
               "subject": subject}
     if message:
-        data['message'] = message
+        data['text'] = message
     if html_message:
         data['html'] = html_message
 
