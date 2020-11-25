@@ -784,7 +784,7 @@ class Email(Identifier):
         from avishan.libraries.mailgun.functions import send_mail as mailgun_send_mail
 
         if get_avishan_config().MAILGUN_EMAIL_ENABLE:
-            return mailgun_send_mail(recipient_list=[self.key], subject=subject, message=message)
+            return mailgun_send_mail(recipient_list=[self.key], subject=subject, message=message, html_message=html_message)
         elif get_avishan_config().DJANGO_EMAIL_ENABLE:
             return self.send_bulk_mail(subject, message, [self.key], html_message)
         else:
