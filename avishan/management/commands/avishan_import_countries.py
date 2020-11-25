@@ -17,8 +17,23 @@ class Command(BaseCommand):
                 continue
             try:
                 country = Country.objects.get(numeric_code=item['numericCode'])
-                country.update(**item)
+                country.update(
+                    name=item['name'],
+                    alpha_2_code=item['alpha2Code'],
+                    alpha_3_code=item['alpha3Code'],
+                    region=item['region'],
+                    native_name=item['nativeName'],
+                    flag=item['flag']
+                )
                 print(f'update {country.name}')
             except Country.DoesNotExist:
-                country = Country.create(**item)
+                country = Country.create(
+                    numeric_code=item['numericCode'],
+                    name=item['name'],
+                    alpha_2_code=item['alpha2Code'],
+                    alpha_3_code=item['alpha3Code'],
+                    region=item['region'],
+                    native_name=item['nativeName'],
+                    flag=item['flag']
+                )
                 print(f'create {country.name}')

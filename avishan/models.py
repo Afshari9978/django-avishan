@@ -1965,8 +1965,7 @@ class Country(AvishanModel):
                alpha_3_code: str,
                region: str,
                native_name: str = None,
-               flag: str = None,
-               **kwargs
+               flag: str = None
                ):
         return super().create(
             numeric_code=numeric_code,
@@ -1985,8 +1984,7 @@ class Country(AvishanModel):
                alpha_3_code: str,
                region: str,
                native_name: str = None,
-               flag: str = None,
-               **kwargs
+               flag: str = None
                ):
         return super().update(
             name=name,
