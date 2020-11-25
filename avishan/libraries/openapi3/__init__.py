@@ -52,10 +52,18 @@ class OpenApi:
 
     def _export_tags(self) -> list:
         # todo https://github.com/OAI/OpenAPI-Specification/blob/master/versions/3.0.0.md#tagObject
-        return [{
-            'name': stringcase.titlecase(item.name),
-            'description': item.description
-        } for item in self.models]
+        tags = []
+        for item in self.models:
+            if item.description:
+                tags.append({
+                    'name': stringcase.titlecase(item.name),
+                    'description': item.description
+                })
+            else:
+                tags.append({
+                    'name': stringcase.titlecase(item.name)
+                })
+        return tags
 
     def _export_tag_groups(self):
         return [
@@ -285,6 +293,9 @@ class Schema:
             'type': self.type,
             'description': ""
         }
+        if self.type == 'integer':
+            data['minimum'] = 1
+            data['maximum'] = 9223372036854775807
         if self.format:
             data['format'] = self.format
         if self.default is not Attribute.NO_DEFAULT:
@@ -309,6 +320,8 @@ class Schema:
                 if item.required:
                     data['required'].append(item.name)
                 data['properties'][item.name] = item.export()
+                if not item.required:
+                    data['properties'][item.name]['nullable'] = True
             if len(data['required']) == 0:
                 del data['required']
 
@@ -353,19 +366,32 @@ class Content:
         }
         if self.examples:
             data['application/json']['examples'] = self.examples
+
         return data
 
 
 class RequestBody:
-    def __init__(self, content: Content, required: bool = True):
+    def __init__(self, content: Content, required: bool = True, examples=None):
+        if examples is None:
+            examples = []
         self.content = content
         self.required = required
+        self.examples = examples
 
     def export(self) -> dict:
-        return {
+        data = {
             'content': self.content.export(),
             'required': self.required
         }
+        if self.examples:
+            data['content']['application/json']['examples'] = {}
+            for example in self.examples:
+                data['content']['application/json']['examples'][example.name] = {
+                    "summary": example.summary,
+                    "value": example.value
+                }
+
+        return data
 
 
 class Response:
@@ -410,13 +436,13 @@ class Operation:
     def extract_request_body_from_direct_callable(direct_callable: DirectCallable) -> Optional[RequestBody]:
         if direct_callable.documentation.request_body is None:
             return None
-        try:
-            return RequestBody(content=Content(schema=Schema.create_object_from_args(
+        return RequestBody(
+            content=Content(schema=Schema.create_object_from_args(
                 direct_callable.documentation.request_body.attributes,
                 request_body_related=True
-            )))
-        except Exception as e:
-            a = 1
+            )),
+            examples=direct_callable.documentation.request_body.examples,
+        )
 
     @staticmethod
     def extract_responses_from_direct_callable(direct_callable: DirectCallable) -> List[Response]:
@@ -470,6 +496,18 @@ class Path:
 
     def export(self) -> dict:
         data = {}
+        if "{id}" in self.url:
+            data['parameters'] = [{
+                "name": "id",
+                "in": "path",
+                "required": True,
+                "description": "Database specified id",
+                "schema": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9223372036854775807
+                }
+            }]
         if self.get:
             data['get'] = self.get.export()
         if self.post:

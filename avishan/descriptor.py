@@ -131,7 +131,6 @@ class DjangoAvishanModel(DataModel):
 
     def parse_auto_resolves(self):
         """auto resolve request body"""
-
         for item in self.methods:
             if item.documentation is None:
                 continue
@@ -139,6 +138,26 @@ class DjangoAvishanModel(DataModel):
                     and isinstance(item.documentation.request_body.attributes,
                                    RequestBodyDocumentation.AutoResolveRequestBody):
                 item.documentation.request_body.attributes = item.args
+
+            if item.authenticate and item.documentation.response_bodies:
+                item.documentation.response_bodies.append(
+                    ResponseBodyDocumentation(
+                        title='Authentication error',
+                        status_code=status.HTTP_403_FORBIDDEN
+                    )
+                )
+            if item.documentation.request_body:
+                related_names = []
+                for attribute in item.documentation.request_body.attributes:
+                    if attribute.type is Attribute.TYPE.OBJECT:
+                        related_names.append(attribute.type_of.class_name())
+                if len(related_names) > 0:
+                    item.documentation.response_bodies.append(
+                        ResponseBodyDocumentation(
+                            title=f'Related object of one of these types not found: {", ".join(related_names)}',
+                            status_code=status.HTTP_404_NOT_FOUND
+                        )
+                    )
 
     def is_abstract(self) -> bool:
         return self.target._meta.abstract
@@ -223,7 +242,7 @@ class ApiMethod(Method):
         self.responses: List[ApiMethod.RESPONSE] = []
         self.method: ApiMethod.METHOD = method
         self.url: str = url
-        self.load_from_doc()
+        # self.load_from_doc()
 
     def load_from_doc(self):
         self.short_description = self._doc.short_description
@@ -586,13 +605,27 @@ class RequestBodyDocumentation:
     class AutoResolveRequestBody:
         pass
 
+    class Example:
+        def __init__(self,
+                     name: str,
+                     summary: str,
+                     value: dict
+                     ):
+            self.name = name
+            self.summary = summary
+            self.value = value
+
     def __init__(self,
                  attributes: Union[List[Attribute], AutoResolveRequestBody] = None,
-                 description: str = None):
+                 description: str = None,
+                 examples: List[Example] = None):
         if attributes is None:
             attributes = []
+        if examples is None:
+            examples = []
         self.attributes = attributes
         self.description = description
+        self.examples = examples
 
 
 class ResponseBodyDocumentation:

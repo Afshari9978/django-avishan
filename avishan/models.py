@@ -10,6 +10,7 @@ from django.conf import settings
 from django.core.files.uploadedfile import InMemoryUploadedFile
 from django.template.loader import render_to_string
 from django.utils import timezone
+from faker import Faker
 
 from avishan.configure import get_avishan_config, AvishanConfigFather
 from avishan.exceptions import AuthException, ErrorMessageException
@@ -17,7 +18,8 @@ from avishan.libraries.faker import AvishanFaker
 from avishan.middlewares import AvishanRequestStorage
 from avishan.misc import status
 from avishan.misc.translation import AvishanTranslatable
-from avishan.descriptor import DirectCallable, ApiDocumentation, ResponseBodyDocumentation, Attribute
+from avishan.descriptor import DirectCallable, ApiDocumentation, ResponseBodyDocumentation, Attribute, \
+    RequestBodyDocumentation
 
 import datetime
 from typing import Optional
@@ -28,6 +30,8 @@ from django.db import models
 # todo app name needed for models
 from avishan.models_extensions import AvishanModelDjangoAdminExtension, AvishanModelModelDetailsExtension, \
     AvishanModelFilterExtension, AvishanModelDescriptorExtension
+
+faker = Faker(get_avishan_config().FAKER_SEED)
 
 
 class AvishanModel(
@@ -127,7 +131,7 @@ class AvishanModel(
                 raise ErrorMessageException(AvishanTranslatable(
                     EN="Chosen " + cls.__name__ + " doesnt exist",
                     FA=f"{cls.__name__} انتخاب شده موجود نیست"
-                ))
+                ), status_code=status.HTTP_404_NOT_FOUND)
             raise e
 
     @classmethod
@@ -488,7 +492,7 @@ class AvishanModel(
 
         """Shortcut for id"""
         if 'id' in input_dict.keys():
-            return cls.get(id=input_dict['id'])
+            return cls.get(avishan_raise_400=True, id=input_dict['id'])
 
         """Usually when unique or one-to-one relations provided, this can help"""
         return cls.get(**input_dict)
@@ -537,6 +541,10 @@ class BaseUser(AvishanModel):
     django_admin_list_filter = [language, is_active]
 
     @classmethod
+    def direct_callable_methods(cls) -> List[DirectCallable]:
+        return [item for item in super().direct_callable_methods() if item.name == 'get']
+
+    @classmethod
     def create(cls) -> 'BaseUser':
         return super().create(
             language=get_avishan_config().NEW_USERS_LANGUAGE
@@ -569,6 +577,10 @@ class UserGroup(AvishanModel):
         'id'
     ]
     django_admin_list_display = [title, token_valid_seconds]
+
+    @classmethod
+    def direct_callable_methods(cls) -> List[DirectCallable]:
+        return [item for item in super().direct_callable_methods() if item.name in ('get', 'all')]
 
     @classmethod
     def create(cls, title: str, token_valid_seconds: int) -> 'UserGroup':
@@ -621,6 +633,10 @@ class UserUserGroup(AvishanModel):
     django_admin_list_filter = [user_group]
     django_admin_raw_id_fields = [base_user]
     to_dict_private_fields = [date_created, is_active]
+
+    @classmethod
+    def direct_callable_methods(cls) -> List[DirectCallable]:
+        return [item for item in super().direct_callable_methods() if item.name in ('get',)]
 
     @classmethod
     def create(cls, user_group: UserGroup, base_user: BaseUser = None) -> 'UserUserGroup':
@@ -682,6 +698,19 @@ class Identifier(AvishanModel):
     to_dict_private_fields = ['id']
 
     @classmethod
+    def direct_callable_methods(cls) -> List[DirectCallable]:
+        total = [item for item in super().direct_callable_methods() if item.name in ('get', 'create')]
+        for item in total:
+            if item.name == 'create':
+                item.documentation.response_bodies.append(
+                    ResponseBodyDocumentation(
+                        title='Signature validation failed',
+                        status_code=status.HTTP_406_NOT_ACCEPTABLE,
+                    )
+                )
+        return total
+
+    @classmethod
     def create(cls, key: str):
         """
 
@@ -698,7 +727,8 @@ class Identifier(AvishanModel):
 
     @classmethod
     def get(cls, avishan_raise_400: bool = False, **kwargs):
-        kwargs['key'] = cls.validate_signature(kwargs['key'])
+        if kwargs.get('key'):
+            kwargs['key'] = cls.validate_signature(kwargs['key'])
         return super().get(avishan_raise_400, **kwargs)
 
     def update(self, key: str):
@@ -726,6 +756,29 @@ class Identifier(AvishanModel):
 
 class Email(Identifier):
 
+    @classmethod
+    def direct_callable_methods(cls) -> List[DirectCallable]:
+        total = super().direct_callable_methods()
+        for item in total:
+            if item.name == 'create':
+                item.documentation.request_body.examples += [
+                    RequestBodyDocumentation.Example(
+                        name='foo',
+                        summary='My Email',
+                        value={
+                            "key": "afshari9978@gmail.com"
+                        }
+                    ),
+                    RequestBodyDocumentation.Example(
+                        name='bar',
+                        summary='Some random email',
+                        value={
+                            "key": faker.email()
+                        }
+                    )
+                ]
+        return total
+
     def send_mail(self, subject: str, message: str, html_message: str = None):
         from avishan.exceptions import ErrorMessageException
         from avishan.libraries.mailgun.functions import send_mail as mailgun_send_mail
@@ -749,10 +802,35 @@ class Email(Identifier):
 
     @staticmethod
     def validate_signature(key: str) -> str:
-        return key.lower().strip()
+        key = key.lower().strip()
+        import re
+        email_regex = re.compile('[^@]+@[^@]+\.[^@]+')
+        if not email_regex.match(key):
+            raise ErrorMessageException(
+                'Email Signature not valid',
+                status_code=status.HTTP_406_NOT_ACCEPTABLE
+            )
+        return key
 
 
 class Phone(Identifier):
+
+    @classmethod
+    def direct_callable_methods(cls) -> List[DirectCallable]:
+        total = super().direct_callable_methods()
+        for item in total:
+            if item.name == 'create':
+                item.documentation.request_body.examples += [
+                    RequestBodyDocumentation.Example(
+                        name='foo',
+                        summary='My Phone',
+                        value={
+                            "key": "00989021207150"
+                        }
+                    )
+                ]
+        return total
+
     @staticmethod
     def send_bulk_sms():
         pass  # todo
@@ -815,9 +893,15 @@ class Phone(Identifier):
         result = re.sub(f'({country_data["dialing_code"]}|00{country_data["dialing_code"]})?(0)?([0-9]*)', r'\3',
                         result)
         if len(result) < 10:
-            raise ValueError(f'Smaller Number Extracted: {result}')
+            raise ErrorMessageException(
+                f'Smaller Number Extracted: {result}',
+                status_code=status.HTTP_406_NOT_ACCEPTABLE
+            )
         elif len(result) != 10:
-            raise ValueError(f'Bigger Number Extracted: {result}')
+            raise ErrorMessageException(
+                f'Bigger Number Extracted: {result}',
+                status_code=status.HTTP_406_NOT_ACCEPTABLE
+            )
 
         temp = (some for some in country_data['mobile_providers'].values())
         prefixes = []
@@ -825,7 +909,10 @@ class Phone(Identifier):
             prefixes += item
 
         if not result.startswith(tuple(prefixes)):
-            raise ValueError('Invalid Prefix')
+            raise ErrorMessageException(
+                'Invalid Prefix',
+                status_code=status.HTTP_406_NOT_ACCEPTABLE
+            )
 
         return f"00{country_data['dialing_code']}" + result
 
@@ -836,6 +923,10 @@ class AuthenticationVerification(AvishanModel):
     tried_codes = models.TextField(default="", blank=True)  # separate by |
 
     to_dict_private_fields = [code, tried_codes]
+
+    @classmethod
+    def direct_callable_methods(cls) -> List[DirectCallable]:
+        return []
 
     @classmethod
     def create(cls, code_length: int, code_domain: str = string.ascii_letters) -> 'AuthenticationVerification':
@@ -887,6 +978,92 @@ class AuthenticationType(AvishanModel):
     to_dict_private_fields = [last_used, last_login, last_logout, date_created, is_active]
 
     @classmethod
+    def direct_callable_methods(cls):
+        return [
+            DirectCallable(
+                model=cls,
+                target_name='login',
+                method=DirectCallable.METHOD.POST,
+                authenticate=False,
+                response_json_key=stringcase.snakecase(cls.class_name()),
+                documentation=ApiDocumentation(
+                    title=f'{stringcase.titlecase(cls.class_name())} Login',
+                    request_body=RequestBodyDocumentation(
+                        attributes=RequestBodyDocumentation.AutoResolveRequestBody(),
+                    ),
+                    response_bodies=[
+                        ResponseBodyDocumentation(
+                            title='Success',
+                            attributes=[
+                                Attribute(
+                                    name=stringcase.snakecase(cls.class_name()),
+                                    type=Attribute.TYPE.OBJECT,
+                                    type_of=cls,
+                                )
+                            ]
+                        ),
+                        ResponseBodyDocumentation(
+                            title='Error message available in response body',
+                            status_code=status.HTTP_418_IM_TEAPOT,
+                        ),
+                        ResponseBodyDocumentation(
+                            title='Authentication error',
+                            status_code=status.HTTP_403_FORBIDDEN
+                        )
+                    ]
+                )
+            ),
+            DirectCallable(
+                model=cls,
+                target_name='register',
+                method=DirectCallable.METHOD.POST,
+                authenticate=False,
+                response_json_key=stringcase.snakecase(cls.class_name()),
+                documentation=ApiDocumentation(
+                    title=f'{stringcase.titlecase(cls.class_name())} Register',
+                    request_body=RequestBodyDocumentation(
+                        attributes=RequestBodyDocumentation.AutoResolveRequestBody(),
+                    ),
+                    response_bodies=[
+                        ResponseBodyDocumentation(
+                            title='Registered',
+                            attributes=[
+                                Attribute(
+                                    name=stringcase.snakecase(cls.class_name()),
+                                    type=Attribute.TYPE.OBJECT,
+                                    type_of=cls,
+                                )
+                            ]
+                        ),
+                        ResponseBodyDocumentation(
+                            title='Error message available in response body',
+                            status_code=status.HTTP_418_IM_TEAPOT,
+                        ),
+                        ResponseBodyDocumentation(
+                            title='Authentication error',
+                            status_code=status.HTTP_403_FORBIDDEN
+                        )
+                    ]
+                )
+            ),
+            DirectCallable(
+                model=cls,
+                target_name='logout',
+                url="/logout",
+                response_json_key=stringcase.snakecase(cls.class_name()),
+                documentation=ApiDocumentation(
+                    title=f'{stringcase.titlecase(cls.class_name())} Logout',
+                    response_bodies=[
+                        ResponseBodyDocumentation(
+                            title='Success',
+                            status_code=status.HTTP_200_OK
+                        )
+                    ]
+                )
+            )
+        ]
+
+    @classmethod
     def register(cls, **kwargs) -> Union[
         'EmailKeyValueAuthentication',
         'PhoneKeyValueAuthentication',
@@ -910,7 +1087,8 @@ class AuthenticationType(AvishanModel):
     def logout():
         request = get_current_request()
         request.avishan: AvishanRequestStorage
-        request.avishan.authentication_object._submit_logout()
+        if request.avishan.authentication_object:
+            request.avishan.authentication_object._submit_logout()
 
     @classmethod
     def find(cls, key: Union[Email, Phone, str], user_group: UserGroup) -> Optional[Union[
@@ -1322,6 +1500,45 @@ class KeyValueAuthentication(VerifiableAuthenticationType):
 class EmailKeyValueAuthentication(KeyValueAuthentication):
     key = models.ForeignKey(Email, on_delete=models.CASCADE, related_name='key_value_authentications')
 
+    @classmethod
+    def direct_callable_methods(cls):
+        total = super().direct_callable_methods()
+        fake_email = faker.email()
+        for item in total:
+            if item.name == 'register':
+                item.documentation.request_body.examples += [
+                    RequestBodyDocumentation.Example(
+                        name='foo',
+                        summary='Example 1',
+                        value={
+                            "key": {
+                                "key": fake_email
+                            },
+                            "password": "XXXXXXXX",
+                            "user_user_group": {
+                                "id": 1
+                            }
+                        }
+                    )
+                ]
+            if item.name == 'login':
+                item.documentation.request_body.examples += [
+                    RequestBodyDocumentation.Example(
+                        name='foo',
+                        summary='Example 1',
+                        value={
+                            "key": {
+                                "key": fake_email
+                            },
+                            "password": "XXXXXXXX",
+                            "user_group": {
+                                "id": 1
+                            }
+                        }
+                    )
+                ]
+        return total
+
 
 class PhoneKeyValueAuthentication(KeyValueAuthentication):
     key = models.ForeignKey(Phone, on_delete=models.CASCADE, related_name='key_value_authentications')
@@ -1438,10 +1655,10 @@ class File(AvishanModel):
     @classmethod
     def direct_callable_methods(cls) -> List[DirectCallable]:
         total = []
-        for item in super().direct_callable_methods():
-            total.append(item)
-            if item.name == 'create':
-                item.hide_in_redoc = True
+        # for item in super().direct_callable_methods():
+        #     total.append(item)
+        #     if item.name == 'create':
+        #         item.hide_in_redoc = True
 
         return total + [
             DirectCallable(
@@ -1505,10 +1722,10 @@ class Image(AvishanModel):
     @classmethod
     def direct_callable_methods(cls) -> List[DirectCallable]:
         total = []
-        for item in super().direct_callable_methods():
-            total.append(item)
-            if item.name == 'create':
-                item.hide_in_redoc = True
+        # for item in super().direct_callable_methods():
+        #     total.append(item)
+        #     if item.name == 'create':
+        #         item.hide_in_redoc = True
 
         return total + [
             DirectCallable(
@@ -1644,6 +1861,10 @@ class TranslatableChar(AvishanModel):
     django_admin_list_display = [en, fa]
 
     @classmethod
+    def direct_callable_methods(cls) -> List[DirectCallable]:
+        return []
+
+    @classmethod
     def create(cls, en: str = None, fa: str = None, auto: str = None) -> 'TranslatableChar':
         if en is not None:
             en = str(en)
@@ -1683,6 +1904,10 @@ class Activity(AvishanModel):
     django_admin_raw_id_fields = [user_user_group, request_track]
 
     export_ignore = True
+
+    @classmethod
+    def direct_callable_methods(cls) -> List[DirectCallable]:
+        return []
 
     @classmethod
     def create(cls,
@@ -1734,47 +1959,74 @@ class Country(AvishanModel):
     # noinspection PyPep8Naming
     @classmethod
     def create(cls,
-               numericCode: str,
+               numeric_code: str,
                name: str,
-               alpha2Code: str,
-               alpha3Code: str,
+               alpha_2_code: str,
+               alpha_3_code: str,
                region: str,
-               nativeName: str = None,
+               native_name: str = None,
                flag: str = None,
                **kwargs
                ):
         return super().create(
-            numeric_code=numericCode,
+            numeric_code=numeric_code,
             name=name,
-            alpha_2_code=alpha2Code,
-            alpha_3_code=alpha3Code,
+            alpha_2_code=alpha_2_code,
+            alpha_3_code=alpha_3_code,
             region=region,
-            native_name=nativeName,
+            native_name=native_name,
             flag_url=flag
         )
 
     # noinspection PyPep8Naming
     def update(self,
                name: str,
-               alpha2Code: str,
-               alpha3Code: str,
+               alpha_2_code: str,
+               alpha_3_code: str,
                region: str,
-               nativeName: str = None,
+               native_name: str = None,
                flag: str = None,
                **kwargs
                ):
         return super().update(
             name=name,
-            alpha_2_code=alpha2Code,
-            alpha_3_code=alpha3Code,
+            alpha_2_code=alpha_2_code,
+            alpha_3_code=alpha_3_code,
             region=region,
-            native_name=nativeName,
+            native_name=native_name,
             flag_url=flag
         )
 
     @classmethod
     def class_plural_name(cls) -> str:
         return 'Countries'
+
+    @classmethod
+    def _create_documentation_request_body_examples(cls) -> List[RequestBodyDocumentation.Example]:
+        return super()._create_documentation_request_body_examples() + [
+            RequestBodyDocumentation.Example(
+                name='foo',
+                summary="My Country",
+                value={
+                    "numeric_code": 2000,
+                    "name": "My Country",
+                    "alpha_2_code": "MY",
+                    "alpha_3_code": "MYC",
+                    "region": "hi region"
+                }
+            ),
+            RequestBodyDocumentation.Example(
+                name='bar',
+                summary="My Country2",
+                value={
+                    "numeric_code": 20002,
+                    "name": "My Country2",
+                    "alpha_2_code": "MY2",
+                    "alpha_3_code": "MYC2",
+                    "region": "hi region2"
+                }
+            )
+        ]
 
     def __str__(self):
         return self.name
@@ -1784,13 +2036,25 @@ class Province(AvishanModel):
     title = models.CharField(max_length=255)
     country = models.ForeignKey(Country, on_delete=models.CASCADE, related_name='provinces')
 
+    @classmethod
+    def create(cls, title: str, country: Country):
+        return super().create(
+            title=title,
+            country=country
+        )
+
 
 class City(AvishanModel):
     title = models.CharField(max_length=255)
     province = models.ForeignKey(Province, on_delete=models.CASCADE, related_name='cities')
 
     @classmethod
+    def create(cls, title: str, province: Province):
+        return super().create(
+            title=title,
+            province=province
+        )
+
+    @classmethod
     def class_plural_name(cls) -> str:
         return 'Cities'
-
-

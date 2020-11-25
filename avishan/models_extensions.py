@@ -7,6 +7,7 @@ from django.db.models import NOT_PROVIDED, QuerySet, Field
 
 from avishan.descriptor import FunctionAttribute, DjangoFieldAttribute, ResponseBodyDocumentation, Attribute, \
     RequestBodyDocumentation, DataModel, Function
+from avishan.misc import status
 
 
 class AvishanModelDjangoAdminExtension:
@@ -353,6 +354,10 @@ class AvishanModelDescriptorExtension:
                     type=Attribute.TYPE.OBJECT,
                     type_of=cls
                 )]
+            ),
+            ResponseBodyDocumentation(
+                title='Item not found',
+                status_code=status.HTTP_404_NOT_FOUND
             )
         ]
 
@@ -396,19 +401,24 @@ class AvishanModelDescriptorExtension:
         return None
 
     @classmethod
+    def _create_documentation_request_body_examples(cls) -> List[RequestBodyDocumentation.Example]:
+        return []
+
+    @classmethod
     def _create_documentation_request_body(cls) -> RequestBodyDocumentation:
         from avishan.models import AvishanModel
         cls: AvishanModel
         return RequestBodyDocumentation(
             attributes=Function.load_args_from_signature(getattr(cls, 'create')),
-            description=cls._create_documentation_request_body_description()
+            description=cls._create_documentation_request_body_description(),
+            examples=cls._create_documentation_request_body_examples()
         )
 
     @classmethod
     def _create_documentation_response_bodies(cls) -> List[ResponseBodyDocumentation]:
         from avishan.models import AvishanModel
         cls: AvishanModel
-        return [
+        responses = [
             ResponseBodyDocumentation(
                 title='Created',
                 attributes=[Attribute(
@@ -416,8 +426,16 @@ class AvishanModelDescriptorExtension:
                     type=Attribute.TYPE.OBJECT,
                     type_of=cls
                 )]
-            )
-        ]
+            )]
+
+        unique_items = [item.name for item in cls.get_fields() if item.unique]
+        unique_items.remove('id')
+        if len(unique_items) > 0:
+            responses.append(ResponseBodyDocumentation(
+                title=f'Unique constraint failed for {" or ".join(unique_items)}',
+                status_code=status.HTTP_418_IM_TEAPOT,
+            ))
+        return responses
 
     @classmethod
     def _update_documentation_title(cls):
@@ -446,7 +464,7 @@ class AvishanModelDescriptorExtension:
     def _update_documentation_response_bodies(cls) -> List[ResponseBodyDocumentation]:
         from avishan.models import AvishanModel
         cls: AvishanModel
-        return [
+        responses = [
             ResponseBodyDocumentation(
                 title='Updated',
                 attributes=[Attribute(
@@ -454,8 +472,21 @@ class AvishanModelDescriptorExtension:
                     type=Attribute.TYPE.OBJECT,
                     type_of=cls
                 )]
+            ),
+            ResponseBodyDocumentation(
+                title='Item not found',
+                status_code=status.HTTP_404_NOT_FOUND
             )
         ]
+
+        unique_items = [item.name for item in cls.get_fields() if item.unique]
+        unique_items.remove('id')
+        if len(unique_items) > 0:
+            responses.append(ResponseBodyDocumentation(
+                title=f'Unique constraint failed for {" or ".join(unique_items)}',
+                status_code=status.HTTP_418_IM_TEAPOT,
+            ))
+        return responses
 
     @classmethod
     def _remove_documentation_title(cls):
@@ -479,5 +510,9 @@ class AvishanModelDescriptorExtension:
                     type=Attribute.TYPE.OBJECT,
                     type_of=cls
                 )]
+            ),
+            ResponseBodyDocumentation(
+                title='Item not found',
+                status_code=status.HTTP_404_NOT_FOUND
             )
         ]
