@@ -1807,7 +1807,7 @@ class RequestTrack(AvishanModel):
     authentication_type_object_id = models.IntegerField(blank=True, null=True)
 
     django_admin_search_fields = [url]
-    django_admin_list_display = [url, method, status_code, user_user_group, 'time', 'total_exec', 'view_exec']
+    django_admin_list_display = ['clean_url', method, status_code, user_user_group, 'time', 'total_exec', 'view_exec']
     django_admin_list_filter = ['url']
 
     export_ignore = True
@@ -1827,7 +1827,7 @@ class RequestTrack(AvishanModel):
         return re.sub(r'(?x)/\d+.*', '/{id}', self.url)
 
     def __str__(self):
-        return self.view_name
+        return self.clean_url()
 
 
 class RequestTrackException(AvishanModel):

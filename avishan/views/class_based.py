@@ -85,13 +85,14 @@ class AvishanView(View):
                 raise AuthException(AuthException.TOKEN_NOT_FOUND)
             request.avishan.view_start_time = timezone.now()
             result = super().dispatch(request, *args, **kwargs)
-            request.avishan.view_end_time = timezone.now()
 
         except AvishanException as e:
             raise e
         except Exception as e:
             AvishanException(wrap_exception=e)
             raise e
+        finally:
+            request.avishan.view_end_time = timezone.now()
         if request.avishan.exception:
             return
         return result
@@ -202,7 +203,8 @@ class AvishanModelApiView(AvishanApiView):
         model_plural_name = kwargs.get('model_plural_name', None)
         model_item_id = kwargs.get('model_item_id', None)
         self.model_function_name = kwargs.get('model_function_name', None)
-        self.model_descripted: DjangoAvishanModel = request.avishan.project.find_model(snake_case_plural_name=model_plural_name)
+        self.model_descripted: DjangoAvishanModel = request.avishan.project.find_model(
+            snake_case_plural_name=model_plural_name)
         if not self.model_descripted:
             raise ErrorMessageException('Entered model name not found')
         self.model = self.model_descripted.target
@@ -364,6 +366,7 @@ class AvishanModelApiView(AvishanApiView):
                                         f'unique values so that db can find corresponding object')
 
         return function_attribute.type_of.request_arg_get_from_dict(target_dict)
+
 
 class Redoc(AvishanTemplateView):
     template_file_address = 'avishan/redoc.html'
