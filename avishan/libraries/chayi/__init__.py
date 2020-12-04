@@ -85,7 +85,7 @@ class ChayiWriter:
 
     def model_file_write_fields(self, model: Type[AvishanModel]) -> str:
         data = ''
-        for field in model.get_fields():
+        for field in model.get_full_fields():
             if field.name == 'id':
                 continue
             data += self.model_file_write_field(model, field)
@@ -118,7 +118,7 @@ class ChayiWriter:
         data = f'    public {model.class_name()} () ' + "{}\n\n"
 
         data += f"    public {model.class_name()} ({model.class_name()} {model.class_snake_case_name()}) " + "{\n"
-        for field in model.get_fields():
+        for field in model.get_full_fields():
             data += f'        this.{field.name} = {model.class_snake_case_name()}.{field.name};\n'
         return data + "    }\n\n"
 

@@ -458,6 +458,9 @@ class Attribute:
                 or isinstance(entry, ModelBase):
             return Attribute.TYPE.OBJECT
 
+        if entry.many_to_many:
+            return Attribute.TYPE.ARRAY
+
         raise NotImplementedError()
 
     @staticmethod
@@ -519,7 +522,7 @@ class DjangoFieldAttribute(Attribute):
             else:
                 raise NotImplementedError()
         if self.type is Attribute.TYPE.ARRAY:
-            raise NotImplementedError()
+            self.type_of = target.related_model
         if self.type is Attribute.TYPE.FILE:
             self.type = Attribute.TYPE.STRING
         self.target = target

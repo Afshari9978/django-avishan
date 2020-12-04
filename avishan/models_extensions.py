@@ -118,7 +118,7 @@ class AvishanModelModelDetailsExtension:
     def get_field(cls, field_name: str) -> models.Field:
         from avishan.misc.translation import AvishanTranslatable
 
-        for item in cls.get_fields():
+        for item in cls.get_full_fields():
             if item.name == field_name:
                 return item
         raise ValueError(AvishanTranslatable(
