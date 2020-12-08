@@ -303,6 +303,14 @@ class AvishanModelFilterExtension:
 
 class AvishanModelDescriptorExtension:
 
+    DEFAULT_CRUD_DICT = {
+        'all': True,
+        'create': True,
+        'update': True,
+        'remove': True,
+        'get': True
+    }
+
     @classmethod
     def _create_default_args(cls) -> List[Union[FunctionAttribute, DjangoFieldAttribute]]:
         from avishan.models import AvishanModel
@@ -362,6 +370,11 @@ class AvishanModelDescriptorExtension:
         ]
 
     @classmethod
+    def _get_authenticate(cls) -> bool:
+        from avishan.configure import get_avishan_config
+        return get_avishan_config().CRUD_AUTHENTICATE.get(cls.class_name(), cls.DEFAULT_CRUD_DICT).get('get', True)
+
+    @classmethod
     def _all_documentation_title(cls):
         from avishan.models import AvishanModel
         cls: AvishanModel
@@ -385,6 +398,11 @@ class AvishanModelDescriptorExtension:
                 )]
             )
         ]
+
+    @classmethod
+    def _all_authenticate(cls) -> bool:
+        from avishan.configure import get_avishan_config
+        return get_avishan_config().CRUD_AUTHENTICATE.get(cls.class_name(), cls.DEFAULT_CRUD_DICT).get('all', True)
 
     @classmethod
     def _create_documentation_title(cls):
@@ -438,6 +456,11 @@ class AvishanModelDescriptorExtension:
         return responses
 
     @classmethod
+    def _create_authenticate(cls) -> bool:
+        from avishan.configure import get_avishan_config
+        return get_avishan_config().CRUD_AUTHENTICATE.get(cls.class_name(), cls.DEFAULT_CRUD_DICT).get('create', True)
+
+    @classmethod
     def _update_documentation_title(cls):
         from avishan.models import AvishanModel
         cls: AvishanModel
@@ -489,6 +512,11 @@ class AvishanModelDescriptorExtension:
         return responses
 
     @classmethod
+    def _update_authenticate(cls) -> bool:
+        from avishan.configure import get_avishan_config
+        return get_avishan_config().CRUD_AUTHENTICATE.get(cls.class_name(), cls.DEFAULT_CRUD_DICT).get('update', True)
+
+    @classmethod
     def _remove_documentation_title(cls):
         from avishan.models import AvishanModel
         cls: AvishanModel
@@ -516,3 +544,8 @@ class AvishanModelDescriptorExtension:
                 status_code=status.HTTP_404_NOT_FOUND
             )
         ]
+
+    @classmethod
+    def _remove_authenticate(cls) -> bool:
+        from avishan.configure import get_avishan_config
+        return get_avishan_config().CRUD_AUTHENTICATE.get(cls.class_name(), cls.DEFAULT_CRUD_DICT).get('remove', True)

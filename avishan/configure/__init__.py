@@ -195,6 +195,8 @@ class AvishanConfigFather:
     """List of OpenApi.Server"""
     OPENAPI_APPLICATION_SERVERS: list = []
 
+    CRUD_AUTHENTICATE = {}
+
     @classmethod
     def on_startup(cls):
         """

@@ -61,6 +61,7 @@ class AvishanModel(
                 model=cls,
                 target_name='all',
                 url='',
+                authenticate=cls._all_authenticate(),
                 response_json_key=stringcase.snakecase(cls.class_plural_name()),
                 documentation=ApiDocumentation(
                     title=cls._all_documentation_title(),
@@ -72,6 +73,7 @@ class AvishanModel(
                 model=cls,
                 target_name='get',
                 url='/{id}',
+                authenticate=cls._get_authenticate(),
                 response_json_key=stringcase.snakecase(cls.class_name()),
                 documentation=ApiDocumentation(
                     title=cls._get_documentation_title(),
@@ -84,6 +86,7 @@ class AvishanModel(
                 target_name='create',
                 url='',
                 method=DirectCallable.METHOD.POST,
+                authenticate=cls._create_authenticate(),
                 response_json_key=stringcase.snakecase(cls.class_name()),
                 documentation=ApiDocumentation(
                     title=cls._create_documentation_title(),
@@ -97,6 +100,7 @@ class AvishanModel(
                 target_name='update',
                 url='/{id}',
                 method=DirectCallable.METHOD.PUT,
+                authenticate=cls._update_authenticate(),
                 response_json_key=stringcase.snakecase(cls.class_name()),
                 documentation=ApiDocumentation(
                     title=cls._update_documentation_title(),
@@ -109,6 +113,7 @@ class AvishanModel(
                 model=cls,
                 target_name='remove',
                 url='/{id}',
+                authenticate=cls._remove_authenticate(),
                 method=DirectCallable.METHOD.DELETE,
                 response_json_key=stringcase.snakecase(cls.class_name()),
                 documentation=ApiDocumentation(
@@ -784,7 +789,8 @@ class Email(Identifier):
         from avishan.libraries.mailgun.functions import send_mail as mailgun_send_mail
 
         if get_avishan_config().MAILGUN_EMAIL_ENABLE:
-            return mailgun_send_mail(recipient_list=[self.key], subject=subject, message=message, html_message=html_message)
+            return mailgun_send_mail(recipient_list=[self.key], subject=subject, message=message,
+                                     html_message=html_message)
         elif get_avishan_config().DJANGO_EMAIL_ENABLE:
             return self.send_bulk_mail(subject, message, [self.key], html_message)
         else:
@@ -1655,10 +1661,6 @@ class File(AvishanModel):
     @classmethod
     def direct_callable_methods(cls) -> List[DirectCallable]:
         total = []
-        # for item in super().direct_callable_methods():
-        #     total.append(item)
-        #     if item.name == 'create':
-        #         item.hide_in_redoc = True
 
         return total + [
             DirectCallable(
@@ -1722,10 +1724,6 @@ class Image(AvishanModel):
     @classmethod
     def direct_callable_methods(cls) -> List[DirectCallable]:
         total = []
-        # for item in super().direct_callable_methods():
-        #     total.append(item)
-        #     if item.name == 'create':
-        #         item.hide_in_redoc = True
 
         return total + [
             DirectCallable(
