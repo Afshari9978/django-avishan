@@ -1,6 +1,3 @@
 include LICENSE
 include README.rst
 recursive-include avishan *
-recursive-include avishan/static *
-recursive-include avishan/templates *
-recursive-include docs *
