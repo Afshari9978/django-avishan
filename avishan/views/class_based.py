@@ -312,8 +312,12 @@ class AvishanModelApiView(AvishanApiView):
         this case we should get corresponding object from database.
         """
 
+        args = self.direct_callable.args \
+            if len(self.direct_callable.args) > 0 \
+            else self.direct_callable.documentation.request_body.attributes
+
         cleaned = {}
-        for function_attribute in self.direct_callable.args:
+        for function_attribute in args:
             function_attribute: FunctionAttribute
 
             """Errors for required data before python raises exception for function params"""

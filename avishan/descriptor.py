@@ -20,8 +20,6 @@ class Project:
         self.name: str = name
         self.apps: List[DjangoApplication] = self.load_apps()
 
-        a = 1
-
     def load_apps(self) -> List['DjangoApplication']:
         from avishan.configure import get_avishan_config
         return [DjangoApplication(project=self, name=app_name) for app_name in settings.INSTALLED_APPS if
@@ -242,13 +240,14 @@ class ApiMethod(Method):
         self.responses: List[ApiMethod.RESPONSE] = []
         self.method: ApiMethod.METHOD = method
         self.url: str = url
-        # self.load_from_doc()
+        self.load_from_doc()
 
     def load_from_doc(self):
         self.short_description = self._doc.short_description
         self.long_description = self._doc.long_description
         if len(self._doc.params) > 0:
             self.args = [Attribute.create_from_doc_param(item) for item in self._doc.params]
+            a = 1
         self.responses = self.load_responses_from_doc()
 
     def load_responses_from_doc(self) -> List['ApiMethod.RESPONSE']:
