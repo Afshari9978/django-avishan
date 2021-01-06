@@ -312,9 +312,12 @@ class AvishanModelApiView(AvishanApiView):
         this case we should get corresponding object from database.
         """
 
-        args = self.direct_callable.args \
-            if len(self.direct_callable.args) > 0 \
-            else self.direct_callable.documentation.request_body.attributes
+        if len(self.direct_callable.args) > 0:
+            args = self.direct_callable.args
+        else:
+            args = (self.direct_callable.documentation.request_body.attributes
+                    if self.direct_callable.documentation.request_body
+                    else [])
 
         cleaned = {}
         for function_attribute in args:
