@@ -1386,8 +1386,6 @@ class KeyValueAuthentication(VerifiableAuthenticationType):
         self.save()
 
     def change_password(self, old_password: str, new_password: str):
-        if not self.hashed_password:
-            raise AuthException(error_kind=AuthException.PASSWORD_NOT_FOUND)
         if not self._check_password(old_password):
             raise AuthException(error_kind=AuthException.INCORRECT_PASSWORD)
         self.set_password(new_password)

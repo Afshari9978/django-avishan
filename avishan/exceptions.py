@@ -84,6 +84,9 @@ class AuthException(AvishanException):
         self.error_kind = error_kind
         if error_kind[0] == AuthException.HTTP_METHOD_NOT_ALLOWED[0]:
             status_code = status.HTTP_405_METHOD_NOT_ALLOWED
+        if error_kind[0] == AuthException.PASSWORD_NOT_FOUND[0]:
+            status_code = status.HTTP_409_CONFLICT
+
         super().__init__(status_code=status_code)
         add_error_message_to_response(code=error_kind[0], body=str(error_kind[1]), title=str(AvishanTranslatable(
             EN='Authentication Exception',
