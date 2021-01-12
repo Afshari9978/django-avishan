@@ -1,21 +1,23 @@
+import datetime
 import inspect
 import json
 from typing import List, get_type_hints, Type, Callable, Optional, Union
 
 from django.core.handlers.wsgi import WSGIRequest
+from django.db import models
 from django.db.models import QuerySet
 from django.http import JsonResponse
-from django.http.response import HttpResponseBase
-from django.utils import timezone
 from django.views import View
 
+from avishan import current_request
 from avishan.configure import get_avishan_config
-from avishan.descriptor import DirectCallable, FunctionAttribute, DjangoAvishanModel
+from avishan.descriptor import DirectCallable, FunctionAttribute
 from avishan.exceptions import ErrorMessageException, AvishanException, AuthException
+from avishan.libraries.openapi3.classes import ApiDocumentation, Path, PathGetMethod, PathResponseGroup, \
+    PathResponse, Content, Schema, PathPostMethod, PathRequest, PathPutMethod, PathDeleteMethod
 from avishan.misc import status
 from avishan.misc.translation import AvishanTranslatable
 from avishan.models import AvishanModel, RequestTrack
-from avishan.middlewares import AvishanRequestStorage
 
 
 # todo fix cors motherfucker
@@ -25,12 +27,21 @@ class AvishanView(View):
     track_it: bool = False
     is_api: bool = None
 
-    def setup(self, request, *args, **kwargs):
-        # noinspection PyTypeHints
-        request.avishan: AvishanRequestStorage
+    # todo can override http_method_not_allowed method
+    # todo implement time logs here
+    search: List[str] = None
+    filter: List[dict] = []
+    # todo add gte lte ... to filter
+    sort: List[str] = []
+    page: int = 0
+    page_size: int = 20
+    page_offset: int = 0
 
+    # todo if page is not 0, send page, page size, items count, next, prev
+
+    def setup(self, request, *args, **kwargs):
         super().setup(request, *args, **kwargs)
-        self.response: dict = request.avishan.response
+        self.response: dict = current_request['response']
         self.request: WSGIRequest
         self.class_attributes_type = get_type_hints(self.__class__)
 
@@ -50,19 +61,30 @@ class AvishanView(View):
                 else:
                     self.__setattr__(kwarg_key, self.cast_data(kwarg_key, data[0]))
 
-        request.avishan.view_class = self
-        request.avishan.on_error_view_class = self
+            if kwarg_key.startswith('filter_'):
+                data = request.GET.getlist(kwarg_key)
+                if len(data) == 1:
+                    data = data[0]
+                self.filter.append({kwarg_key[7:]: data})
 
-        request.avishan.is_api = self.is_api
-        if self.track_it and not request.avishan.is_tracked:
-            request.avishan.is_tracked = True
-            request.avishan.request_track_object = RequestTrack.objects.create()
+            if kwarg_key.startswith('sort_'):
+                data = request.GET.getlist(kwarg_key)
+                if len(data) == 1:
+                    data = data[0]
+                self.filter.append({kwarg_key[5:]: data})
+
+        self.current_request = current_request
+        self.current_request['view_name'] = self.__class__.__name__
+        self.current_request['request_track_exec'] = [
+            {'title': 'begin', 'now': datetime.datetime.now()}
+        ]
+        self.current_request['is_api'] = self.is_api
+        if self.track_it and not self.current_request['is_tracked']:
+            self.current_request['is_tracked'] = True
+            self.current_request['request_track_object'] = RequestTrack.objects.create()
 
     def http_method_not_allowed(self, request, *args, **kwargs):
-        # noinspection PyTypeHints
-        request.avishan: AvishanRequestStorage
-
-        request.avishan.status_code = status.HTTP_405_METHOD_NOT_ALLOWED
+        self.current_request['status_code'] = status.HTTP_405_METHOD_NOT_ALLOWED
         self.response['allowed_methods'] = self.get_allowed_methods()
         return super().http_method_not_allowed(request, *args, **kwargs)
 
@@ -74,35 +96,31 @@ class AvishanView(View):
         return allowed
 
     def dispatch(self, request, *args, **kwargs):
-        # noinspection PyTypeHints
-        request.avishan: AvishanRequestStorage
-
-        if request.avishan.exception:
+        if self.current_request['exception']:
             return
 
         try:
-            if self.authenticate and not self.is_authenticated(request):
+            if self.authenticate and not self.is_authenticated():
                 raise AuthException(AuthException.TOKEN_NOT_FOUND)
-            request.avishan.view_start_time = timezone.now()
+            self.current_request['view_start_time'] = datetime.datetime.now()
             result = super().dispatch(request, *args, **kwargs)
+            self.current_request['view_end_time'] = datetime.datetime.now()
 
         except AvishanException as e:
             raise e
         except Exception as e:
             AvishanException(wrap_exception=e)
             raise e
-        finally:
-            request.avishan.view_end_time = timezone.now()
-        if request.avishan.exception:
+        if current_request['exception']:
             return
         return result
 
-    def is_authenticated(self, request) -> bool:
+    def is_authenticated(self) -> bool:
         """
-        Checks for user available in storage
+        Checks for user available in current_request storage
         :return: true if authenticated
         """
-        if not request.avishan.authentication_object:
+        if not self.current_request['authentication_object']:
             return False
         return True
 
@@ -119,22 +137,17 @@ class AvishanApiView(AvishanView):
     authenticate = True
 
     def dispatch(self, request, *args, **kwargs):
-        # noinspection PyTypeHints
-        request.avishan: AvishanRequestStorage
-
-        if request.method not in ['GET', 'DELETE']:
+        if self.current_request['request'].method not in ['GET', 'DELETE']:
             try:
-                if len(request.body) > 0:
-                    request.data = json.loads(request.body.decode('utf-8'))
+                if len(current_request['request'].body) > 0:
+                    current_request['request'].data = json.loads(current_request['request'].body.decode('utf-8'))
                 else:
-                    request.data = {}
+                    current_request['request'].data = {}
             except:
-                request.data = {}
+                current_request['request'].data = {}
 
         super().dispatch(request, *args, **kwargs)
-        if request.avishan.can_touch_response:
-            return JsonResponse(self.response)
-        return self.response
+        return JsonResponse(self.response)
 
 
 class AvishanTemplateView(AvishanView):
@@ -148,35 +161,29 @@ class AvishanTemplateView(AvishanView):
         self.context = {
             **self.context,
             **{
-                'CURRENT_REQUEST': request,
+                'CURRENT_REQUEST': self.current_request,
                 'AVISHAN_CONFIG': get_avishan_config(),
                 'self': self
             }
         }
 
     def dispatch(self, request, *args, **kwargs):
-        self.parse_request_post_to_data(request)
+        self.parse_request_post_to_data()
 
         return super().dispatch(request, *args, **kwargs)
 
-    def parse_request_post_to_data(self, request):
-        # noinspection PyTypeHints
-        request.avishan: AvishanRequestStorage
-
-        if request.method in ['POST', 'PUT']:
+    def parse_request_post_to_data(self):
+        if self.current_request['request'].method in ['POST', 'PUT']:
             try:
-                if len(request.body) > 0:
-                    request.data = dict(request.POST)
-                    for key, value in request.data.items():
+                if len(self.current_request['request'].body) > 0:
+                    self.current_request['request'].data = dict(self.current_request['request'].POST)
+                    for key, value in self.current_request['request'].data.items():
                         if len(value) == 1:
-                            request.data[key] = value[0]
+                            self.current_request['request'].data[key] = value[0]
                 else:
-                    request.data = {}
+                    self.current_request['request'].data = {}
             except:
-                request.data = {}
-
-    def get(self, request, *args, **kwargs):
-        return self.render()
+                self.current_request['request'].data = {}
 
     def render(self):
         from django.shortcuts import render as django_render
@@ -189,25 +196,19 @@ class AvishanModelApiView(AvishanApiView):
     model_item: AvishanModel = None
     model_function: Callable = None  # todo these sends model not dict
     model_function_name: str = None
-    model_descripted: DjangoAvishanModel = None
     direct_callable: Optional[DirectCallable] = None
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
     def setup(self, request, *args, **kwargs):
-        # noinspection PyTypeHints
-        request.avishan: AvishanRequestStorage
-
         super().setup(request, *args, **kwargs)
         model_plural_name = kwargs.get('model_plural_name', None)
         model_item_id = kwargs.get('model_item_id', None)
         self.model_function_name = kwargs.get('model_function_name', None)
-        self.model_descripted: DjangoAvishanModel = request.avishan.project.find_model(
-            snake_case_plural_name=model_plural_name)
-        if not self.model_descripted:
+        self.model: Union[AvishanModel, type] = AvishanModel.get_model_by_plural_snake_case_name(model_plural_name)
+        if not self.model:
             raise ErrorMessageException('Entered model name not found')
-        self.model = self.model_descripted.target
 
         if self.model_function_name is None:
             if request.method == 'GET':
@@ -225,7 +226,7 @@ class AvishanModelApiView(AvishanApiView):
         if model_item_id is not None:
             self.model_item = self.model.get(avishan_raise_400=True, id=int(model_item_id))
         if self.model_function_name is not None:
-            for direct_callable in self.model_descripted.methods:
+            for direct_callable in self.model.direct_callable_methods():
                 if self.model_function_name == direct_callable.name:
                     self.direct_callable = direct_callable
                     break
@@ -243,56 +244,34 @@ class AvishanModelApiView(AvishanApiView):
                 ))
 
     def get(self, request, *args, **kwargs):
-        # noinspection PyTypeHints
-        request.avishan: AvishanRequestStorage
-
         if self.model_function_name == 'get':
-            result = self.model.get(id=self.model_item.id)
+            result = self.model_item
         else:
             result = self.model_function()
 
             if isinstance(result, QuerySet):
                 result = self.model.queryset_handler(request.GET, queryset=result)
-        response = self.parse_returned_data(request, result)
-        if request.avishan.can_touch_response:
-            self.response[self.direct_callable.response_json_key] = response
-        else:
-            self.response = response
+        self.response[self.direct_callable.response_json_key] = self.parse_returned_data(result)
 
     def post(self, request, *args, **kwargs):
-        # noinspection PyTypeHints
-        request.avishan: AvishanRequestStorage
-
-        request_data = self.parse_request_data(**request.data)
-        result = self.model_function(**request_data)
-        response = self.parse_returned_data(request, result)
-        if request.avishan.can_touch_response:
-            self.response[self.direct_callable.response_json_key] = response
+        if self.direct_callable.dismiss_request_json_key:
+            data = request.data
         else:
-            self.response = response
+            data = request.data[self.direct_callable.request_json_key]
+
+        # data = self.parse_request_data(**data)
+        result = self.model_function(**data)
+        self.response[self.direct_callable.response_json_key] = self.parse_returned_data(result)
 
     def put(self, request, *args, **kwargs):
         self.post(request, *args, **kwargs)
 
     def delete(self, request, *args, **kwargs):
-        # noinspection PyTypeHints
-        request.avishan: AvishanRequestStorage
-
         result = self.model_function()
-        response = self.parse_returned_data(request, result)
-        if request.avishan.can_touch_response:
-            self.response[self.direct_callable.response_json_key] = response
-        else:
-            self.response = response
+        self.response[self.direct_callable.response_json_key] = self.parse_returned_data(result)
 
     @staticmethod
-    def parse_returned_data(request, returned):
-        # noinspection PyTypeHints
-        request.avishan: AvishanRequestStorage
-
-        if isinstance(returned, HttpResponseBase):
-            request.avishan.can_touch_response = False
-            return returned
+    def parse_returned_data(returned):
         if isinstance(returned, QuerySet):
             return [item.to_dict() for item in returned]
         elif isinstance(returned, list):
@@ -305,40 +284,17 @@ class AvishanModelApiView(AvishanApiView):
             return returned
 
     def parse_request_data(self, **kwargs):
-        """Parse Request Body
-
-        Request body consists of multiple items, some have primitive data, like name:str or price:float. But for
-        relational objects like birth_place:City, we should convert json-acceptable data to specific python objects. In
-        this case we should get corresponding object from database.
-        """
-
-        if len(self.direct_callable.args) > 0:
-            args = self.direct_callable.args
-        else:
-            args = (self.direct_callable.documentation.request_body.attributes
-                    if self.direct_callable.documentation.request_body
-                    else [])
-
         cleaned = {}
-        for function_attribute in args:
+        for function_attribute in self.direct_callable.args:
             function_attribute: FunctionAttribute
-
-            """Errors for required data before python raises exception for function params"""
             if function_attribute.is_required and function_attribute.name not in kwargs.keys():
                 raise ErrorMessageException(f'field "{function_attribute.name}" is required')
 
-            """Optional field not provided"""
-            if function_attribute.name not in kwargs.keys():
-                continue
-
-            """Objects and array of objects should convert to db objects"""
             if function_attribute.type is function_attribute.TYPE.OBJECT:
                 cleaned[function_attribute.name] = self._parse_request_object(
                     function_attribute=function_attribute, target_dict=kwargs[function_attribute.name]
                 )
-            elif function_attribute.type is function_attribute.TYPE.ARRAY and \
-                    inspect.isclass(function_attribute.type_of) and \
-                    issubclass(function_attribute.type_of, AvishanModel):
+            elif function_attribute.type is function_attribute.TYPE.ARRAY:
                 cleaned[function_attribute.name] = [
                     self._parse_request_object(
                         function_attribute=function_attribute, target_dict=item
@@ -347,7 +303,6 @@ class AvishanModelApiView(AvishanApiView):
             elif function_attribute.type is function_attribute.TYPE.FILE:
                 raise NotImplementedError()
             else:
-                """Casts primitive data here"""
                 cleaned[function_attribute.name] = function_attribute.type_caster(
                     entry=kwargs[function_attribute.name],
                     target_type=function_attribute.type
@@ -357,35 +312,20 @@ class AvishanModelApiView(AvishanApiView):
 
     @staticmethod
     def _parse_request_object(function_attribute: FunctionAttribute, target_dict: dict):
-        """Parse object
-
-        Get objects from database
-
-        :param FunctionAttribute function_attribute: corresponding attribute data
-        :param dict target_dict: request data
-        :return: cleaned object
-        """
-
-        if not isinstance(target_dict, dict):
-            if target_dict is None:
-                return None
-            raise ErrorMessageException(f'value for "{function_attribute.name}" must be dict consist of id or other '
-                                        f'unique values so that db can find corresponding object')
-
-        return function_attribute.type_of.request_arg_get_from_dict(target_dict)
+        if function_attribute.type is function_attribute.TYPE.OBJECT and not isinstance(target_dict, dict):
+            raise ErrorMessageException(f'value for "{function_attribute.name}" must be dict')
+        if 'id' in target_dict.keys():
+            return function_attribute.type_of.get(
+                id=int(target_dict['id'])
+            )
+        return function_attribute.type_of(**target_dict)
 
 
-class Redoc(AvishanTemplateView):
-    template_file_address = 'avishan/redoc.html'
+class PasswordHash(AvishanApiView):
     authenticate = False
-    track_it = False
 
     def get(self, request, *args, **kwargs):
-        from avishan.libraries.openapi3 import OpenApi
-
-        open_api_yaml = OpenApi().export_yaml()
-
-        text_file = open('static/openapi.yaml', 'w+')
-        text_file.write(open_api_yaml)
-        text_file.close()
-        return self.render()
+        import bcrypt
+        current_request['response']['hashed'] = bcrypt.hashpw(kwargs['password'].encode('utf8'),
+                                                              bcrypt.gensalt()).decode('utf8')
+        return JsonResponse(current_request['response'])

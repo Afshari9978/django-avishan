@@ -1,5 +1,4 @@
 from avishan.configure import get_avishan_config
-from crum import get_current_request
 
 
 class AvishanTranslatable:
@@ -17,12 +16,13 @@ class AvishanTranslatable:
             self.__setattr__(key.upper(), value)
 
     def __str__(self):
+        from avishan import current_request
 
         try:
-            if get_current_request().avishan.language is None:
+            if current_request['language'] is None:
                 lang = get_avishan_config().LANGUAGE
             else:
-                lang = get_current_request().avishan.language
+                lang = current_request['language']
             if lang.upper() in self.__dict__.keys() and self.__dict__[lang.upper()] is not None:
                 return self.__dict__[lang.upper()]
         except:

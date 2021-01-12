@@ -85,7 +85,7 @@ class ChayiWriter:
 
     def model_file_write_fields(self, model: Type[AvishanModel]) -> str:
         data = ''
-        for field in model.get_full_fields():
+        for field in model.get_fields():
             if field.name == 'id':
                 continue
             data += self.model_file_write_field(model, field)
@@ -118,7 +118,7 @@ class ChayiWriter:
         data = f'    public {model.class_name()} () ' + "{}\n\n"
 
         data += f"    public {model.class_name()} ({model.class_name()} {model.class_snake_case_name()}) " + "{\n"
-        for field in model.get_full_fields():
+        for field in model.get_fields():
             data += f'        this.{field.name} = {model.class_snake_case_name()}.{field.name};\n'
         return data + "    }\n\n"
 
@@ -128,14 +128,18 @@ class ChayiWriter:
         data = ''
         skip = ['all', 'create', 'update', 'remove', 'get']
 
-        data += '    public static final boolean create_token = true;\n'
         for direct_callable in model.direct_callable_methods():
             if direct_callable.name in skip:
                 continue
             if not direct_callable.authenticate:
                 data += f'    public static final boolean {direct_callable.name}_token = false;\n'
-            else:
-                data += f'    public static final boolean {direct_callable.name}_token = true;\n'
+
+        data += '    public static final boolean create_token = true;\n'
+        for direct_callable in model.direct_callable_methods():
+            direct_callable: DirectCallable
+            if direct_callable.name in skip:
+                continue
+            data += f'    public static final boolean {direct_callable.name}_token = true;\n'
 
         if inspect.ismethod(getattr(model, 'create')):
             data += '    public static final boolean create_on_item = false;\n'
@@ -426,7 +430,7 @@ public class Image {
         return id;
     }
     public String getFile() {
-        return Constants.BASE_URL + file;
+        return Constants.ZIMA_URL_BASE + file;
     }
     
 }"""
@@ -446,7 +450,7 @@ public class File {
     }
     
     public String getFile() {
-        return Constants.BASE_URL + file;
+        return Constants.ZIMA_URL_BASE + file;
     }
 
 }"""

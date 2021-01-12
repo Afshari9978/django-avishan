@@ -1,0 +1,54 @@
+{% extends 'avishan/panel/components/div.html' %}
+{% block div_content %}
+    {% if card.header %}
+        <div class="card-header d-flex p-2" style="align-items: center">
+            {% if card.tabs|length > 0 %}
+                <ul class="nav nav-pills">
+                    {% for tab in card.tabs %}
+                        <li class="nav-item">
+                            <a class="nav-link
+                            {% if forloop.counter == 1 %}
+                            active
+                            {% endif %}
+                            " href="#tab_{{ forloop.counter }}" data-toggle="tab">{{ tab.title }}</a>
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                {% if card.header.title %}
+                    <h3 class="card-title">
+                        {{ card.header.title }}
+                    </h3>
+                {% endif %}
+            {% endif %}
+            {% if card.header.buttons|length > 0 %}
+                <ul class="nav nav-pills mr-auto p-0">
+                    {% for button in card.header.buttons %}
+                        <li class="nav-item mr-1">
+                            {% include 'avishan/panel/components/button.html' %}
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% endif %}
+        </div>
+    {% endif %}
+    {% if card.body or card.tabs|length > 0 %}
+        <div class="card-body {{ card.body_added_classes }}">
+            {% if card.tabs|length > 0 %}
+                <div class="tab-content">
+                    {% for tab in card.tabs %}
+                        <div class="{% if forloop.counter == 1 %}active{% endif %} tab-pane"
+                             id="tab_{{ forloop.counter }}">
+                            {% include 'avishan/panel/components/div_component.html' with div_component=tab.body %}
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                {% include 'avishan/panel/components/div_component.html' with div_component=card.body %}
+            {% endif %}
+        </div>
+    {% endif %}
+    {% if card.footer %}
+        {% include 'avishan/panel/components/div_component.html' with div_component=card.footer %}
+    {% endif %}
+{% endblock %}

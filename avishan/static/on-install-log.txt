@@ -1,0 +1,139 @@
+/usr/bin/node /usr/lib/node_modules/npm/bin/npm-cli.js install --scripts-prepend-node-path=auto
+npm WARN deprecated extract-text-webpack-plugin@3.0.2: Deprecated. Please use https://github.com/webpack-contrib/mini-css-extract-plugin
+npm WARN deprecated popper.js@1.16.1: You can find the new Popper v2 at @popperjs/core, this package is dedicated to the legacy v1
+npm WARN deprecated request@2.88.2: request has been deprecated, see https://github.com/request/request/issues/3142
+npm WARN deprecated core-js@2.6.11: core-js@<3 is no longer maintained and not recommended for usage due to the number of issues. Please, upgrade your dependencies to the actual version of core-js@3.
+npm WARN deprecated browserslist@1.7.7: Browserslist 2 could fail on reading Browserslist >3.0 config used in other tools.
+npm WARN deprecated circular-json@0.3.3: CircularJSON is in maintenance only, flatted is its successor.
+
+> node-sass@4.13.1 install /home/afshari9978/Projects/PersianAdminLTE/node_modules/node-sass
+> node scripts/install.js
+
+Downloading binary from https://github.com/sass/node-sass/releases/download/v4.13.1/linux-x64-64_binding.node
+Download complete  ] - :
+Binary saved to /home/afshari9978/Projects/PersianAdminLTE/node_modules/node-sass/vendor/linux-x64-64/binding.node
+Caching binary to /home/afshari9978/.npm/node-sass/4.13.1/linux-x64-64_binding.node
+
+> core-js@2.6.11 postinstall /home/afshari9978/Projects/PersianAdminLTE/node_modules/core-js
+> node -e "try{require('./postinstall')}catch(e){}"
+
+Thank you for using core-js ( https://github.com/zloirock/core-js ) for polyfilling JavaScript standard library!
+
+The project needs your help! Please consider supporting of core-js on Open Collective or Patreon:
+> https://opencollective.com/core-js
+> https://www.patreon.com/zloirock
+
+Also, the author of core-js ( https://github.com/zloirock ) is looking for a good job -)
+
+
+> node-sass@4.13.1 postinstall /home/afshari9978/Projects/PersianAdminLTE/node_modules/node-sass
+> node scripts/build.js
+
+Binary found at /home/afshari9978/Projects/PersianAdminLTE/node_modules/node-sass/vendor/linux-x64-64/binding.node
+Testing binary
+Binary is fine
+
+> nodemon@1.19.4 postinstall /home/afshari9978/Projects/PersianAdminLTE/node_modules/nodemon
+> node bin/postinstall || exit 0
+
+Love nodemon? You can now support the project via the open collective:
+ > https://opencollective.com/nodemon/donate
+
+npm notice created a lockfile as package-lock.json. You should commit this file.
+npm WARN optional SKIPPING OPTIONAL DEPENDENCY: fsevents@^1.0.0 (node_modules/chokidar/node_modules/fsevents):
+npm WARN notsup SKIPPING OPTIONAL DEPENDENCY: Unsupported platform for fsevents@1.2.11: wanted {"os":"darwin","arch":"any"} (current: {"os":"linux","arch":"x64"})
+npm WARN extract-text-webpack-plugin@3.0.2 requires a peer of webpack@^3.1.0 but none is installed. You must install peer dependencies yourself.
+npm WARN optional SKIPPING OPTIONAL DEPENDENCY: abbrev@1.1.1 (node_modules/fsevents/node_modules/abbrev):
+npm WARN enoent SKIPPING OPTIONAL DEPENDENCY: ENOENT: no such file or directory, rename '/home/afshari9978/Projects/PersianAdminLTE/node_modules/fsevents/node_modules/abbrev' -> '/home/afshari9978/Projects/PersianAdminLTE/node_modules/fsevents/node_modules/.abbrev.DELETE'
+npm WARN optional SKIPPING OPTIONAL DEPENDENCY: ansi-regex@2.1.1 (node_modules/fsevents/node_modules/ansi-regex):
+npm WARN enoent SKIPPING OPTIONAL DEPENDENCY: ENOENT: no such file or directory, rename '/home/afshari9978/Projects/PersianAdminLTE/node_modules/fsevents/node_modules/ansi-regex' -> '/home/afshari9978/Projects/PersianAdminLTE/node_modules/fsevents/node_modules/.ansi-regex.DELETE'
+npm WARN optional SKIPPING OPTIONAL DEPENDENCY: aproba@1.2.0 (node_modules/fsevents/node_modules/aproba):
+npm WARN enoent SKIPPING OPTIONAL DEPENDENCY: ENOENT: no such file or directory, rename '/home/afshari9978/Projects/PersianAdminLTE/node_modules/fsevents/node_modules/aproba' -> '/home/afshari9978/Projects/PersianAdminLTE/node_modules/fsevents/node_modules/.aproba.DELETE'
+npm WARN optional SKIPPING OPTIONAL DEPENDENCY: balanced-match@1.0.0 (node_modules/fsevents/node_modules/balanced-match):
+npm WARN enoent SKIPPING OPTIONAL DEPENDENCY: ENOENT: no such file or directory, rename '/home/afshari9978/Projects/PersianAdminLTE/node_modules/fsevents/node_modules/balanced-match' -> '/home/afshari9978/Projects/PersianAdminLTE/node_modules/fsevents/node_modules/.balanced-match.DELETE'
+npm WARN optional SKIPPING OPTIONAL DEPENDENCY: chownr@1.1.3 (node_modules/fsevents/node_modules/chownr):
+npm WARN enoent SKIPPING OPTIONAL DEPENDENCY: ENOENT: no such file or directory, rename '/home/afshari9978/Projects/PersianAdminLTE/node_modules/fsevents/node_modules/chownr' -> '/home/afshari9978/Projects/PersianAdminLTE/node_modules/fsevents/node_modules/.chownr.DELETE'
+npm WARN optional SKIPPING OPTIONAL DEPENDENCY: code-point-at@1.1.0 (node_modules/fsevents/node_modules/code-point-at):
+npm WARN enoent SKIPPING OPTIONAL DEPENDENCY: ENOENT: no such file or directory, rename '/home/afshari9978/Projects/PersianAdminLTE/node_modules/fsevents/node_modules/code-point-at' -> '/home/afshari9978/Projects/PersianAdminLTE/node_modules/fsevents/node_modules/.code-point-at.DELETE'
+npm WARN optional SKIPPING OPTIONAL DEPENDENCY: concat-map@0.0.1 (node_modules/fsevents/node_modules/concat-map):
+npm WARN enoent SKIPPING OPTIONAL DEPENDENCY: ENOENT: no such file or directory, rename '/home/afshari9978/Projects/PersianAdminLTE/node_modules/fsevents/node_modules/concat-map' -> '/home/afshari9978/Projects/PersianAdminLTE/node_modules/fsevents/node_modules/.concat-map.DELETE'
+npm WARN optional SKIPPING OPTIONAL DEPENDENCY: console-control-strings@1.1.0 (node_modules/fsevents/node_modules/console-control-strings):
+npm WARN enoent SKIPPING OPTIONAL DEPENDENCY: ENOENT: no such file or directory, rename '/home/afshari9978/Projects/PersianAdminLTE/node_modules/fsevents/node_modules/console-control-strings' -> '/home/afshari9978/Projects/PersianAdminLTE/node_modules/fsevents/node_modules/.console-control-strings.DELETE'
+npm WARN optional SKIPPING OPTIONAL DEPENDENCY: core-util-is@1.0.2 (node_modules/fsevents/node_modules/core-util-is):
+npm WARN enoent SKIPPING OPTIONAL DEPENDENCY: ENOENT: no such file or directory, rename '/home/afshari9978/Projects/PersianAdminLTE/node_modules/fsevents/node_modules/core-util-is' -> '/home/afshari9978/Projects/PersianAdminLTE/node_modules/fsevents/node_modules/.core-util-is.DELETE'
+npm WARN optional SKIPPING OPTIONAL DEPENDENCY: deep-extend@0.6.0 (node_modules/fsevents/node_modules/deep-extend):
+npm WARN enoent SKIPPING OPTIONAL DEPENDENCY: ENOENT: no such file or directory, rename '/home/afshari9978/Projects/PersianAdminLTE/node_modules/fsevents/node_modules/deep-extend' -> '/home/afshari9978/Projects/PersianAdminLTE/node_modules/fsevents/node_modules/.deep-extend.DELETE'
+npm WARN optional SKIPPING OPTIONAL DEPENDENCY: delegates@1.0.0 (node_modules/fsevents/node_modules/delegates):
+npm WARN enoent SKIPPING OPTIONAL DEPENDENCY: ENOENT: no such file or directory, rename '/home/afshari9978/Projects/PersianAdminLTE/node_modules/fsevents/node_modules/delegates' -> '/home/afshari9978/Projects/PersianAdminLTE/node_modules/fsevents/node_modules/.delegates.DELETE'
+npm WARN optional SKIPPING OPTIONAL DEPENDENCY: detect-libc@1.0.3 (node_modules/fsevents/node_modules/detect-libc):
+npm WARN enoent SKIPPING OPTIONAL DEPENDENCY: ENOENT: no such file or directory, rename '/home/afshari9978/Projects/PersianAdminLTE/node_modules/fsevents/node_modules/detect-libc' -> '/home/afshari9978/Projects/PersianAdminLTE/node_modules/fsevents/node_modules/.detect-libc.DELETE'
+npm WARN optional SKIPPING OPTIONAL DEPENDENCY: fs.realpath@1.0.0 (node_modules/fsevents/node_modules/fs.realpath):
+npm WARN enoent SKIPPING OPTIONAL DEPENDENCY: ENOENT: no such file or directory, rename '/home/afshari9978/Projects/PersianAdminLTE/node_modules/fsevents/node_modules/fs.realpath' -> '/home/afshari9978/Projects/PersianAdminLTE/node_modules/fsevents/node_modules/.fs.realpath.DELETE'
+npm WARN optional SKIPPING OPTIONAL DEPENDENCY: has-unicode@2.0.1 (node_modules/fsevents/node_modules/has-unicode):
+npm WARN enoent SKIPPING OPTIONAL DEPENDENCY: ENOENT: no such file or directory, rename '/home/afshari9978/Projects/PersianAdminLTE/node_modules/fsevents/node_modules/has-unicode' -> '/home/afshari9978/Projects/PersianAdminLTE/node_modules/fsevents/node_modules/.has-unicode.DELETE'
+npm WARN optional SKIPPING OPTIONAL DEPENDENCY: inherits@2.0.4 (node_modules/fsevents/node_modules/inherits):
+npm WARN enoent SKIPPING OPTIONAL DEPENDENCY: ENOENT: no such file or directory, rename '/home/afshari9978/Projects/PersianAdminLTE/node_modules/fsevents/node_modules/inherits' -> '/home/afshari9978/Projects/PersianAdminLTE/node_modules/fsevents/node_modules/.inherits.DELETE'
+npm WARN optional SKIPPING OPTIONAL DEPENDENCY: ini@1.3.5 (node_modules/fsevents/node_modules/ini):
+npm WARN enoent SKIPPING OPTIONAL DEPENDENCY: ENOENT: no such file or directory, rename '/home/afshari9978/Projects/PersianAdminLTE/node_modules/fsevents/node_modules/ini' -> '/home/afshari9978/Projects/PersianAdminLTE/node_modules/fsevents/node_modules/.ini.DELETE'
+npm WARN optional SKIPPING OPTIONAL DEPENDENCY: isarray@1.0.0 (node_modules/fsevents/node_modules/isarray):
+npm WARN enoent SKIPPING OPTIONAL DEPENDENCY: ENOENT: no such file or directory, rename '/home/afshari9978/Projects/PersianAdminLTE/node_modules/fsevents/node_modules/isarray' -> '/home/afshari9978/Projects/PersianAdminLTE/node_modules/fsevents/node_modules/.isarray.DELETE'
+npm WARN optional SKIPPING OPTIONAL DEPENDENCY: minimist@0.0.8 (node_modules/fsevents/node_modules/minimist):
+npm WARN enoent SKIPPING OPTIONAL DEPENDENCY: ENOENT: no such file or directory, rename '/home/afshari9978/Projects/PersianAdminLTE/node_modules/fsevents/node_modules/minimist' -> '/home/afshari9978/Projects/PersianAdminLTE/node_modules/fsevents/node_modules/.minimist.DELETE'
+npm WARN optional SKIPPING OPTIONAL DEPENDENCY: ms@2.1.2 (node_modules/fsevents/node_modules/ms):
+npm WARN enoent SKIPPING OPTIONAL DEPENDENCY: ENOENT: no such file or directory, rename '/home/afshari9978/Projects/PersianAdminLTE/node_modules/fsevents/node_modules/ms' -> '/home/afshari9978/Projects/PersianAdminLTE/node_modules/fsevents/node_modules/.ms.DELETE'
+npm WARN optional SKIPPING OPTIONAL DEPENDENCY: npm-normalize-package-bin@1.0.1 (node_modules/fsevents/node_modules/npm-normalize-package-bin):
+npm WARN enoent SKIPPING OPTIONAL DEPENDENCY: ENOENT: no such file or directory, rename '/home/afshari9978/Projects/PersianAdminLTE/node_modules/fsevents/node_modules/npm-normalize-package-bin' -> '/home/afshari9978/Projects/PersianAdminLTE/node_modules/fsevents/node_modules/.npm-normalize-package-bin.DELETE'
+npm WARN optional SKIPPING OPTIONAL DEPENDENCY: number-is-nan@1.0.1 (node_modules/fsevents/node_modules/number-is-nan):
+npm WARN enoent SKIPPING OPTIONAL DEPENDENCY: ENOENT: no such file or directory, rename '/home/afshari9978/Projects/PersianAdminLTE/node_modules/fsevents/node_modules/number-is-nan' -> '/home/afshari9978/Projects/PersianAdminLTE/node_modules/fsevents/node_modules/.number-is-nan.DELETE'
+npm WARN optional SKIPPING OPTIONAL DEPENDENCY: object-assign@4.1.1 (node_modules/fsevents/node_modules/object-assign):
+npm WARN enoent SKIPPING OPTIONAL DEPENDENCY: ENOENT: no such file or directory, rename '/home/afshari9978/Projects/PersianAdminLTE/node_modules/fsevents/node_modules/object-assign' -> '/home/afshari9978/Projects/PersianAdminLTE/node_modules/fsevents/node_modules/.object-assign.DELETE'
+npm WARN optional SKIPPING OPTIONAL DEPENDENCY: os-homedir@1.0.2 (node_modules/fsevents/node_modules/os-homedir):
+npm WARN enoent SKIPPING OPTIONAL DEPENDENCY: ENOENT: no such file or directory, rename '/home/afshari9978/Projects/PersianAdminLTE/node_modules/fsevents/node_modules/os-homedir' -> '/home/afshari9978/Projects/PersianAdminLTE/node_modules/fsevents/node_modules/.os-homedir.DELETE'
+npm WARN optional SKIPPING OPTIONAL DEPENDENCY: os-tmpdir@1.0.2 (node_modules/fsevents/node_modules/os-tmpdir):
+npm WARN enoent SKIPPING OPTIONAL DEPENDENCY: ENOENT: no such file or directory, rename '/home/afshari9978/Projects/PersianAdminLTE/node_modules/fsevents/node_modules/os-tmpdir' -> '/home/afshari9978/Projects/PersianAdminLTE/node_modules/fsevents/node_modules/.os-tmpdir.DELETE'
+npm WARN optional SKIPPING OPTIONAL DEPENDENCY: path-is-absolute@1.0.1 (node_modules/fsevents/node_modules/path-is-absolute):
+npm WARN enoent SKIPPING OPTIONAL DEPENDENCY: ENOENT: no such file or directory, rename '/home/afshari9978/Projects/PersianAdminLTE/node_modules/fsevents/node_modules/path-is-absolute' -> '/home/afshari9978/Projects/PersianAdminLTE/node_modules/fsevents/node_modules/.path-is-absolute.DELETE'
+npm WARN optional SKIPPING OPTIONAL DEPENDENCY: process-nextick-args@2.0.1 (node_modules/fsevents/node_modules/process-nextick-args):
+npm WARN enoent SKIPPING OPTIONAL DEPENDENCY: ENOENT: no such file or directory, rename '/home/afshari9978/Projects/PersianAdminLTE/node_modules/fsevents/node_modules/process-nextick-args' -> '/home/afshari9978/Projects/PersianAdminLTE/node_modules/fsevents/node_modules/.process-nextick-args.DELETE'
+npm WARN optional SKIPPING OPTIONAL DEPENDENCY: minimist@1.2.0 (node_modules/fsevents/node_modules/rc/node_modules/minimist):
+npm WARN enoent SKIPPING OPTIONAL DEPENDENCY: ENOENT: no such file or directory, rename '/home/afshari9978/Projects/PersianAdminLTE/node_modules/fsevents/node_modules/rc/node_modules/minimist' -> '/home/afshari9978/Projects/PersianAdminLTE/node_modules/fsevents/node_modules/rc/node_modules/.minimist.DELETE'
+npm WARN optional SKIPPING OPTIONAL DEPENDENCY: safe-buffer@5.1.2 (node_modules/fsevents/node_modules/safe-buffer):
+npm WARN enoent SKIPPING OPTIONAL DEPENDENCY: ENOENT: no such file or directory, rename '/home/afshari9978/Projects/PersianAdminLTE/node_modules/fsevents/node_modules/safe-buffer' -> '/home/afshari9978/Projects/PersianAdminLTE/node_modules/fsevents/node_modules/.safe-buffer.DELETE'
+npm WARN optional SKIPPING OPTIONAL DEPENDENCY: safer-buffer@2.1.2 (node_modules/fsevents/node_modules/safer-buffer):
+npm WARN enoent SKIPPING OPTIONAL DEPENDENCY: ENOENT: no such file or directory, rename '/home/afshari9978/Projects/PersianAdminLTE/node_modules/fsevents/node_modules/safer-buffer' -> '/home/afshari9978/Projects/PersianAdminLTE/node_modules/fsevents/node_modules/.safer-buffer.DELETE'
+npm WARN optional SKIPPING OPTIONAL DEPENDENCY: sax@1.2.4 (node_modules/fsevents/node_modules/sax):
+npm WARN enoent SKIPPING OPTIONAL DEPENDENCY: ENOENT: no such file or directory, rename '/home/afshari9978/Projects/PersianAdminLTE/node_modules/fsevents/node_modules/sax' -> '/home/afshari9978/Projects/PersianAdminLTE/node_modules/fsevents/node_modules/.sax.DELETE'
+npm WARN optional SKIPPING OPTIONAL DEPENDENCY: semver@5.7.1 (node_modules/fsevents/node_modules/semver):
+npm WARN enoent SKIPPING OPTIONAL DEPENDENCY: ENOENT: no such file or directory, rename '/home/afshari9978/Projects/PersianAdminLTE/node_modules/fsevents/node_modules/semver' -> '/home/afshari9978/Projects/PersianAdminLTE/node_modules/fsevents/node_modules/.semver.DELETE'
+npm WARN optional SKIPPING OPTIONAL DEPENDENCY: set-blocking@2.0.0 (node_modules/fsevents/node_modules/set-blocking):
+npm WARN enoent SKIPPING OPTIONAL DEPENDENCY: ENOENT: no such file or directory, rename '/home/afshari9978/Projects/PersianAdminLTE/node_modules/fsevents/node_modules/set-blocking' -> '/home/afshari9978/Projects/PersianAdminLTE/node_modules/fsevents/node_modules/.set-blocking.DELETE'
+npm WARN optional SKIPPING OPTIONAL DEPENDENCY: signal-exit@3.0.2 (node_modules/fsevents/node_modules/signal-exit):
+npm WARN enoent SKIPPING OPTIONAL DEPENDENCY: ENOENT: no such file or directory, rename '/home/afshari9978/Projects/PersianAdminLTE/node_modules/fsevents/node_modules/signal-exit' -> '/home/afshari9978/Projects/PersianAdminLTE/node_modules/fsevents/node_modules/.signal-exit.DELETE'
+npm WARN optional SKIPPING OPTIONAL DEPENDENCY: strip-json-comments@2.0.1 (node_modules/fsevents/node_modules/strip-json-comments):
+npm WARN enoent SKIPPING OPTIONAL DEPENDENCY: ENOENT: no such file or directory, rename '/home/afshari9978/Projects/PersianAdminLTE/node_modules/fsevents/node_modules/strip-json-comments' -> '/home/afshari9978/Projects/PersianAdminLTE/node_modules/fsevents/node_modules/.strip-json-comments.DELETE'
+npm WARN optional SKIPPING OPTIONAL DEPENDENCY: util-deprecate@1.0.2 (node_modules/fsevents/node_modules/util-deprecate):
+npm WARN enoent SKIPPING OPTIONAL DEPENDENCY: ENOENT: no such file or directory, rename '/home/afshari9978/Projects/PersianAdminLTE/node_modules/fsevents/node_modules/util-deprecate' -> '/home/afshari9978/Projects/PersianAdminLTE/node_modules/fsevents/node_modules/.util-deprecate.DELETE'
+npm WARN optional SKIPPING OPTIONAL DEPENDENCY: wrappy@1.0.2 (node_modules/fsevents/node_modules/wrappy):
+npm WARN enoent SKIPPING OPTIONAL DEPENDENCY: ENOENT: no such file or directory, rename '/home/afshari9978/Projects/PersianAdminLTE/node_modules/fsevents/node_modules/wrappy' -> '/home/afshari9978/Projects/PersianAdminLTE/node_modules/fsevents/node_modules/.wrappy.DELETE'
+npm WARN optional SKIPPING OPTIONAL DEPENDENCY: yallist@3.1.1 (node_modules/fsevents/node_modules/yallist):
+npm WARN enoent SKIPPING OPTIONAL DEPENDENCY: ENOENT: no such file or directory, rename '/home/afshari9978/Projects/PersianAdminLTE/node_modules/fsevents/node_modules/yallist' -> '/home/afshari9978/Projects/PersianAdminLTE/node_modules/fsevents/node_modules/.yallist.DELETE'
+
+added 1021 packages from 685 contributors and audited 10903 packages in 115.894s
+
+18 packages are looking for funding
+  run `npm fund` for details
+
+found 3 vulnerabilities (1 low, 1 moderate, 1 high)
+  run `npm audit fix` to fix them, or `npm audit` for details
+
+
+   ╭────────────────────────────────────────────────────────────────╮
+   │                                                                │
+   │      New patch version of npm available! 6.13.4 → 6.13.7       │
+   │   Changelog: https://github.com/npm/cli/releases/tag/v6.13.7   │
+   │               Run npm install -g npm to update!                │
+   │                                                                │
+   ╰────────────────────────────────────────────────────────────────╯
+
+
+Process finished with exit code 0

@@ -1,9 +1,20 @@
 from typing import Optional, Union, List
 
+from . import current_request
 from .misc import status
 from .misc.translation import AvishanTranslatable
-from crum import get_current_request
 
+"""
+try:
+    b = json.dumps(a, default=lambda o: o.__dict__, indent=2)
+except Exception as e:
+    c = 1
+current_request['locals'] = json.dumps(exc_value.__traceback__.tb_frame.f_locals, default=lambda o: o.__dict__,
+                                       indent=2)                                      
+"""
+
+
+# todo save locals too
 
 class AvishanException(Exception):
     def __init__(
@@ -12,7 +23,6 @@ class AvishanException(Exception):
             status_code: int = status.HTTP_400_BAD_REQUEST
     ):
         save_traceback()
-        request = get_current_request()
         if wrap_exception:
             if isinstance(wrap_exception, KeyError):
                 body = f'field {wrap_exception.args[0]} not found in data and its required'
@@ -23,14 +33,14 @@ class AvishanException(Exception):
                     body = str(wrap_exception.args[0])
                 else:
                     body = str(wrap_exception.args)[1:-1]
-            request.avishan.exception = wrap_exception
-            request.avishan.status_code = status.HTTP_418_IM_TEAPOT
+            current_request['exception'] = wrap_exception
+            current_request['status_code'] = status.HTTP_418_IM_TEAPOT
             add_error_message_to_response(
                 body=body,
             )
         else:
-            request.avishan.exception = self
-            request.avishan.status_code = status_code
+            current_request['exception'] = self
+            current_request['status_code'] = status_code
 
 
 class AuthException(AvishanException):
@@ -64,18 +74,13 @@ class AuthException(AvishanException):
         FA='توکن غیرفعال شده است، دوباره وارد شوید'
     )
     MULTIPLE_CONNECTED_ACCOUNTS = 13, AvishanTranslatable(
-        EN='Multiple Accounts found with this identifier.',
-        FA='چند حساب با این شناسه پیدا شد'
+        EN='Multiple Accounts found with this identifier, Choose user group in url parameter',
+        FA='چند حساب با این شناسه پیدا شد، گروه کاربری را در پارامتر url مشخص کنید'
     )
 
     METHOD_NOT_DIRECT_CALLABLE = 14, AvishanTranslatable(
         EN='Method is not callable direct to model',
         FA='تابع به طور مستقیم قابل صدا زدن نیست'
-    )
-
-    PASSWORD_NOT_FOUND = 15, AvishanTranslatable(
-        EN='Password not found for user account',
-        FA='رمز برای این کاربر تنظیم نشده است'
     )
 
     def __init__(self, error_kind: tuple = NOT_DEFINED):
@@ -84,9 +89,6 @@ class AuthException(AvishanException):
         self.error_kind = error_kind
         if error_kind[0] == AuthException.HTTP_METHOD_NOT_ALLOWED[0]:
             status_code = status.HTTP_405_METHOD_NOT_ALLOWED
-        if error_kind[0] == AuthException.PASSWORD_NOT_FOUND[0]:
-            status_code = status.HTTP_409_CONFLICT
-
         super().__init__(status_code=status_code)
         add_error_message_to_response(code=error_kind[0], body=str(error_kind[1]), title=str(AvishanTranslatable(
             EN='Authentication Exception',
@@ -113,6 +115,15 @@ class ErrorMessageException(AvishanException):
                  status_code: int = status.HTTP_400_BAD_REQUEST):
         super().__init__(status_code=status_code)
         message = str(message)
+        # add_error_message_to_response(
+        #     body=message if message else AvishanTranslatable(
+        #         EN='Error details not provided',
+        #         FA='توضیحات خطا ارائه نشده').__str__(),
+        #     title=AvishanTranslatable(
+        #         EN='Error',
+        #         FA='خطا'
+        #     ).__str__()
+        # )
         add_error_message_to_response(
             body=message if message else 'Error details not provided',
             title='Error'
@@ -125,7 +136,7 @@ def add_debug_message_to_response(body: str = None, title: str = None):
         debug['body'] = body
     if title is not None:
         debug['title'] = title
-    get_current_request().avishan.messages['debug'].append(debug)
+    current_request['messages']['debug'].append(debug)
 
 
 def add_info_message_to_response(body: str = None, title: str = None):
@@ -134,7 +145,7 @@ def add_info_message_to_response(body: str = None, title: str = None):
         info['body'] = body
     if title is not None:
         info['title'] = title
-    get_current_request().avishan.messages['info'].append(info)
+    current_request['messages']['info'].append(info)
 
 
 def add_success_message_to_response(body: str = None, title: str = None):
@@ -143,7 +154,7 @@ def add_success_message_to_response(body: str = None, title: str = None):
         success['body'] = body
     if title is not None:
         success['title'] = title
-    get_current_request().avishan.messages['success'].append(success)
+    current_request['messages']['success'].append(success)
 
 
 def add_warning_message_to_response(body: str = None, title: str = None):
@@ -152,10 +163,12 @@ def add_warning_message_to_response(body: str = None, title: str = None):
         warning['body'] = body
     if title is not None:
         warning['title'] = title
-    get_current_request().avishan.messages['warning'].append(warning)
+    current_request['messages']['warning'].append(warning)
 
 
 def add_error_message_to_response(body: str = None, title: str = None, code=None):
+    if 'messages' not in current_request.keys():
+        return
     error = {}
     if body is not None:
         error['body'] = body
@@ -163,13 +176,12 @@ def add_error_message_to_response(body: str = None, title: str = None, code=None
         error['title'] = title
     if code is not None:
         error['code'] = code
-    get_current_request().avishan.messages['error'].append(error)
+    current_request['messages']['error'].append(error)
 
 
 def save_traceback():
-    request = get_current_request()
     try:
-        if request.avishan.traceback is not None:
+        if current_request['traceback'] is not None:
             return
     except KeyError:
         return
@@ -179,6 +191,9 @@ def save_traceback():
         exc_type, exc_value, exc_tb,
     )
     if tbe.exc_traceback is not None:
-        request.avishan.traceback = ''.join(tbe.format())
-        if request.avishan.debug:
-            print(request.avishan.traceback)
+        current_request['traceback'] = ''.join(tbe.format())
+        if current_request['DEBUG']:
+            print(current_request['traceback'])
+        if current_request['exception_record']:
+            current_request['exception_record'].traceback = current_request['traceback']
+            current_request['exception_record'].save()

@@ -1,0 +1,118 @@
+{% extends "avishan/panel/base.html" %}
+{% load static %}
+{% block body_start %}
+    <div class="wrapper">
+
+        {% include 'avishan/panel/components/navbar.html' with navbar=self.navbar %}
+
+        {% include 'avishan/panel/components/aside.html' with sidebar=self.sidebar %}
+
+        <div class="content-wrapper">
+            <div class="content-header">
+                <div class="container-fluid">
+                    <div class="row mb-2">
+                        <div class="col-sm-12">
+                            <h1 class="m-0 text-dark">{{ self.page_header_text }}</h1>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {% if self.contents|length or messages|length %}
+                {#                todo check if have message show it#}
+                <section class="content">
+                    <div class="container-fluid">
+                        {% if messages|length %}
+                            <div class="row">
+                                <div class="col-12">
+                                    {% include "avishan/panel/components/messages_list.html" %}
+                                </div>
+                            </div>
+                        {% endif %}
+                        {% for div in self.contents %}
+                            {% include 'avishan/panel/components/div_component.html' with div_component=div %}
+                        {% endfor %}
+                    </div>
+                </section>
+            {% endif %}
+        </div>
+
+        <footer class="main-footer">
+            <strong><a href="http://github.com/hesammousavi/">حسام موسوی</a> Static Panel CopyLeft &copy; 2018 </strong>
+        </footer>
+        <!-- Control Sidebar -->
+        <aside class="control-sidebar control-sidebar-dark">
+            <!-- Control sidebar content goes here -->
+        </aside>
+        <!-- /.control-sidebar -->
+    </div>
+{% endblock body_start %}
+
+{% block body_scripts %}
+    {{ block.super }}
+    <!-- Select2 -->
+    <script src="{% static "plugins/select2/select2.full.min.js" %}"></script>
+    <script>
+        $(function () {
+
+            var enToFaDigits = function (input) {
+                if (input === undefined)
+                    return;
+                var returnModel = "", symbolMap = {
+                    '1': '۱',
+                    '2': '۲',
+                    '3': '۳',
+                    '4': '۴',
+                    '5': '۵',
+                    '6': '۶',
+                    '7': '۷',
+                    '8': '۸',
+                    '9': '۹',
+                    '0': '۰'
+                };
+                input = input.toString();
+                for (var i = 0; i < input.length; i++)
+                    if (symbolMap[input[i]])
+                        returnModel += symbolMap[input[i]];
+                    else
+                        returnModel += input[i];
+                return returnModel;
+            };
+
+            //Initialize Select2 Elements
+            function matchCustom(params, data) {
+                // If there are no search terms, return all of the data
+                if ($.trim(params.term) === '') {
+                    return data;
+                }
+
+                // Do not display the item if there is no 'text' property
+                if (typeof data.text === 'undefined') {
+                    return null;
+                }
+
+                // `params.term` should be the term that is used for searching
+                // `data.text` is the text that is displayed for the data object
+                if (data.text.indexOf(params.term) > -1 || data.text.indexOf(enToFaDigits(params.term)) > -1) {
+                    console.log(params.term, data.text);
+                    {#modifiedData.text += ' (matched)';#}
+
+                    // You can return modified objects from here
+                    // This includes matching the `children` how you want in nested data sets
+                    return $.extend({}, data, true);
+                }
+
+                // Return `null` if the term should not be displayed
+                return null;
+            }
+
+            $('.select2').select2({
+                matcher: matchCustom
+            });
+        })
+    </script>
+{% endblock body_scripts %}
+{% block head_tail %}
+    <!-- Select2 -->
+    <link rel="stylesheet" href="{% static "plugins/select2/select2.min.css" %}">
+{% endblock head_tail %}

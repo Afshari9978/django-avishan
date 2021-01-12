@@ -1,0 +1,16 @@
+{% extends "avishan/panel/base.html" %}
+
+{% block body_class %}hold-transition lockscreen{% endblock body_class %}
+{% block body_start %}
+    <div class="lockscreen-wrapper">
+        <div class="lockscreen-logo">
+            <b>خطا</b>
+        </div>
+        {% include "avishan/panel/components/messages_list.html" %}
+        <div class="input-group" style="padding: 10px">
+            <a type="button" class="btn" href="{{ self.redirected_from|default_if_none:AVISHAN_CONFIG.PANEL_ROOT }}"
+               style="background-color: lightgray">بازگشت <i
+                    class="fa fa-arrow-right text-muted"></i></a>
+        </div>
+    </div>
+{% endblock body_start %}

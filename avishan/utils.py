@@ -2,10 +2,10 @@ import datetime
 from typing import Optional, Union, List
 
 from django.http import HttpResponse
-from django.utils import timezone
-from crum import get_current_request
 
 from avishan.exceptions import AuthException, AvishanException
+from avishan.misc.bch_datetime import BchDatetime
+from . import current_request
 from .configure import get_avishan_config
 from .misc import status
 from .models import AuthenticationType
@@ -17,13 +17,12 @@ class AvishanDataValidator:
 
         def __init__(self, field_name: Union[str, 'AvishanTranslatable']):
             from avishan.misc.translation import AvishanTranslatable
-            request = get_current_request()
-            request.avishan.response['error_in_field'] = field_name
-            request.avishan.response['error_message'] = AvishanTranslatable(
+            current_request['response']['error_in_field'] = field_name
+            current_request['response']['error_message'] = AvishanTranslatable(
                 EN=f'"{field_name}" not accepted',
                 FA='"' + field_name + '" قابل قبول نیست'
             )
-            request.avishan.status_code = status.HTTP_417_EXPECTATION_FAILED
+            current_request['status_code'] = status.HTTP_417_EXPECTATION_FAILED
             super().__init__()
 
     @classmethod
@@ -149,9 +148,9 @@ def find_token_in_header() -> bool:
     :return: false if token not found
     """
     try:
-        temp = get_current_request().META['HTTP_AUTHORIZATION']
+        temp = current_request['request'].META['HTTP_AUTHORIZATION']
         if can_be_token(temp[6:]):
-            get_current_request().avishan.token = temp[6:]
+            current_request['token'] = temp[6:]
             return True
     except KeyError:
         pass
@@ -165,9 +164,9 @@ def find_token_in_session() -> bool:
     :return: false if token not found
     """
     try:
-        temp = get_current_request().COOKIES['token']
+        temp = current_request['request'].COOKIES['token']
         if can_be_token(temp):
-            get_current_request().avishan.token = temp
+            current_request['token'] = temp
             return True
     except KeyError:
         pass
@@ -180,7 +179,7 @@ def find_token() -> bool:
     check for token in both session and header
     :return: true if token
     """
-    if get_current_request().path.startswith('/api/v1/login/generate/'):
+    if current_request['request'].path.startswith('/api/v1/login/generate/'):
         return False
     if not find_token_in_header() and not find_token_in_session():
         return False
@@ -204,23 +203,28 @@ def add_token_to_response(rendered_response: HttpResponse):
     create new token if needed, else reuse previous
     add token to session if session-based auth, else to response header
     """
-    if get_current_request().avishan.json_unsafe:
+    if current_request['json_unsafe']:
         return
-    if not get_current_request().avishan.add_token or not get_current_request().avishan.authentication_object:
+    if not current_request['add_token']:
+        delete_token_from_request(rendered_response)
+
+    if not current_request['authentication_object']:
         delete_token_from_request(rendered_response)
     else:
-        token = encode_token(get_current_request().avishan.authentication_object)
+        token = encode_token(current_request['authentication_object'])
 
-        if get_current_request().avishan.is_api:
-            get_current_request().avishan.response['token'] = token
+        if current_request['is_api']:
+            # todo 0.2.0: where should be?
+            current_request['response']['token'] = token
+
         else:
             rendered_response.set_cookie('token', token)
 
 
 def delete_token_from_request(rendered_response=None):
-    if get_current_request().avishan.is_api:
+    if current_request['is_api']:
         try:
-            del get_current_request().avishan.response['token']
+            del current_request['response']['token']
         except KeyError:
             pass
     else:
@@ -231,14 +235,17 @@ def encode_token(authentication_object: 'AuthenticationType') -> Optional[str]:
     import jwt
     from datetime import timedelta
 
-    now = timezone.now()
+    now = BchDatetime()
     token_data = {
         'at_n': authentication_object.class_name(),
         'at_id': authentication_object.id,
         'exp': (now + timedelta(
-            seconds=authentication_object.user_user_group.user_group.token_valid_seconds)).timestamp(),
-        'crt': now.timestamp(),
-        'lgn': authentication_object.last_login.timestamp() if authentication_object.last_login else now.timestamp()
+            seconds=authentication_object.user_user_group.user_group.token_valid_seconds)).to_unix_timestamp(),
+        'crt': now.to_unix_timestamp(),
+        'lgn':
+            BchDatetime(authentication_object.last_login).to_unix_timestamp()
+            if authentication_object.last_login
+            else now.to_unix_timestamp()
     }
     return jwt.encode(token_data,
                       get_avishan_config().JWT_KEY,
@@ -248,14 +255,14 @@ def encode_token(authentication_object: 'AuthenticationType') -> Optional[str]:
 
 def decode_token():
     import jwt
-    if not get_current_request().avishan.token:
+    if not current_request['token']:
         raise AuthException(AuthException.TOKEN_NOT_FOUND)
     try:
-        get_current_request().avishan.decoded_token = jwt.decode(
-            get_current_request().avishan.token, get_avishan_config().JWT_KEY,
+        current_request['decoded_token'] = jwt.decode(
+            current_request['token'], get_avishan_config().JWT_KEY,
             algorithms=['HS256']
         )
-        get_current_request().avishan.add_token = True
+        current_request['add_token'] = True
     except jwt.exceptions.ExpiredSignatureError:
         raise AuthException(AuthException.TOKEN_EXPIRED)
     except:
@@ -269,15 +276,15 @@ def find_and_check_user():
     """
     from avishan.models import AvishanModel
 
-    if not get_current_request().avishan.decoded_token:
+    if not current_request['decoded_token']:
         AuthException(AuthException.ERROR_IN_TOKEN)
 
     authentication_type_class = AvishanModel.get_model_with_class_name(
-        get_current_request().avishan.decoded_token['at_n']
+        current_request['decoded_token']['at_n']
     )
     try:
         authentication_type_object: 'AuthenticationType' = authentication_type_class.objects.get(
-            id=get_current_request().avishan.decoded_token['at_id'])
+            id=current_request['decoded_token']['at_id'])
         user_user_group = authentication_type_object.user_user_group
     except authentication_type_class.DoesNotExist:
         raise AuthException(AuthException.ACCOUNT_NOT_FOUND)
@@ -286,15 +293,11 @@ def find_and_check_user():
         raise AuthException(AuthException.GROUP_ACCOUNT_NOT_ACTIVE)
     if not user_user_group.base_user.is_active:
         raise AuthException(AuthException.ACCOUNT_NOT_ACTIVE)
-    if authentication_type_object.last_login is None or \
-            authentication_type_object.last_login.timestamp() != get_current_request().avishan.decoded_token['lgn'] \
-            or authentication_type_object.last_logout:
-        get_current_request().avishan.add_token = False
+    if BchDatetime(authentication_type_object.last_login).to_unix_timestamp() != current_request['decoded_token'][
+        'lgn'] or authentication_type_object.last_logout:
         raise AuthException(AuthException.DEACTIVATED_TOKEN)
 
-    authentication_type_object.last_used = timezone.now()
-    authentication_type_object.save()
-    authentication_type_object._populate_current_request()
+    authentication_type_object.populate_current_request()
 
 
 def create_avishan_config_file(app_name: str = None):

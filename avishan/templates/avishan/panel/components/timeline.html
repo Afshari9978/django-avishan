@@ -1,0 +1,32 @@
+<ul class="timeline timeline-inverse">
+    {% for section in timeline.sections %}
+        <li class="time-label">
+        <span class="bg-danger">
+          {{ section.title }}
+        </span>
+        </li>
+        {% for item in section.items %}
+            <li>
+                <i class="fa {{ item.fa_icon }} bg-primary"></i>
+
+                <div class="timeline-item">
+                    <span class="time"><i class="fa fa-clock-o"></i> {{ item.time }}</span>
+                    <h3 class="timeline-header">{{ item.title }}</h3>
+
+                    {% if item.body_text %}
+                        <div class="timeline-body">
+                            {{ item.body_text }}
+                        </div>
+                    {% endif %}
+                    {% if item.buttons|length > 0 %}
+                        <div class="timeline-footer">
+                            {% for button in item.buttons %}
+                                {% include 'avishan/panel/components/button.html' with button=button %}
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                </div>
+            </li>
+        {% endfor %}
+    {% endfor %}
+</ul>

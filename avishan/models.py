@@ -1,37 +1,29 @@
 import random
 import re
-import string
+from inspect import Parameter
 from typing import List, Type, Union, Tuple, Dict
 
-import pytz
+import requests
 import stringcase
-from crum import get_current_request
-from django.conf import settings
 from django.core.files.uploadedfile import InMemoryUploadedFile
-from django.template.loader import render_to_string
-from django.utils import timezone
-from faker import Faker
 
+from avishan import current_request
 from avishan.configure import get_avishan_config, AvishanConfigFather
-from avishan.exceptions import AuthException, ErrorMessageException
 from avishan.libraries.faker import AvishanFaker
-from avishan.middlewares import AvishanRequestStorage
 from avishan.misc import status
 from avishan.misc.translation import AvishanTranslatable
-from avishan.descriptor import DirectCallable, ApiDocumentation, ResponseBodyDocumentation, Attribute, \
-    RequestBodyDocumentation
+from avishan.descriptor import DirectCallable
 
 import datetime
 from typing import Optional
 
+from avishan.misc.bch_datetime import BchDatetime
 from django.db import models
 
 # todo related name on abstracts
 # todo app name needed for models
 from avishan.models_extensions import AvishanModelDjangoAdminExtension, AvishanModelModelDetailsExtension, \
-    AvishanModelFilterExtension, AvishanModelDescriptorExtension
-
-faker = Faker(get_avishan_config().FAKER_SEED)
+    AvishanModelFilterExtension
 
 
 class AvishanModel(
@@ -39,8 +31,7 @@ class AvishanModel(
     AvishanFaker,
     AvishanModelDjangoAdminExtension,
     AvishanModelModelDetailsExtension,
-    AvishanModelFilterExtension,
-    AvishanModelDescriptorExtension,
+    AvishanModelFilterExtension
 ):
     # todo 0.2.1: use manager or simply create functions here?
     # todo 0.2.0 relation on_delete will call our remove() ?
@@ -50,84 +41,71 @@ class AvishanModel(
     """
     Models default settings
     """
-    to_dict_private_fields: List[Union[models.Field, str]] = []
+    private_fields: List[Union[models.Field, str]] = []
     export_ignore: bool = False  # todo check
     to_dict_added_fields: List[Tuple[str, Type[type]]] = []
 
     @classmethod
     def direct_callable_methods(cls) -> List[DirectCallable]:
+        """
+        method name, response json key, (request json key)
+        :return:
+        :rtype: DirectCallable
+        """
         return [
             DirectCallable(
                 model=cls,
                 target_name='all',
-                url='',
-                authenticate=cls._all_authenticate(),
-                response_json_key=stringcase.snakecase(cls.class_plural_name()),
-                documentation=ApiDocumentation(
-                    title=cls._all_documentation_title(),
-                    description=cls._all_documentation_description(),
-                    response_bodies=cls._all_documentation_response_bodies()
-                )
-            ),
-            DirectCallable(
-                model=cls,
-                target_name='get',
-                url='/{id}',
-                authenticate=cls._get_authenticate(),
-                response_json_key=stringcase.snakecase(cls.class_name()),
-                documentation=ApiDocumentation(
-                    title=cls._get_documentation_title(),
-                    description=cls._get_documentation_description(),
-                    response_bodies=cls._get_documentation_response_bodies()
-                )
+                url=''
             ),
             DirectCallable(
                 model=cls,
                 target_name='create',
-                url='',
+                response_json_key=cls.class_snake_case_name(),
                 method=DirectCallable.METHOD.POST,
-                authenticate=cls._create_authenticate(),
-                response_json_key=stringcase.snakecase(cls.class_name()),
-                documentation=ApiDocumentation(
-                    title=cls._create_documentation_title(),
-                    description=cls._create_documentation_description(),
-                    request_body=cls._create_documentation_request_body(),
-                    response_bodies=cls._create_documentation_response_bodies()
-                )
+                url=''
+            ),
+            DirectCallable(
+                model=cls,
+                target_name='get',
+                response_json_key=cls.class_snake_case_name(),
+                url='/{id}'
             ),
             DirectCallable(
                 model=cls,
                 target_name='update',
+                response_json_key=cls.class_snake_case_name(),
+                request_json_key=cls.class_snake_case_name(),
                 url='/{id}',
-                method=DirectCallable.METHOD.PUT,
-                authenticate=cls._update_authenticate(),
-                response_json_key=stringcase.snakecase(cls.class_name()),
-                documentation=ApiDocumentation(
-                    title=cls._update_documentation_title(),
-                    description=cls._update_documentation_description(),
-                    request_body=cls._update_documentation_request_body(),
-                    response_bodies=cls._update_documentation_response_bodies()
-                )
+                method=DirectCallable.METHOD.PUT
             ),
             DirectCallable(
                 model=cls,
                 target_name='remove',
+                response_json_key=cls.class_snake_case_name(),
                 url='/{id}',
-                authenticate=cls._remove_authenticate(),
-                method=DirectCallable.METHOD.DELETE,
-                response_json_key=stringcase.snakecase(cls.class_name()),
-                documentation=ApiDocumentation(
-                    title=cls._remove_documentation_title(),
-                    description=cls._remove_documentation_description(),
-                    response_bodies=cls._remove_documentation_response_bodies()
-                )
-            ),
+                method=DirectCallable.METHOD.DELETE
+            )
         ]
+
+    @classmethod
+    def openapi_documented_methods(cls):
+        return cls.direct_callable_methods()
+
+    @classmethod
+    def openapi_documented_fields(cls) -> List[str]:
+        """Returns list of field names should be visible by openapi documentation
+
+        :return: list of document visible fields
+        :rtype: List[str]
+        """
+        return [field.name for field in list(cls._meta.fields + cls._meta.many_to_many)]
 
     @classmethod
     def get(cls, avishan_raise_400: bool = False,
             **kwargs):
         from avishan.exceptions import ErrorMessageException
+        # todo 0.2.1 compact, private, added properties
 
         try:
             return cls.objects.get(**kwargs)
@@ -136,19 +114,31 @@ class AvishanModel(
                 raise ErrorMessageException(AvishanTranslatable(
                     EN="Chosen " + cls.__name__ + " doesnt exist",
                     FA=f"{cls.__name__} انتخاب شده موجود نیست"
-                ), status_code=status.HTTP_404_NOT_FOUND)
+                ))
             raise e
+
+    @classmethod
+    def _get_documentation_params(cls):
+        return stringcase.titlecase(cls.class_name()), cls.class_name(), cls.class_name()
+
+    @classmethod
+    def _get_documentation_raw(cls):
+        return """Get %s item
+
+        :response %s 200: Success
+        :return %s: Item
+        """
 
     @classmethod
     def filter(cls, **kwargs):
         # todo show filterable fields on doc
         # todo use django-filter for on-url filter
 
-        if get_current_request():
-            for item in get_current_request().GET.keys():
+        if 'request' in current_request.keys():
+            for item in current_request['request'].GET.keys():
                 if item.startswith('filter_'):
                     field = cls.get_field(item[7:])
-                    kwargs[field.name] = field.related_model.get(id=get_current_request().GET[item])
+                    kwargs[field.name] = field.related_model.get(id=current_request['request'].GET[item])
 
         if len(kwargs.items()) > 0:
             return cls.objects.filter(**kwargs)
@@ -158,6 +148,18 @@ class AvishanModel(
     @classmethod
     def all(cls):
         return cls.filter()
+
+    @classmethod
+    def _all_documentation_params(cls):
+        return stringcase.titlecase(cls.class_plural_name()), cls.class_name(), cls.class_name()
+
+    @classmethod
+    def _all_documentation_raw(cls):
+        return """Get %s
+
+        :response List[%s] 200: Success
+        :return List[%s]: Items, usually ordered by id, acceding
+        """
 
     @classmethod
     def create(cls, **kwargs):
@@ -177,6 +179,18 @@ class AvishanModel(
                     **target_object
                 })
         return created
+
+    @classmethod
+    def _create_documentation_params(cls):
+        return stringcase.titlecase(cls.class_name()), cls.class_name(), cls.class_name()
+
+    @classmethod
+    def _create_documentation_raw(cls):
+        return """Create %s
+
+        :response %s 200: Created
+        :return %s: Current created object
+        """
 
     def update(self, **kwargs):
 
@@ -202,10 +216,41 @@ class AvishanModel(
         self.save()
         return self
 
+    @classmethod
+    def _update_documentation_params(cls):
+        return stringcase.titlecase(cls.class_name()), cls.class_name(), cls.class_name()
+
+    @classmethod
+    def _update_documentation_raw(cls):
+        return """Edit %s
+
+        :response %s 200: Edited
+        :return %s: Current edited object
+        """
+
     def remove(self) -> dict:
         temp = self.to_dict()
         self.delete()
         return temp
+
+    @classmethod
+    def _remove_documentation_params(cls):
+        return stringcase.titlecase(cls.class_name()), cls.class_name(), cls.class_name()
+
+    @classmethod
+    def _remove_documentation_raw(cls):
+        return """Delete %s
+
+        :response %s 200: Deleted
+        :return %s: Deleted object
+        """
+
+    @classmethod
+    def update_properties(cls) -> Dict[str, Parameter]:
+        from avishan.libraries.openapi3 import get_functions_properties
+        data = dict(get_functions_properties(getattr(cls, 'update')))
+        del data['self']
+        return data
 
     @classmethod
     def search(cls, query_set: models.QuerySet, search_text: str = None) -> models.QuerySet:
@@ -245,54 +290,38 @@ class AvishanModel(
         Convert object to dict
         :return:
         """
-        from khayyam import JalaliDatetime, JalaliDate
 
+        # todo 0.2.1: compact
         dicted = {}
 
         for field in self.get_full_fields():
-            if (field not in self.to_dict_private_fields and field.name not in self.to_dict_private_fields) and \
+            if (field not in self.private_fields and field.name not in self.private_fields) and \
                     (field not in exclude_list and field.name not in exclude_list):
                 value = self.get_data_from_field(field)
                 if value is None:
                     dicted[field.name] = None
                 elif isinstance(field, models.DateField):
-                    if get_avishan_config().USE_DATETIME_DICT:
-                        if value is None:
-                            dicted[field.name] = {}
+                    try:
                         if get_avishan_config().USE_JALALI_DATETIME:
-                            if isinstance(field, models.DateTimeField):
-                                value = JalaliDatetime(value)
-                            else:
-                                value = JalaliDate(value)
-
-                        if value is not None:
-                            dicted[field.name] = {
-                                'year': value.year,
-                                'month': value.month,
-                                'day': value.day
-                            }
-                            if isinstance(field, models.DateTimeField):
-                                dicted[field.name]['hour'] = value.hour
-                                dicted[field.name]['minute'] = value.minute
-                                dicted[field.name]['second'] = value.second
-                                dicted[field.name]['microsecond'] = value.microsecond
-                    else:
-                        if value is None:
-                            dicted[field.name] = None
-                        elif get_avishan_config().USE_JALALI_DATETIME:
-                            if isinstance(field, models.DateTimeField):
-                                format_string = get_avishan_config().DATETIME_STRING_FORMAT
-                                dicted[field.name] = JalaliDatetime(value)
-                            else:
-                                format_string = get_avishan_config().DATE_STRING_FORMAT
-                                dicted[field.name] = JalaliDate(value)
-                            dicted[field.name] = dicted[field.name].strftime(format_string)
+                            dicted[field.name] = BchDatetime(value).to_dict(full=True)
                         else:
-                            if isinstance(field, models.DateTimeField):
-                                dicted[field.name] = value.strftime(get_avishan_config().DATETIME_STRING_FORMAT)
+                            if value is None:
+                                dicted[field.name] = {}
                             else:
-                                dicted[field.name] = value.strftime(get_avishan_config().DATE_STRING_FORMAT)
-
+                                dicted[field.name] = {
+                                    'year': value.year,
+                                    'month': value.month,
+                                    'day': value.day
+                                }
+                                if isinstance(field, models.DateTimeField):
+                                    dicted[field.name] = {**{
+                                        'hour': value.hour,
+                                        'minute': value.minute,
+                                        'second': value.second,
+                                        'microsecond': value.microsecond
+                                    }, **dicted[field.name]}
+                    except:
+                        dicted[field.name] = {}
                 elif isinstance(field, (models.OneToOneField, models.ForeignKey)):
                     dicted[field.name] = value.to_dict()
                 elif isinstance(field, models.ManyToManyField):
@@ -313,7 +342,7 @@ class AvishanModel(
         base_kwargs = {}
         many_to_many_kwargs = {}
 
-        if get_current_request() and not get_current_request().avishan.is_api:
+        if 'is_api' in current_request.keys() and not current_request['is_api']:
             kwargs = cls._clean_form_post(kwargs)
 
         for field in cls.get_full_fields():
@@ -349,14 +378,14 @@ class AvishanModel(
                                 fa = 'NOT TRANSLATED'
                             base_kwargs[field.name] = TranslatableChar.create(en=en, fa=fa)
                         else:
-                            base_kwargs[field.name] = field.related_model.get_from_dict(kwargs[field.name])
+                            base_kwargs[field.name] = field.related_model.__get_object_from_dict(kwargs[field.name])
             elif isinstance(field, models.ManyToManyField):
                 many_to_many_kwargs[field.name] = []
                 for input_item in kwargs[field.name]:
                     if isinstance(input_item, models.Model):
                         item_object = input_item
                     else:
-                        item_object = field.related_model.get_from_dict(input_item)
+                        item_object = field.related_model.__get_object_from_dict(input_item)
                     many_to_many_kwargs[field.name].append(item_object)
             else:
                 base_kwargs[field.name] = cls.cast_field_data(kwargs[field.name], field)
@@ -419,10 +448,14 @@ class AvishanModel(
 
     @classmethod
     def cast_field_data(cls, data, field: models.Field):
-
+        """
+        Cast data to it's appropriate form
+        :param data: entered data
+        :param field: target field
+        :return: after cast data
+        """
         if data is None:
             return None
-
         if isinstance(field, (models.CharField, models.TextField)):
             cast_class = str
         elif isinstance(field, (models.IntegerField, models.AutoField)):
@@ -430,83 +463,79 @@ class AvishanModel(
         elif isinstance(field, models.FloatField):
             cast_class = float
         elif isinstance(field, models.TimeField):
-            raise NotImplementedError('AvishanModel.cast_field_data for models.TimeField')
-        elif isinstance(field, models.DateTimeField) and not isinstance(data, datetime.datetime):
-            cast_class = datetime.datetime
-        elif isinstance(field, models.DateField) and not isinstance(data, datetime.date):
-            cast_class = datetime.date
+            if not isinstance(data, datetime.time):
+                cast_class = datetime.time
+            else:
+                cast_class = None
+        elif isinstance(field, models.DateTimeField):
+            if not isinstance(data, datetime.datetime):
+                cast_class = datetime.datetime
+            else:
+                cast_class = None
+        elif isinstance(field, models.DateField):
+            if not isinstance(data, datetime.date):
+                cast_class = datetime.date
+            else:
+                cast_class = None
         elif isinstance(field, models.BooleanField):
             cast_class = bool
-        elif isinstance(field, (models.ManyToManyField, models.ForeignKey)):
+        elif isinstance(field, models.ManyToManyField):
+            cast_class = field.related_model
+        elif isinstance(field, models.ForeignKey):
             cast_class = field.related_model
         else:
             return data
 
-        return cls.cast_type_data(cast_class, data)
-
-    @classmethod
-    def cast_type_data(cls, cast_class, data):
-        from khayyam import JalaliDatetime
-
-        format_string = get_avishan_config().DATETIME_STRING_FORMAT if \
-            cast_class is datetime.datetime else \
-            get_avishan_config().DATE_STRING_FORMAT
-
+        if cast_class is None:
+            return data
         if isinstance(cast_class, AvishanModel):
             if not isinstance(data, dict):
-                raise ValueError('Relational args should contain dict with id or other unique values so that db can '
-                                 'find corresponding object')
-            output = cast_class.get_from_dict(data)
-        elif cast_class in [datetime.datetime, datetime.date]:
-            if isinstance(data, dict):
-                if settings.USE_TZ:
-                    data['tzinfo'] = pytz.timezone(settings.TIME_ZONE)
-
-                if get_avishan_config().USE_JALALI_DATETIME:
-                    output = JalaliDatetime(**data).todatetime() if \
-                        cast_class is datetime.datetime else \
-                        JalaliDatetime(**data).todate()
-                else:
-                    output = datetime.datetime(**data)
-                    if cast_class is datetime.date:
-                        output = output.date()
-            elif isinstance(data, str):
-                if get_avishan_config().USE_JALALI_DATETIME:
-                    output = JalaliDatetime.strptime(data, format_string).todatetime()
-                    if settings.USE_TZ:
-                        output = output.replace(tzinfo=pytz.timezone(settings.TIME_ZONE))
-                    if cast_class is datetime.date:
-                        output = output.date()
-                else:
-                    output = datetime.datetime.strptime(data, format_string)
-                    if settings.USE_TZ:
-                        output = output.replace(tzinfo=pytz.timezone(settings.TIME_ZONE))
-                    if cast_class is datetime.date:
-                        output = output.date()
-            else:
-                raise ValueError('Cannot parse datetime, supported types are dict (containing year, month, .etc) or str'
-                                 f' (with format "{format_string}")')
+                raise ValueError('ForeignKey or ManyToMany relation should contain dict with id')
+            output = cast_class.objects.get(id=int(data['id']))
+        elif isinstance(cast_class, datetime.datetime):
+            if not isinstance(data, dict):
+                raise ValueError('Datetime should contain dict')
+            output = BchDatetime(data).to_datetime()
+        elif isinstance(cast_class, datetime.date):
+            if not isinstance(data, dict):
+                raise ValueError('Date should contain dict')
+            output = BchDatetime(data).to_date()
         else:
             output = cast_class(data)
 
         return output
 
     @classmethod
-    def get_from_dict(cls, input_dict: dict) -> 'AvishanModel':
-        """Converts dict object to Model"""
-
-        """Shortcut for id"""
+    def __get_object_from_dict(cls, input_dict: dict) -> 'AvishanModel':
         if 'id' in input_dict.keys():
-            return cls.get(avishan_raise_400=True, id=input_dict['id'])
-
-        """Usually when unique or one-to-one relations provided, this can help"""
+            return cls.get(id=input_dict['id'])
         return cls.get(**input_dict)
 
-    @classmethod
-    def request_arg_get_from_dict(cls, input_dict: dict) -> 'AvishanModel':
-        return cls.get_from_dict(input_dict)
+    # todo 0.2.2: check None amount for choice added fields
+    def get_data_from_field(self, field: models.Field, string_format_dates: bool = False):
+        from avishan.exceptions import ErrorMessageException
+        if field.choices is not None:
+            for k, v in field.choices:
+                if k == self.__getattribute__(field.name):
+                    return v
+            raise ErrorMessageException(AvishanTranslatable(
+                EN=f'Incorrect Data entered for field {field.name} in model {self.class_name()}',
+                FA=f'اطلاعات نامعتبر برای فیلد {field.name} مدل {self.class_name()}'
+            ))
+        if string_format_dates:
+            if string_format_dates:
+                if isinstance(field, models.DateTimeField):
+                    if get_avishan_config().USE_JALALI_DATETIME:
+                        return BchDatetime(self.__getattribute__(field.name)).to_str('%Y/%m/%d %H:%M:%S')
+                    return self.__getattribute__(field.name).strftime("%Y/%m/%d %H:%M:%S")
+                if isinstance(field, models.DateField):
+                    if get_avishan_config().USE_JALALI_DATETIME:
+                        return BchDatetime(self.__getattribute__(field.name)).to_str('%Y/%m/%d')
+                    return self.__getattribute__(field.name).strftime("%Y/%m/%d")
+                if isinstance(field, models.TimeField):
+                    return self.__getattribute__(field.name).strftime("%H:%M:%S")
+            return self.__getattribute__(field.name)
 
-    def get_data_from_field(self, field: models.Field):
         if isinstance(field, models.ManyToManyField):
             return self.__getattribute__(field.name).all()
 
@@ -524,10 +553,6 @@ class AvishanModel(
     def chayi_ignore_serialize_field(cls, field: models.Field) -> bool:
         return cls.is_field_readonly(field)
 
-    @classmethod
-    def _model_description(cls) -> Optional[str]:
-        return None
-
 
 class BaseUser(AvishanModel):
     """
@@ -535,19 +560,14 @@ class BaseUser(AvishanModel):
     """
 
     """Only active users can use system. This field checks on every request"""
-    is_active = models.BooleanField(default=True, blank=True, help_text='Checks if user can use system')
-    language = models.CharField(max_length=255, default=AvishanConfigFather.LANGUAGES.EN,
-                                help_text='Language for user, using 2 words ISO standard: EN, FA, AR')
-    date_created = models.DateTimeField(auto_now_add=True, help_text='Date user joined system')
+    is_active = models.BooleanField(default=True, blank=True)
+    language = models.CharField(max_length=255, default=AvishanConfigFather.LANGUAGES.EN)
+    date_created = models.DateTimeField(auto_now_add=True)
 
-    to_dict_private_fields = ['id', is_active]
+    private_fields = [date_created, 'id']
 
     django_admin_list_display = ['__str__', 'id', is_active, language, date_created]
     django_admin_list_filter = [language, is_active]
-
-    @classmethod
-    def direct_callable_methods(cls) -> List[DirectCallable]:
-        return [item for item in super().direct_callable_methods() if item.name == 'get']
 
     @classmethod
     def create(cls) -> 'BaseUser':
@@ -564,6 +584,7 @@ class BaseUser(AvishanModel):
         if hasattr(self, 'user'):
             return str(self.user)
         return super().__str__()
+    # todo ye rahi bezarim in betoone username mese adam bargardoone
 
 
 class UserGroup(AvishanModel):
@@ -573,19 +594,14 @@ class UserGroup(AvishanModel):
     """
 
     """Unique titles for groups. examples: Customer, User, Driver, Admin, Supervisor"""
-    title = models.CharField(max_length=255, unique=True,
-                             help_text='Project specific groups, like "driver", "customer"')
-    token_valid_seconds = models.BigIntegerField(default=30 * 60, blank=True, help_text='Token valid seconds')
+    title = models.CharField(max_length=255, unique=True)
+    token_valid_seconds = models.BigIntegerField(default=30 * 60, blank=True)
 
-    to_dict_private_fields = [
+    private_fields = [
         token_valid_seconds,
         'id'
     ]
     django_admin_list_display = [title, token_valid_seconds]
-
-    @classmethod
-    def direct_callable_methods(cls) -> List[DirectCallable]:
-        return [item for item in super().direct_callable_methods() if item.name in ('get', 'all')]
 
     @classmethod
     def create(cls, title: str, token_valid_seconds: int) -> 'UserGroup':
@@ -623,25 +639,18 @@ class UserUserGroup(AvishanModel):
     lack of reliability on django Meta unique_together. 
     """
     # todo 0.2.1: raise appropriate exception for exceeding unique rule here.
-    base_user = models.ForeignKey(BaseUser, on_delete=models.CASCADE, related_name='user_user_groups',
-                                  help_text='BaseUser object side')
-    user_group = models.ForeignKey(UserGroup, on_delete=models.CASCADE, related_name='user_user_groups',
-                                   help_text='UserGroup object side')
-    date_created = models.DateTimeField(auto_now_add=True, help_text='Date BaseUser added to this UserGroup')
+    base_user = models.ForeignKey(BaseUser, on_delete=models.CASCADE, related_name='user_user_groups')
+    user_group = models.ForeignKey(UserGroup, on_delete=models.CASCADE, related_name='user_user_groups')
+    date_created = models.DateTimeField(auto_now_add=True)
     """
     Each token have address to models.authentication.UserUserGroup object. If this fields become false, user cannot use 
     system with this role. "is_active" field on models.authentication.BaseUser will not override on this field. 
     """
-    is_active = models.BooleanField(default=True, blank=True, help_text='Is BaseUser active with this UserGroup')
+    is_active = models.BooleanField(default=True, blank=True)
 
     django_admin_list_display = [base_user, user_group, date_created]
     django_admin_list_filter = [user_group]
     django_admin_raw_id_fields = [base_user]
-    to_dict_private_fields = [date_created, is_active]
-
-    @classmethod
-    def direct_callable_methods(cls) -> List[DirectCallable]:
-        return [item for item in super().direct_callable_methods() if item.name in ('get',)]
 
     @classmethod
     def create(cls, user_group: UserGroup, base_user: BaseUser = None) -> 'UserUserGroup':
@@ -679,15 +688,6 @@ class UserUserGroup(AvishanModel):
             return None
         return max(dates)
 
-    def check_is_active(self) -> bool:
-        """Summary activation check
-
-        :return: Is User active or not
-        """
-        if self.is_active:
-            return self.base_user.is_active
-        return False
-
     def __str__(self):
         return f'{self.base_user} - {self.user_group}'
 
@@ -696,31 +696,14 @@ class Identifier(AvishanModel):
     class Meta:
         abstract = True
 
-    key = models.CharField(max_length=255, unique=True, help_text='Unique value of target data')
+    key = models.CharField(max_length=255, unique=True)
+    date_verified = models.DateTimeField(default=None, null=True, blank=True)
 
-    django_admin_list_display = [key]
+    django_admin_list_display = [key, 'date_verified']
     django_admin_search_fields = [key]
-    to_dict_private_fields = ['id']
-
-    @classmethod
-    def direct_callable_methods(cls) -> List[DirectCallable]:
-        total = [item for item in super().direct_callable_methods() if item.name in ('get', 'create')]
-        for item in total:
-            if item.name == 'create':
-                item.documentation.response_bodies.append(
-                    ResponseBodyDocumentation(
-                        title='Signature validation failed',
-                        status_code=status.HTTP_406_NOT_ACCEPTABLE,
-                    )
-                )
-        return total
 
     @classmethod
     def create(cls, key: str):
-        """
-
-        :param str key: Target key
-        """
         return super().create(key=cls.validate_signature(key))
 
     @classmethod
@@ -732,8 +715,7 @@ class Identifier(AvishanModel):
 
     @classmethod
     def get(cls, avishan_raise_400: bool = False, **kwargs):
-        if kwargs.get('key'):
-            kwargs['key'] = cls.validate_signature(kwargs['key'])
+        kwargs['key'] = cls.validate_signature(kwargs['key'])
         return super().get(avishan_raise_400, **kwargs)
 
     def update(self, key: str):
@@ -747,13 +729,7 @@ class Identifier(AvishanModel):
 
     @staticmethod
     def validate_signature(key: str) -> str:
-        return key
-
-    @classmethod
-    def get_from_dict(cls, input_dict: dict) -> 'AvishanModel':
-        if 'key' in input_dict.keys():
-            return cls.get_or_create(key=input_dict['key'])
-        return super().get_from_dict(input_dict)
+        return key  # todo
 
     def __str__(self):
         return self.key
@@ -761,38 +737,14 @@ class Identifier(AvishanModel):
 
 class Email(Identifier):
 
-    @classmethod
-    def direct_callable_methods(cls) -> List[DirectCallable]:
-        total = super().direct_callable_methods()
-        for item in total:
-            if item.name == 'create':
-                item.documentation.request_body.examples += [
-                    RequestBodyDocumentation.Example(
-                        name='foo',
-                        summary='My Email',
-                        value={
-                            "key": "afshari9978@gmail.com"
-                        }
-                    ),
-                    RequestBodyDocumentation.Example(
-                        name='bar',
-                        summary='Some random email',
-                        value={
-                            "key": faker.email()
-                        }
-                    )
-                ]
-        return total
-
     def send_mail(self, subject: str, message: str, html_message: str = None):
         from avishan.exceptions import ErrorMessageException
         from avishan.libraries.mailgun.functions import send_mail as mailgun_send_mail
 
         if get_avishan_config().MAILGUN_EMAIL_ENABLE:
-            return mailgun_send_mail(recipient_list=[self.key], subject=subject, message=message,
-                                     html_message=html_message)
-        elif get_avishan_config().DJANGO_EMAIL_ENABLE:
-            return self.send_bulk_mail(subject, message, [self.key], html_message)
+            mailgun_send_mail(recipient_list=[self.key], subject=subject, message=message)
+        elif get_avishan_config().DJANGO_SMTP_EMAIL_ENABLE:
+            self.send_bulk_mail(subject, message, [self.key], html_message)
         else:
             raise ErrorMessageException(AvishanTranslatable(
                 EN='Email Provider not found. Enable in "Email Providers" avishan config section'
@@ -802,41 +754,12 @@ class Email(Identifier):
     def send_bulk_mail(subject: str, message: str, recipient_list: List[str], html_message: str = None):
         from django.core.mail import send_mail
         if html_message is not None:
-            return send_mail(subject, message, get_avishan_config().DJANGO_SENDER_ADDRESS, recipient_list, html_message)
+            send_mail(subject, message, get_avishan_config().DJANGO_SMTP_SENDER_ADDRESS, recipient_list, html_message)
         else:
-            return send_mail(subject, message, get_avishan_config().DJANGO_SENDER_ADDRESS, recipient_list)
-
-    @staticmethod
-    def validate_signature(key: str) -> str:
-        key = key.lower().strip()
-        import re
-        email_regex = re.compile('[^@]+@[^@]+\.[^@]+')
-        if not email_regex.match(key):
-            raise ErrorMessageException(
-                'Email Signature not valid',
-                status_code=status.HTTP_406_NOT_ACCEPTABLE
-            )
-        return key
+            send_mail(subject, message, get_avishan_config().DJANGO_SMTP_SENDER_ADDRESS, recipient_list)
 
 
 class Phone(Identifier):
-
-    @classmethod
-    def direct_callable_methods(cls) -> List[DirectCallable]:
-        total = super().direct_callable_methods()
-        for item in total:
-            if item.name == 'create':
-                item.documentation.request_body.examples += [
-                    RequestBodyDocumentation.Example(
-                        name='foo',
-                        summary='My Phone',
-                        value={
-                            "key": "00989021207150"
-                        }
-                    )
-                ]
-        return total
-
     @staticmethod
     def send_bulk_sms():
         pass  # todo
@@ -864,12 +787,12 @@ class Phone(Identifier):
                 EN='SMS Provider not found. Enable in "SMS Providers" avishan config section'
             ))
 
-    def send_verification_sms(self, code: str, template: str = get_avishan_config().KAVENEGAR_DEFAULT_TEMPLATE):
+    def send_verification_sms(self, code: str):
         from avishan.exceptions import ErrorMessageException
 
         if get_avishan_config().KAVENEGAR_SMS_ENABLE:
             self.send_sms(
-                template=template,
+                template=get_avishan_config().KAVENEGAR_DEFAULT_TEMPLATE,
                 token=code
             )
         else:
@@ -899,15 +822,9 @@ class Phone(Identifier):
         result = re.sub(f'({country_data["dialing_code"]}|00{country_data["dialing_code"]})?(0)?([0-9]*)', r'\3',
                         result)
         if len(result) < 10:
-            raise ErrorMessageException(
-                f'Smaller Number Extracted: {result}',
-                status_code=status.HTTP_406_NOT_ACCEPTABLE
-            )
+            raise ValueError(f'Smaller Number Extracted: {result}')
         elif len(result) != 10:
-            raise ErrorMessageException(
-                f'Bigger Number Extracted: {result}',
-                status_code=status.HTTP_406_NOT_ACCEPTABLE
-            )
+            raise ValueError(f'Bigger Number Extracted: {result}')
 
         temp = (some for some in country_data['mobile_providers'].values())
         prefixes = []
@@ -915,65 +832,114 @@ class Phone(Identifier):
             prefixes += item
 
         if not result.startswith(tuple(prefixes)):
-            raise ErrorMessageException(
-                'Invalid Prefix',
-                status_code=status.HTTP_406_NOT_ACCEPTABLE
-            )
+            raise ValueError('Invalid Prefix')
 
         return f"00{country_data['dialing_code']}" + result
 
 
-class AuthenticationVerification(AvishanModel):
-    code = models.CharField(max_length=255)
-    date_created = models.DateTimeField(auto_now_add=True)
-    tried_codes = models.TextField(default="", blank=True)  # separate by |
-
-    to_dict_private_fields = [code, tried_codes]
-
-    @classmethod
-    def direct_callable_methods(cls) -> List[DirectCallable]:
-        return []
-
-    @classmethod
-    def create(cls, code_length: int, code_domain: str = string.ascii_letters) -> 'AuthenticationVerification':
-        return super().create(
-            code=cls._code_generator(code_length, code_domain)
-        )
-
-    def check_code(self, entered_code: str, valid_seconds: int) -> bool:
-        from avishan.exceptions import ErrorMessageException
-
-        if (timezone.now() - self.date_created).total_seconds() > valid_seconds:
-            self.remove()
-            raise ErrorMessageException(AvishanTranslatable(
-                EN='Code Expired',
-                FA='کد منقضی شده است'
-            ))
-
-        if self.code != entered_code:
-            self.tried_codes += f"{entered_code}\n"
-            self.save()
-            return False
-
-        self.remove()
-        return True
-
-    @classmethod
-    def _code_generator(cls, code_length: int, code_domain: str) -> str:
-        return ''.join(random.choice(code_domain) for _ in range(code_length))
-
-
-class AuthenticationType(AvishanModel):
+class IdentifierVerification(AvishanModel):
     class Meta:
         abstract = True
 
-    user_user_group = models.OneToOneField(UserUserGroup, on_delete=models.CASCADE, related_name='%(class)s',
-                                           help_text='Target UserUserGroup')
-    last_used = models.DateTimeField(blank=True, null=True, help_text='Last time user sent request')
-    last_login = models.DateTimeField(blank=True, null=True, help_text='Last time user logged in')
-    last_logout = models.DateTimeField(blank=True, null=True, help_text='Last time user logged out')
-    is_active = models.BooleanField(default=True, blank=True)
-    date_created = models.DateTimeField(auto_now_add=True)
+    verification_code = models.CharField(max_length=255)
+    verification_date = models.DateTimeField(auto_now_add=True)
+    tried_codes = models.TextField(blank=True, default="")
+
+    private_fields = [verification_code, verification_date, tried_codes]
+    django_admin_list_display = ['identifier', 'verification_code', 'verification_date']
+    django_admin_raw_id_fields = ['identifier']
+    django_admin_search_fields = ['identifier']
+    export_ignore = True
+
+    @classmethod
+    def create_verification(cls, target: Union[Phone, Email]):
+        from avishan.exceptions import ErrorMessageException
+
+        if isinstance(target, Phone):
+            gap_seconds = get_avishan_config().PHONE_VERIFICATION_GAP_SECONDS
+        else:
+            gap_seconds = get_avishan_config().EMAIL_VERIFICATION_GAP_SECONDS
+
+        if hasattr(target, 'verification'):
+            previous = target.verification
+
+            if (datetime.datetime.now() - previous.verification_date).total_seconds() < gap_seconds:
+                raise ErrorMessageException(AvishanTranslatable(
+                    EN='Verification Code sent recently, Please try again later',
+                    FA='برای ارسال مجدد کد، کمی صبر کنید'
+                ))
+            previous.remove()
+        return cls.create(
+            identifier=target,
+            verification_code=cls.create_verification_code()
+        )
+
+    @classmethod
+    def check_verification(cls, target: Union[Phone, Email], code: str) -> bool:
+        from avishan.exceptions import ErrorMessageException
+        try:
+            item = cls.get(identifier=target)
+        except cls.DoesNotExist:
+            raise ErrorMessageException(AvishanTranslatable(
+                EN='Verification challenge not found',
+                FA='عملیات تاییدی پیدا نشد'
+            ))
+
+        if isinstance(target, Phone):
+            valid_seconds = get_avishan_config().PHONE_VERIFICATION_VALID_SECONDS
+            tries_count = get_avishan_config().PHONE_VERIFICATION_TRIES_COUNT
+        else:
+            valid_seconds = get_avishan_config().EMAIL_VERIFICATION_VALID_SECONDS
+            tries_count = get_avishan_config().EMAIL_VERIFICATION_TRIES_COUNT
+
+        if (datetime.datetime.now() - item.verification_date).total_seconds() > valid_seconds:
+            item.remove()
+            raise ErrorMessageException(AvishanTranslatable(
+                EN='Code Expired, Request a new one',
+                FA='کد منقضی شده است، دوباره درخواست کنید'
+            ))
+        if item.verification_code == code:
+            item.remove()
+            target.date_verified = datetime.datetime.now()
+            target.save()
+            return True
+        if len(item.tried_codes.splitlines()) > tries_count - 1:
+            item.remove()
+            raise ErrorMessageException(AvishanTranslatable(
+                EN=f'Incorrect Code repeated {tries_count} times, request a new code',
+                FA=f'کد {tries_count} مرتبه اشتباه وارد شده است، دوباره درخواست کنید'
+            ))
+        item.tried_codes += f"{code}\n"
+        item.save()
+        raise ErrorMessageException(AvishanTranslatable(
+            EN='Incorrect Code',
+            FA='کد اشتباه است'
+        ))
+
+    @classmethod
+    def create_verification_code(cls) -> str:
+        import random
+        if cls._meta.model is PhoneVerification:
+            length = get_avishan_config().PHONE_VERIFICATION_CODE_LENGTH
+        else:
+            length = get_avishan_config().EMAIL_VERIFICATION_CODE_LENGTH
+
+        return str(random.randint(10 ** (length - 1), 10 ** length - 1))
+
+
+class EmailVerification(IdentifierVerification):
+    identifier = models.OneToOneField(Email, on_delete=models.CASCADE, related_name='verification')
+
+
+class PhoneVerification(IdentifierVerification):
+    identifier = models.OneToOneField(Phone, on_delete=models.CASCADE, related_name='verification')
+
+
+class AuthenticationType(AvishanModel):
+    user_user_group = models.OneToOneField(UserUserGroup, on_delete=models.CASCADE)
+    last_used = models.DateTimeField(default=None, blank=True, null=True)
+    last_login = models.DateTimeField(default=None, blank=True, null=True)
+    last_logout = models.DateTimeField(default=None, blank=True, null=True)
 
     export_ignore = True
 
@@ -981,497 +947,148 @@ class AuthenticationType(AvishanModel):
     django_admin_list_display = ['key', user_user_group, last_used, last_login, last_logout]
     django_admin_list_filter = [user_user_group]
     django_admin_search_fields = ['key']
-    to_dict_private_fields = [last_used, last_login, last_logout, date_created, is_active]
+
+    class Meta:
+        abstract = True
 
     @classmethod
     def direct_callable_methods(cls):
-        return [
+
+        return super().direct_callable_methods() + [
             DirectCallable(
                 model=cls,
                 target_name='login',
+                response_json_key=cls.class_snake_case_name(),
                 method=DirectCallable.METHOD.POST,
-                authenticate=False,
-                response_json_key=stringcase.snakecase(cls.class_name()),
-                documentation=ApiDocumentation(
-                    title=f'{stringcase.titlecase(cls.class_name())} Login',
-                    request_body=RequestBodyDocumentation(
-                        attributes=RequestBodyDocumentation.AutoResolveRequestBody(),
-                    ),
-                    response_bodies=[
-                        ResponseBodyDocumentation(
-                            title='Success',
-                            attributes=[
-                                Attribute(
-                                    name=stringcase.snakecase(cls.class_name()),
-                                    type=Attribute.TYPE.OBJECT,
-                                    type_of=cls,
-                                )
-                            ]
-                        ),
-                        ResponseBodyDocumentation(
-                            title='Error message available in response body',
-                            status_code=status.HTTP_418_IM_TEAPOT,
-                        ),
-                        ResponseBodyDocumentation(
-                            title='Authentication error',
-                            status_code=status.HTTP_403_FORBIDDEN
-                        )
-                    ]
-                )
-            ),
-            DirectCallable(
-                model=cls,
-                target_name='register',
-                method=DirectCallable.METHOD.POST,
-                authenticate=False,
-                response_json_key=stringcase.snakecase(cls.class_name()),
-                documentation=ApiDocumentation(
-                    title=f'{stringcase.titlecase(cls.class_name())} Register',
-                    request_body=RequestBodyDocumentation(
-                        attributes=RequestBodyDocumentation.AutoResolveRequestBody(),
-                    ),
-                    response_bodies=[
-                        ResponseBodyDocumentation(
-                            title='Registered',
-                            attributes=[
-                                Attribute(
-                                    name=stringcase.snakecase(cls.class_name()),
-                                    type=Attribute.TYPE.OBJECT,
-                                    type_of=cls,
-                                )
-                            ]
-                        ),
-                        ResponseBodyDocumentation(
-                            title='Error message available in response body',
-                            status_code=status.HTTP_418_IM_TEAPOT,
-                        ),
-                        ResponseBodyDocumentation(
-                            title='Authentication error',
-                            status_code=status.HTTP_403_FORBIDDEN
-                        )
-                    ]
-                )
-            ),
-            DirectCallable(
-                model=cls,
-                target_name='logout',
-                url="/logout",
-                response_json_key=stringcase.snakecase(cls.class_name()),
-                documentation=ApiDocumentation(
-                    title=f'{stringcase.titlecase(cls.class_name())} Logout',
-                    response_bodies=[
-                        ResponseBodyDocumentation(
-                            title='Success',
-                            status_code=status.HTTP_200_OK
-                        )
-                    ]
-                )
+                authenticate=False
             )
         ]
 
     @classmethod
-    def register(cls, **kwargs) -> Union[
-        'EmailKeyValueAuthentication',
-        'PhoneKeyValueAuthentication',
-        'EmailOtpAuthentication',
-        'PhoneOtpAuthentication',
-        'VisitorKeyAuthentication'
-    ]:
-        raise NotImplementedError()
-
-    @classmethod
-    def login(cls, **kwargs) -> Union[
-        'EmailKeyValueAuthentication',
-        'PhoneKeyValueAuthentication',
-        'EmailOtpAuthentication',
-        'PhoneOtpAuthentication',
-        'VisitorKeyAuthentication'
-    ]:
-        raise NotImplementedError()
-
-    @staticmethod
-    def logout():
-        request = get_current_request()
-        request.avishan: AvishanRequestStorage
-        if request.avishan.authentication_object:
-            request.avishan.authentication_object._submit_logout()
-
-    @classmethod
-    def find(cls, key: Union[Email, Phone, str], user_group: UserGroup) -> Optional[Union[
-        'EmailKeyValueAuthentication',
-        'PhoneKeyValueAuthentication',
-        'EmailOtpAuthentication',
-        'PhoneOtpAuthentication',
-        'VisitorKeyAuthentication'
-    ]]:
-        """Finds item for each key+uug"""
-        try:
-            return cls.get(
-                key=key,
-                user_user_group__user_group=user_group
-            )
-        except cls.DoesNotExist:
-            return None
-        except cls.MultipleObjectsReturned:
-            raise AuthException(error_kind=AuthException.MULTIPLE_CONNECTED_ACCOUNTS)
-
-    @classmethod
-    def _related_key_model(cls):
-        """Returns target model for key, if available, else None"""
-        field: models.ForeignKey = cls.get_field('key')
-        if not field:
-            return None
-        return field.related_model
-
-    @classmethod
-    def _register(cls, key: Union[Email, Phone, str], user_user_group: UserUserGroup,
-                  **create_added_kwargs) -> Union[
-        'EmailKeyValueAuthentication',
-        'PhoneKeyValueAuthentication',
-        'EmailOtpAuthentication',
-        'PhoneOtpAuthentication',
-        'VisitorKeyAuthentication'
-    ]:
+    def _register(cls, user_user_group: UserUserGroup, key: str, **kwargs) -> 'AuthenticationType':
         from avishan.exceptions import AuthException
 
-        if isinstance(key, str) and cls._related_key_model():
-            try:
-                key = cls._related_key_model().get(key=key)
-            except cls._related_key_model().DoesNotExist:
-                key = cls._related_key_model().create(key)
-
-        if cls.find(key, user_user_group.user_group):
+        try:
+            key_item = cls.key_field().related_model.get(key=key)
+        except cls.key_field().related_model.DoesNotExist:
+            key_item = cls.key_field().related_model.create(key)
+        try:
+            cls.objects.get(**{
+                'key': key_item,
+                'user_user_group__user_group': user_user_group.user_group
+            })
             raise AuthException(AuthException.DUPLICATE_AUTHENTICATION_IDENTIFIER)
+        except cls.DoesNotExist:
+            pass
 
         creation_dict = {
             **{
                 'user_user_group': user_user_group,
-                'key': key,
+                'key': key_item,
             },
-            **create_added_kwargs
+            **kwargs
         }
 
         return cls.create(**creation_dict)
 
     @classmethod
-    def _login(cls, key: Union[Email, Phone, str], user_group: UserGroup, **kwargs) -> Union[
-        'EmailKeyValueAuthentication',
-        'PhoneKeyValueAuthentication',
-        'EmailOtpAuthentication',
-        'PhoneOtpAuthentication',
-        'VisitorKeyAuthentication'
-    ]:
+    def login(cls, key: str, user_group: UserGroup = None, **kwargs) -> 'AuthenticationType':
         from avishan.exceptions import AuthException
 
-        found_object: Union[
-            'EmailKeyValueAuthentication',
-            'PhoneKeyValueAuthentication',
-            'EmailOtpAuthentication',
-            'PhoneOtpAuthentication',
-            'VisitorKeyAuthentication'
-        ] = cls.find(key, user_group)
-        if not found_object:
-            raise AuthException(AuthException.ACCOUNT_NOT_FOUND)
+        try:
+            if not user_group:
+                found_object: KeyValueAuthentication = cls.objects.get(
+                    key=cls.key_field().related_model.get(key=key))
+            else:
+                found_object: KeyValueAuthentication = cls.objects.get(**{
+                    'key': cls.key_field().related_model.get(key=key),
+                    'user_user_group__user_group': user_group
+                })
 
+        except cls.DoesNotExist:
+            raise AuthException(AuthException.ACCOUNT_NOT_FOUND)
+        except cls.MultipleObjectsReturned:
+            raise AuthException(AuthException.MULTIPLE_CONNECTED_ACCOUNTS)
         kwargs['found_object'] = found_object
         kwargs['submit_login'] = True
 
-        cls._login_before_submit_actions(kwargs)
+        cls._login_post_check(kwargs)
 
         if kwargs['submit_login']:
             found_object._submit_login()
         return found_object
 
     @classmethod
-    def _login_before_submit_actions(cls, data: dict):
-        """Before login check space"""
+    def _login_post_check(cls, kwargs):
+        """
+        Checks for post login
+        :param kwargs:
+        :type kwargs:
+        """
         pass
 
     def _submit_login(self):
-        if not self.is_active:
-            raise ErrorMessageException(AvishanTranslatable(
-                EN='Authentication types deactivated, try other types',
-                FA='این نوع احراز هویت غیرفعال شده است، لطفا نوع دیگری را امتحان کنید'
-            ))
-        if not self.user_user_group.check_is_active():
-            raise ErrorMessageException(AvishanTranslatable(
-                EN='User deactivated',
-                FA='کاربر غیرفعال شده‌است'
-            ))
-        self.last_login = timezone.now()
+        self.last_login = datetime.datetime.now()
         self.last_used = None
         self.last_logout = None
         self.save()
-        self._populate_current_request()
+        self.populate_current_request()
 
     def _submit_logout(self):
-        self.last_logout = timezone.now()
+        self.last_logout = datetime.datetime.now()
         self.save()
-        get_current_request().avishan.add_token = False
+        current_request['authentication_object'] = None
+        current_request['add_token'] = False
 
-    def _populate_current_request(self):
-        request = get_current_request()
-        request.avishan: AvishanRequestStorage
-        request.avishan.base_user = self.user_user_group.base_user
-        request.avishan.user_group = self.user_user_group.user_group
-        request.avishan.user_user_group = self.user_user_group
-        request.avishan.authentication_object = self
-        if request.avishan.language is None:
-            request.avishan.language = self.user_user_group.base_user.language
-        request.avishan.add_token = True
+    def populate_current_request(self):
+        current_request['base_user'] = self.user_user_group.base_user
+        current_request['user_group'] = self.user_user_group.user_group
+        current_request['user_user_group'] = self.user_user_group
+        current_request['authentication_object'] = self
+        if current_request['language'] is None:
+            current_request['language'] = self.user_user_group.base_user.language
+        current_request['add_token'] = True
+
+    @classmethod
+    def key_field(cls) -> models.ForeignKey:
+        raise NotImplementedError()
 
 
-class VerifiableAuthenticationType(AuthenticationType):
+class KeyValueAuthentication(AuthenticationType):
+    hashed_password = models.CharField(max_length=255, blank=True, null=True, default=None)
+
     class Meta:
         abstract = True
 
-    date_verified = models.DateTimeField(default=None, null=True, blank=True)
-    verification = models.OneToOneField(AuthenticationVerification, on_delete=models.SET_NULL, null=True, blank=True)
+    @classmethod
+    def register(cls, user_user_group: UserUserGroup, key: str, password: Optional[str] = None) -> \
+            Union['EmailPasswordAuthenticate', 'PhonePasswordAuthenticate']:
 
-    to_dict_private_fields = [verification, 'last_used', 'last_login', 'last_logout', 'date_created', 'is_active']
+        data = {
+            'user_user_group': user_user_group,
+            'key': key
+        }
 
-    def must_verify(self) -> bool:
-        if getattr(get_avishan_config(), stringcase.constcase(self.class_name()) + '_VERIFICATION_REQUIRED'):
+        if password is not None:
+            data['hashed_password'] = cls._hash_password(password)
+
+        return cls._register(**data)
+
+    # noinspection PyMethodOverriding
+    @classmethod
+    def login(cls, key: str, password: str, user_group: UserGroup = None, **kwargs) -> 'KeyValueAuthentication':
+        return super().login(key=key, user_group=user_group, password=password, **kwargs)
+
+    def add_password(self, password: str) -> bool:
+        if self.hashed_password is None:
+            self.hashed_password = self._hash_password(password)
+            self.save()
             return True
-        return self.date_verified is not None
-
-    def start_verification(self):
-        self: Union[
-            EmailKeyValueAuthentication, PhoneKeyValueAuthentication, EmailOtpAuthentication, PhoneOtpAuthentication]
-        if not getattr(get_avishan_config(), stringcase.constcase(self.class_name()) + '_VERIFICATION_REQUIRED'):
-            return
-        if self.verification:
-            if (timezone.now() - self.verification.date_created).total_seconds() < getattr(
-                    get_avishan_config(), stringcase.constcase(self.class_name()) + '_VERIFICATION_CODE_GAP_SECONDS'):
-                raise ErrorMessageException(AvishanTranslatable(
-                    EN='Code created recently, try again later',
-                    FA='کد به تازگی ایجاد شده است، کمی بعد تلاش کنید'
-                ))
-            else:
-                self.verification.remove()
-
-        self.date_verified = None
-        self.verification = AuthenticationVerification.create(
-            code_length=getattr(get_avishan_config(),
-                                stringcase.constcase(self.class_name()) + '_VERIFICATION_CODE_LENGTH'),
-            code_domain=getattr(get_avishan_config(),
-                                stringcase.constcase(self.class_name()) + '_VERIFICATION_CODE_DOMAIN')
-        )
-        self.save()
-
-        if self._related_key_model() is Email:
-            message = getattr(get_avishan_config(), stringcase.snakecase(self.class_name()) +
-                              '_verification_body')(self)
-            html_message = getattr(get_avishan_config(), stringcase.snakecase(self.class_name()) +
-                                   '_verification_html_body')(self)
-            self.key.send_mail(
-                subject=getattr(get_avishan_config(), stringcase.snakecase(self.class_name()) +
-                                '_verification_subject')(self),
-                message=message,
-                html_message=html_message
-            )
-        elif self._related_key_model() is Phone:
-            self.key.send_verification_sms(
-                code=self.verification.code
-            )
-        else:
-            raise NotImplementedError()
-
-    def check_verification(self, code: str):
-        from avishan.exceptions import ErrorMessageException
-
-        if not self.verification:
-            raise ErrorMessageException(AvishanTranslatable(
-                EN='Verification not started',
-                FA='اعتبارسنجی آغاز نشده است'
-            ))
-        if not self.verification.check_code(
-                entered_code=code,
-                valid_seconds=getattr(get_avishan_config(), stringcase.constcase(self.class_name()) +
-                                                            '_VERIFICATION_CODE_VALID_SECONDS')
-        ):
-            raise ErrorMessageException(AvishanTranslatable(
-                EN='Incorrect Code',
-                FA='کد اشتباه'
-            ))
-        self.verification = None
-        self.date_verified = timezone.now()
-        self.save()
-
-        self._successful_verification_post_actions()
+        return False
 
     @classmethod
-    def _login_before_submit_actions(cls, data: dict):
-        super()._login_before_submit_actions(data)
-        found_object: cls = data['found_object']
-        if getattr(get_avishan_config(), stringcase.constcase(cls.class_name()) + '_VERIFICATION_REQUIRED') \
-                and found_object.date_verified is None:
-            data['submit_login'] = False
-            get_current_request().avishan.status_code = status.HTTP_401_UNAUTHORIZED
-
-    def _successful_verification_post_actions(self):
-        """If successful verification"""
-        pass
-
-    @classmethod
-    def register(cls, **kwargs) -> Union[
-        'EmailKeyValueAuthentication',
-        'PhoneKeyValueAuthentication',
-        'EmailOtpAuthentication',
-        'PhoneOtpAuthentication',
-        'VisitorKeyAuthentication'
-    ]:
-        raise NotImplementedError()
-
-    @classmethod
-    def login(cls, **kwargs) -> Union[
-        'EmailKeyValueAuthentication',
-        'PhoneKeyValueAuthentication',
-        'EmailOtpAuthentication',
-        'PhoneOtpAuthentication',
-        'VisitorKeyAuthentication'
-    ]:
-        raise NotImplementedError()
-
-
-class KeyValueAuthentication(VerifiableAuthenticationType):
-    class Meta:
-        abstract = True
-
-    hashed_password = models.CharField(max_length=255, blank=True, null=True)
-    change_password_token = models.CharField(max_length=255, blank=True, null=True, default=None)
-    change_password_date = models.DateTimeField(max_length=255, blank=True, null=True, default=None)
-
-    to_dict_private_fields = [hashed_password, 'verification', 'last_used', 'last_login', 'last_logout', 'date_created',
-                              'is_active', change_password_token, change_password_date]
-
-    @classmethod
-    def register(cls, key: Union[Email, Phone], user_user_group: UserUserGroup, password: str = None,
-                 verify_now: bool = False, add_token: bool = False) -> \
-            Union['EmailKeyValueAuthentication', 'PhoneKeyValueAuthentication']:
-
-        created = cls._register(
-            key=key,
-            user_user_group=user_user_group
-        )
-
-        if password is not None and len(password.strip()) == 0:
-            password = None
-        if password:
-            created.set_password(password)
-
-        if verify_now:
-            created.start_verification()
-
-        if add_token:
-            created.login(
-                key=key,
-                user_group=user_user_group.user_group,
-                password=password
-            )
-        return created
-
-    @classmethod
-    def login(cls, key: Union[Email, Phone], user_group: UserGroup, password: str) -> \
-            Union['EmailKeyValueAuthentication', 'PhoneKeyValueAuthentication']:
-        return cls._login(key=key, user_group=user_group, password=password)
-
-    @classmethod
-    def find(cls, key: Union[Email, Phone], user_group: UserGroup) \
-            -> Optional[Union['EmailKeyValueAuthentication', 'PhoneKeyValueAuthentication']]:
-        return super().find(key, user_group)
-
-    def set_password(self, password: str):
-        self.hashed_password = self._hash_password(password)
-        self.save()
-
-    def change_password(self, old_password: str, new_password: str):
-        if not self._check_password(old_password):
-            raise AuthException(error_kind=AuthException.INCORRECT_PASSWORD)
-        self.set_password(new_password)
-
-    @classmethod
-    def reset_password_start(cls, key: Union[Email, Phone], user_group: UserGroup):
-        found = cls.find(key=key, user_group=user_group)
-
-        """Account not found"""
-        if not found:
-            raise AuthException(AuthException.ACCOUNT_NOT_FOUND)
-
-        """Check for gap seconds"""
-        if found.change_password_token and (timezone.now() - found.change_password_date).total_seconds() < getattr(
-                get_avishan_config(), stringcase.constcase(cls.class_name()) + '_RESET_PASSWORD_GAP_SECONDS'):
-            raise ErrorMessageException('Reset password applied recently, please try later')
-
-        """Do routine"""
-        found._reset_password()
-
-        """Sending Part"""
-        if found._related_key_model() is Email:
-            message = getattr(get_avishan_config(), stringcase.constcase(cls.class_name()) +
-                              '_RESET_PASSWORD_BODY')
-            html_message = render_to_string(
-                template_name=getattr(get_avishan_config(), stringcase.constcase(cls.class_name()) +
-                                      '_RESET_PASSWORD_HTML_BODY_TEMPLATE_NAME'),
-                context={'token': found.change_password_token}
-            ) \
-                if getattr(get_avishan_config(), stringcase.constcase(cls.class_name()) +
-                           '_RESET_PASSWORD_HTML_BODY_TEMPLATE_NAME') \
-                else None
-            if message:
-                message = message.format(token=found.change_password_token)
-            found.key.send_mail(
-                subject=getattr(get_avishan_config(), stringcase.constcase(cls.class_name()) +
-                                '_RESET_PASSWORD_SUBJECT'),
-                message=message,
-                html_message=html_message
-            )
-        elif found._related_key_model() is Phone:
-            found.key.send_verification_sms(
-                code=found.change_password_token,
-                template=getattr(
-                    get_avishan_config(), stringcase.constcase(cls.class_name()) + '_RESET_PASSWORD_SMS_TEMPLATE'
-                )
-            )
-        else:
-            raise NotImplementedError()
-
-    @classmethod
-    def reset_password_check(cls, key: Union[Email, Phone], user_group: UserGroup, token: str) -> bool:
-        found = cls.find(key=key, user_group=user_group)
-
-        """Account not found"""
-        if not found:
-            raise AuthException(AuthException.ACCOUNT_NOT_FOUND)
-
-        if (timezone.now() - found.change_password_date).total_seconds() > getattr(
-                get_avishan_config(), stringcase.constcase(cls.class_name()) + '_RESET_PASSWORD_VALID_SECONDS'
-        ):
-            raise ErrorMessageException('Reset password code expired, apply for a new one')
-
-        return found.change_password_token == token
-
-    @classmethod
-    def reset_password_complete(cls, key: Union[Email, Phone], user_group: UserGroup, token: str, password: str):
-        if not cls.reset_password_check(key, user_group, token):
-            raise ErrorMessageException('Incorrect reset password code')
-        found = cls.find(key, user_group)
-        found._apply_reset_password(password)
-
-    def _reset_password(self):
-        self.change_password_token = ''.join(
-            random.choice(getattr(get_avishan_config(), stringcase.constcase(self.class_name()) +
-                                  '_RESET_PASSWORD_TOKEN_DOMAIN')) for _ in
-            range(getattr(get_avishan_config(), stringcase.constcase(self.class_name()) +
-                          '_RESET_PASSWORD_TOKEN_LENGTH')))
-        self.change_password_date = timezone.now()
-        self.save()
-
-    def _apply_reset_password(self, password: str):
-        self.set_password(password)
-        self.change_password_token = None
-        self.change_password_date = None
-        self.save()
+    def key_field(cls) -> Union[models.ForeignKey, models.Field]:
+        return cls.get_field('key')
 
     @staticmethod
     def _hash_password(password: str) -> str:
@@ -1483,137 +1100,199 @@ class KeyValueAuthentication(VerifiableAuthenticationType):
         import bcrypt
         return bcrypt.hashpw(password.encode('utf8'), bcrypt.gensalt()).decode('utf8')
 
-    def _check_password(self, password: str) -> bool:
+    @staticmethod
+    def _check_password(password: str, hashed_password: str) -> bool:
         """
         compares password with hashed instance.
         :param password:
+        :param hashed_password:
         :return: True if match
         """
-        if not self.hashed_password:
-            raise AuthException(error_kind=AuthException.PASSWORD_NOT_FOUND)
         import bcrypt
-        return bcrypt.checkpw(password.encode('utf8'), self.hashed_password.encode('utf8'))
+        return bcrypt.checkpw(password.encode('utf8'), hashed_password.encode('utf8'))
 
     @classmethod
-    def _login_before_submit_actions(cls, data: dict):
-        super()._login_before_submit_actions(data)
-        if not data['found_object']._check_password(data['password']):
+    def _login_post_check(cls, kwargs):
+        from avishan.exceptions import AuthException
+
+        if not cls._check_password(kwargs['password'], kwargs['found_object'].hashed_password):
             raise AuthException(AuthException.INCORRECT_PASSWORD)
 
 
-class EmailKeyValueAuthentication(KeyValueAuthentication):
-    key = models.ForeignKey(Email, on_delete=models.CASCADE, related_name='key_value_authentications')
-
-    @classmethod
-    def direct_callable_methods(cls):
-        total = super().direct_callable_methods()
-        fake_email = faker.email()
-        for item in total:
-            if item.name == 'register':
-                item.documentation.request_body.examples += [
-                    RequestBodyDocumentation.Example(
-                        name='foo',
-                        summary='Example 1',
-                        value={
-                            "key": {
-                                "key": fake_email
-                            },
-                            "password": "XXXXXXXX",
-                            "user_user_group": {
-                                "id": 1
-                            }
-                        }
-                    )
-                ]
-            if item.name == 'login':
-                item.documentation.request_body.examples += [
-                    RequestBodyDocumentation.Example(
-                        name='foo',
-                        summary='Example 1',
-                        value={
-                            "key": {
-                                "key": fake_email
-                            },
-                            "password": "XXXXXXXX",
-                            "user_group": {
-                                "id": 1
-                            }
-                        }
-                    )
-                ]
-        return total
+class EmailPasswordAuthenticate(KeyValueAuthentication):
+    key = models.ForeignKey(Email, on_delete=models.CASCADE, related_name='password_authenticates')
 
 
-class PhoneKeyValueAuthentication(KeyValueAuthentication):
-    key = models.ForeignKey(Phone, on_delete=models.CASCADE, related_name='key_value_authentications')
+class PhonePasswordAuthenticate(KeyValueAuthentication):
+    key = models.ForeignKey(Phone, on_delete=models.CASCADE, related_name='password_authenticates')
 
 
-class OtpAuthentication(VerifiableAuthenticationType):
+class OtpAuthentication(AuthenticationType):
+    code = models.CharField(max_length=255, blank=True, null=True)
+    date_sent = models.DateTimeField(null=True, blank=True, default=None)
+    tried_codes = models.TextField(blank=True, default="")
+
     class Meta:
         abstract = True
 
-    def _successful_verification_post_actions(self):
-        super()._successful_verification_post_actions()
-        self._submit_login()
+    @classmethod
+    def register(cls, user_user_group: UserUserGroup, key: str) -> 'OtpAuthentication':
+
+        data = {
+            'user_user_group': user_user_group,
+            'key': key
+        }
+        return cls._register(**data)
 
     @classmethod
-    def register(cls, key: Union[Email, Phone], user_user_group: UserUserGroup, add_token: bool = False):
-        created = cls._register(
+    def login(cls, key: str, user_group: UserGroup = None, **kwargs) -> 'OtpAuthentication':
+        return super().login(key=key, user_group=user_group, verify=False)
+
+    @classmethod
+    def _login_post_check(cls, kwargs):
+        from avishan.exceptions import ErrorMessageException, AuthException
+
+        found_object: PhoneOtpAuthenticate = kwargs['found_object']
+        if isinstance(found_object, PhoneOtpAuthenticate):
+            gap = get_avishan_config().POA_VERIFICATION_GAP_SECONDS
+        else:
+            raise NotImplementedError()
+
+        if not kwargs.get('verify', False):
+            kwargs['submit_login'] = False
+            if found_object.date_sent and (datetime.datetime.now() - found_object.date_sent).total_seconds() < gap:
+                raise ErrorMessageException(AvishanTranslatable(
+                    EN='Verification code sent recently, Please try again later',
+                    FA='برای ارسال مجدد کد، کمی صبر کنید'
+                ))
+            if get_avishan_config().ASYNC_AVAILABLE:
+                from avishan.tasks import async_phone_otp_authentication_send_otp_code
+                async_phone_otp_authentication_send_otp_code.delay(poa_id=found_object.id)
+            else:
+                found_object.send_otp_code()
+
+        else:
+            code = kwargs['entered_code']
+            if not found_object._check_entered_code(code):
+                raise AuthException(AuthException.INCORRECT_PASSWORD)
+            if found_object.last_login is None:
+                current_request['status_code'] = status.HTTP_201_CREATED
+            found_object.code = None
+            found_object.date_sent = None
+            found_object.tried_codes = ""
+            found_object.save()
+            if found_object.key.date_verified is None:
+                found_object.key.date_verified = datetime.datetime.now()
+                found_object.key.save()
+
+    @classmethod
+    def verify(cls, key: str, entered_code: str, user_group: UserGroup = None) -> 'OtpAuthentication':
+
+        try:
+            cls.key_field().related_model.get(key=key)
+        except cls.key_field().related_model.DoesNotExist:
+            cls.key_field().related_model.create(key)
+
+        return super().login(
             key=key,
-            user_user_group=user_user_group
+            user_group=user_group,
+            verify=True,
+            entered_code=entered_code
         )
 
-        if add_token:
-            created.login(
-                key=key,
-                user_group=user_user_group.user_group
+    def send_otp_code(self):
+        self.code = self.create_otp_code()
+        self.date_sent = datetime.datetime.now()
+        self.tried_codes = ""
+        self.save()
+
+    def _check_entered_code(self, entered_code: str) -> bool:
+        from avishan.exceptions import ErrorMessageException
+
+        if isinstance(self, PhoneOtpAuthenticate):
+            valid_seconds = get_avishan_config().POA_VERIFICATION_VALID_SECONDS
+        else:
+            raise NotImplementedError()
+
+        if self.code is None:
+            raise ErrorMessageException(AvishanTranslatable(
+                EN='Code not found for this account',
+                FA='برای این حساب کدی پیدا نشد'
+            ))
+        if (datetime.datetime.now() - self.date_sent).total_seconds() > valid_seconds:
+            self.code = None
+            self.save()
+            raise ErrorMessageException(AvishanTranslatable(
+                EN='Code Expired',
+                FA='کد منقضی شده است'
+            ))
+
+        if self.code != entered_code:
+            self.tried_codes += f"{entered_code}\n"
+            self.save()
+            return False
+
+        return True
+
+    @classmethod
+    def create_otp_code(cls) -> str:
+        if cls._meta.model is PhoneOtpAuthenticate:
+            length = get_avishan_config().POA_VERIFICATION_CODE_LENGTH
+        else:
+            raise NotImplementedError()
+
+        return str(random.randint(10 ** (length - 1), 10 ** length - 1))
+
+    @classmethod
+    def key_field(cls) -> Union[models.Field, models.ForeignKey]:
+        return cls.get_field('key')
+
+
+class PhoneOtpAuthenticate(OtpAuthentication):
+    key = models.ForeignKey(Phone, on_delete=models.CASCADE, related_name='otp_authenticates')
+
+    def send_otp_code(self):
+        from avishan.exceptions import ErrorMessageException
+        super().send_otp_code()
+
+        if get_avishan_config().KAVENEGAR_SMS_ENABLE:
+            self.key.send_sms(
+                template=get_avishan_config().KAVENEGAR_DEFAULT_TEMPLATE,
+                token=self.code
             )
-
-        return created
-
-    @classmethod
-    def login(cls, key: Union[Email, Phone], user_group: UserGroup):
-        return cls._login(key=key, user_group=user_group)
-
-    @classmethod
-    def _login_before_submit_actions(cls, data: dict):
-        super()._login_before_submit_actions(data)
-        found_object: cls = data['found_object']
-        found_object.verification = None
-        found_object.date_verified = None
-        found_object.save()
-        data['submit_login'] = False
-        found_object.start_verification()
+        else:
+            raise ErrorMessageException(AvishanTranslatable(
+                EN='SMS Provider not found. Enable in "SMS Providers" avishan config section'
+            ))
 
 
-class EmailOtpAuthentication(OtpAuthentication):
-    key = models.ForeignKey(Email, on_delete=models.CASCADE, related_name='otp_authentications')
+class VisitorKey(AuthenticationType):
+    key = models.CharField(max_length=255, unique=True)
 
-
-class PhoneOtpAuthentication(OtpAuthentication):
-    key = models.ForeignKey(Phone, on_delete=models.CASCADE, related_name='otp_authentications')
-
-
-class KeyAuthentication(AuthenticationType):
-    class Meta:
-        abstract = True
-
-    key = models.CharField(max_length=255)
+    django_admin_list_display = key,
+    django_admin_search_fields = key,
 
     @classmethod
-    def create(cls, key: str, user_user_group: UserUserGroup):
-        return super().create(
-            key=key,
-            user_user_group=user_user_group
-        )
+    def create(cls, key: str) -> 'VisitorKey':
+        return super().create(key=key)
 
     @classmethod
-    def register(cls, user_user_group: UserUserGroup):
-        key = cls.generate_key()
+    def key_field(cls) -> models.Field:
+        return cls.get_field('key')
+
+    @staticmethod
+    def create_key() -> str:
+        import secrets
+        return secrets.token_urlsafe(get_avishan_config().VISITOR_KEY_LENGTH)
+
+    @classmethod
+    def register(cls, user_user_group: UserUserGroup) -> 'VisitorKey':
+
+        key = cls.create_key()
         while True:
             try:
                 cls.get(key=key)
-                key = cls.generate_key()
+                key = cls.create_key()
             except cls.DoesNotExist:
                 break
 
@@ -1625,88 +1304,30 @@ class KeyAuthentication(AuthenticationType):
         return cls.objects.create(**data)
 
     @classmethod
-    def login(cls, key: str, user_group: UserGroup):
+    def login(cls, key: str, user_group: UserGroup) -> 'VisitorKey':
         from avishan.exceptions import AuthException
 
-        found_object: KeyAuthentication = cls.find(key, user_group)
-        if not found_object:
+        try:
+            found_object = cls.objects.get(
+                **{
+                    'key': key,
+                    "user_user_group__user_group": user_group
+                }
+            )
+        except cls.DoesNotExist:
             raise AuthException(AuthException.ACCOUNT_NOT_FOUND)
 
         found_object._submit_login()
         return found_object
 
-    @classmethod
-    def generate_key(cls) -> str:
-        import secrets
-        return secrets.token_urlsafe(
-            getattr(get_avishan_config(), stringcase.constcase(cls.class_name()) + '_KEY_LENGTH'))
-
-
-class VisitorKeyAuthentication(KeyAuthentication):
-    pass
-
-
-class File(AvishanModel):
-    file = models.FileField(blank=True, null=True, help_text='File url')
-    base_user = models.ForeignKey(BaseUser, on_delete=models.SET_NULL, null=True, blank=True, help_text='Uploaded by')
-    date_created = models.DateTimeField(auto_now_add=True, help_text='Date uploaded')
-
-    export_ignore = True
-
-    django_admin_list_display = [file, base_user, date_created]
-    django_admin_raw_id_fields = [base_user]
-
-    @classmethod
-    def direct_callable_methods(cls) -> List[DirectCallable]:
-        total = []
-
-        return total + [
-            DirectCallable(
-                model=cls,
-                target_name='file_from_multipart_form_data_request',
-                method=DirectCallable.METHOD.POST,
-                response_json_key=stringcase.snakecase(cls.class_name()),
-            )]
-
-    @classmethod
-    def file_from_in_memory_upload(cls, file: InMemoryUploadedFile) -> 'File':
-        from avishan.exceptions import ErrorMessageException
-        if file is None:
-            raise ErrorMessageException(AvishanTranslatable(
-                EN='File not found',
-                FA='فایل ارسال نشده است'
-            ))
-
-        created = cls.create(
-            base_user=get_current_request().avishan.base_user
-        )
-        created.file.save("uploaded_files/" + file.name, file, save=True)
-        created.save()
-
-        return created
-
-    @classmethod
-    def file_from_multipart_form_data_request(cls, name: str = 'file') -> 'File':
-        """Upload File
-
-        Upload file to server using "multipart/form-data".
-
-        :param str? name: key in multipart form data
-        :response File 200: Saved
-        """
-        return cls.file_from_in_memory_upload(file=get_current_request().FILES.get(name))
-
-    def to_dict(self, exclude_list: List[Union[models.Field, str]] = ()) -> dict:
-        return {
-            'id': self.id,
-            'file': self.file.url
-        }
+    def __str__(self):
+        return self.key
 
 
 class Image(AvishanModel):
-    file = models.ImageField(blank=True, null=True, help_text='Image url')
-    base_user = models.ForeignKey(BaseUser, on_delete=models.SET_NULL, null=True, blank=True, help_text='Uploaded by')
-    date_created = models.DateTimeField(auto_now_add=True, help_text='Date uploaded')
+    file = models.ImageField(blank=True, null=True)
+    base_user = models.ForeignKey(BaseUser, on_delete=models.SET_NULL, null=True, blank=True)
+    date_created = models.DateTimeField(auto_now_add=True)
 
     export_ignore = True
 
@@ -1721,18 +1342,20 @@ class Image(AvishanModel):
 
     @classmethod
     def direct_callable_methods(cls) -> List[DirectCallable]:
-        total = []
 
-        return total + [
+        return super().direct_callable_methods() + [
             DirectCallable(
                 model=cls,
                 target_name='image_from_multipart_form_data_request',
+                response_json_key='image',
                 method=DirectCallable.METHOD.POST,
-                response_json_key=stringcase.snakecase(cls.class_name()),
             )]
 
     @staticmethod
     def image_from_url(url: str) -> 'Image':
+        """
+        :param url: like "core/init_files/blue-car.png"
+        """
         from django.core.files import File
 
         name = url.split('/')[-1]
@@ -1761,7 +1384,7 @@ class Image(AvishanModel):
             ))
 
         created = Image.create(
-            base_user=get_current_request().avishan.base_user if get_current_request() else None
+            base_user=current_request['base_user']
         )
         created.file.save("uploaded_images/" + file.name, file, save=True)
         created.save()
@@ -1770,14 +1393,24 @@ class Image(AvishanModel):
 
     @classmethod
     def image_from_multipart_form_data_request(cls, name: str = 'file') -> 'Image':
-        """Upload Image
+        return cls.image_from_in_memory_upload(file=current_request['request'].FILES.get(name))
 
-        Upload image to server using "multipart/form-data".
 
-        :param str? name: key in multipart form data
-        :response Image 200: Saved
-        """
-        return cls.image_from_in_memory_upload(file=get_current_request().FILES.get(name))
+class File(AvishanModel):
+    file = models.FileField(blank=True, null=True)
+    base_user = models.ForeignKey(BaseUser, on_delete=models.SET_NULL, null=True, blank=True)
+    date_created = models.DateTimeField(auto_now_add=True)
+
+    export_ignore = True
+
+    django_admin_list_display = [file, base_user, date_created]
+    django_admin_raw_id_fields = [base_user]
+
+    def to_dict(self, exclude_list: List[Union[models.Field, str]] = ()) -> dict:
+        return {
+            'id': self.id,
+            'file': self.file.url
+        }
 
 
 class RequestTrack(AvishanModel):
@@ -1803,7 +1436,7 @@ class RequestTrack(AvishanModel):
     authentication_type_object_id = models.IntegerField(blank=True, null=True)
 
     django_admin_search_fields = [url]
-    django_admin_list_display = ['clean_url', method, status_code, user_user_group, 'time', 'total_exec', 'view_exec']
+    django_admin_list_display = [url, status_code, user_user_group, 'time', 'total_exec', 'view_exec']
     django_admin_list_filter = ['url']
 
     export_ignore = True
@@ -1819,11 +1452,8 @@ class RequestTrack(AvishanModel):
             return self.start_time
         return self.start_time.strftime("%d/%m/%y %H:%M:%S.%f")
 
-    def clean_url(self) -> str:
-        return re.sub(r'(?x)/\d+.*', '/{id}', self.url)
-
     def __str__(self):
-        return self.clean_url()
+        return self.view_name
 
 
 class RequestTrackException(AvishanModel):
@@ -1857,10 +1487,6 @@ class TranslatableChar(AvishanModel):
     django_admin_list_display = [en, fa]
 
     @classmethod
-    def direct_callable_methods(cls) -> List[DirectCallable]:
-        return []
-
-    @classmethod
     def create(cls, en: str = None, fa: str = None, auto: str = None) -> 'TranslatableChar':
         if en is not None:
             en = str(en)
@@ -1873,7 +1499,7 @@ class TranslatableChar(AvishanModel):
         return super().create(en=en, fa=fa)
 
     def to_dict(self, exclude_list: List[Union[models.Field, str]] = ()) -> Union[str, dict]:
-        if get_current_request().avishan.language == 'all':
+        if current_request['language'] == 'all':
             return {
                 'en': self.en,
                 'fa': self.fa
@@ -1882,7 +1508,7 @@ class TranslatableChar(AvishanModel):
 
     def __str__(self):
         try:
-            return self.__getattribute__(get_current_request().avishan.language.lower())
+            return self.__getattribute__(current_request['language'].lower())
         except:
             return self.__getattribute__(get_avishan_config().LANGUAGE.lower())
 
@@ -1902,10 +1528,6 @@ class Activity(AvishanModel):
     export_ignore = True
 
     @classmethod
-    def direct_callable_methods(cls) -> List[DirectCallable]:
-        return []
-
-    @classmethod
     def create(cls,
                title: str,
                object_class: str = None,
@@ -1918,10 +1540,11 @@ class Activity(AvishanModel):
         :param str object_class: name of target class, defaults to None
         :param int object_id: target object, defaults to None
         :param str data: notes about activity, defaults to None
-        :return Activity: created activity
+        :return: created activity
+        :rtype: Activity
         """
-        request_track = get_current_request().avishan.request_track_object
-        user_user_group = get_current_request().avishan.user_user_group
+        request_track = current_request['request_track_object']
+        user_user_group = current_request['user_user_group']
         if not request_track and not user_user_group:
             return
         return super().create(
@@ -1939,116 +1562,3 @@ class Activity(AvishanModel):
 
     def __str__(self):
         return self.title
-
-
-class Country(AvishanModel):
-    name = models.CharField(max_length=255)
-    alpha_2_code = models.CharField(max_length=255)
-    alpha_3_code = models.CharField(max_length=255)
-    region = models.CharField(max_length=255)
-    native_name = models.CharField(max_length=255, blank=True, null=True)
-    numeric_code = models.CharField(max_length=255, unique=True)
-    flag_url = models.CharField(max_length=255, blank=True, null=True)
-
-    django_admin_search_fields = [name, alpha_2_code, alpha_3_code, native_name, numeric_code]
-
-    # noinspection PyPep8Naming
-    @classmethod
-    def create(cls,
-               numeric_code: str,
-               name: str,
-               alpha_2_code: str,
-               alpha_3_code: str,
-               region: str,
-               native_name: str = None,
-               flag: str = None
-               ):
-        return super().create(
-            numeric_code=numeric_code,
-            name=name,
-            alpha_2_code=alpha_2_code,
-            alpha_3_code=alpha_3_code,
-            region=region,
-            native_name=native_name,
-            flag_url=flag
-        )
-
-    # noinspection PyPep8Naming
-    def update(self,
-               name: str,
-               alpha_2_code: str,
-               alpha_3_code: str,
-               region: str,
-               native_name: str = None,
-               flag: str = None
-               ):
-        return super().update(
-            name=name,
-            alpha_2_code=alpha_2_code,
-            alpha_3_code=alpha_3_code,
-            region=region,
-            native_name=native_name,
-            flag_url=flag
-        )
-
-    @classmethod
-    def class_plural_name(cls) -> str:
-        return 'Countries'
-
-    @classmethod
-    def _create_documentation_request_body_examples(cls) -> List[RequestBodyDocumentation.Example]:
-        return super()._create_documentation_request_body_examples() + [
-            RequestBodyDocumentation.Example(
-                name='foo',
-                summary="My Country",
-                value={
-                    "numeric_code": 2000,
-                    "name": "My Country",
-                    "alpha_2_code": "MY",
-                    "alpha_3_code": "MYC",
-                    "region": "hi region"
-                }
-            ),
-            RequestBodyDocumentation.Example(
-                name='bar',
-                summary="My Country2",
-                value={
-                    "numeric_code": 20002,
-                    "name": "My Country2",
-                    "alpha_2_code": "MY2",
-                    "alpha_3_code": "MYC2",
-                    "region": "hi region2"
-                }
-            )
-        ]
-
-    def __str__(self):
-        return self.name
-
-
-class Province(AvishanModel):
-    title = models.CharField(max_length=255)
-    country = models.ForeignKey(Country, on_delete=models.CASCADE, related_name='provinces')
-
-    @classmethod
-    def create(cls, title: str, country: Country):
-        return super().create(
-            title=title,
-            country=country
-        )
-
-
-class City(AvishanModel):
-    title = models.CharField(max_length=255)
-    province = models.ForeignKey(Province, on_delete=models.CASCADE, related_name='cities')
-
-    @classmethod
-    def create(cls, title: str, province: Province):
-        return super().create(
-            title=title,
-            province=province
-        )
-
-    @classmethod
-    def class_plural_name(cls) -> str:
-        return 'Cities'

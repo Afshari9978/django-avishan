@@ -1,0 +1,26 @@
+{#todo auto find file#}
+{% if div_component.element_kind == 'card' %}
+    {% include 'avishan/panel/components/card.html' with card=div_component %}
+{% elif div_component.element_kind == 'pagination' %}
+    {% include 'avishan/panel/components/pagination.html' with pagination=div_component %}
+{% elif div_component.element_kind == 'form' %}
+    {% include 'avishan/panel/components/form.html' with form=div_component %}
+{% elif div_component.element_kind == 'table' %}
+    {% include 'avishan/panel/components/table.html' with table=div_component %}
+{% elif div_component.element_kind == 'data_list' %}
+    {% include 'avishan/panel/components/data_list.html' with data_list=div_component %}
+{% elif div_component.element_kind == 'unordered_list' %}
+    {% include 'avishan/panel/components/unordered_list.html' with unordered_list=div_component %}
+{% elif div_component.element_kind == 'line_chart_js' %}
+    {% include 'avishan/panel/components/line_chart_js.html' with line_chart_js=div_component %}
+{% elif div_component.element_kind == 'timeline' %}
+    {% include 'avishan/panel/components/timeline.html' with timeline=div_component %}
+{% elif div_component.element_kind == 'info_box' %}
+    {% include 'avishan/panel/components/info_box.html' with info_box=div_component %}
+{% elif div_component.element_kind == 'raw' %}
+    {% autoescape off %}
+        {{ div_component.raw }}
+    {% endautoescape %}
+{% else %}
+    {% include 'avishan/panel/components/div.html' %}
+{% endif %}
