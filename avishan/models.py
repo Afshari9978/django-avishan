@@ -10,6 +10,7 @@ from django.conf import settings
 from django.core.files.uploadedfile import InMemoryUploadedFile
 from django.template.loader import render_to_string
 from django.utils import timezone
+from djmoney.models.fields import MoneyField
 from faker import Faker
 
 from avishan.configure import get_avishan_config, AvishanConfigFather
@@ -297,6 +298,8 @@ class AvishanModel(
                     dicted[field.name] = value.to_dict()
                 elif isinstance(field, models.ManyToManyField):
                     dicted[field.name] = [item.to_dict() for item in value.all()]
+                elif isinstance(field, MoneyField):
+                    dicted[field.name] = value.amount
                 elif isinstance(value, datetime.time):
                     dicted[field.name] = {
                         'hour': value.hour, 'minute': value.minute, 'second': value.second,
