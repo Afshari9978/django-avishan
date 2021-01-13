@@ -302,7 +302,6 @@ class AvishanModelFilterExtension:
 
 
 class AvishanModelDescriptorExtension:
-
     DEFAULT_CRUD_DICT = {
         'all': True,
         'create': True,
@@ -426,8 +425,12 @@ class AvishanModelDescriptorExtension:
     def _create_documentation_request_body(cls) -> RequestBodyDocumentation:
         from avishan.models import AvishanModel
         cls: AvishanModel
+        if len(Function.load_args_from_signature(getattr(cls, 'create'))) > 0:
+            args = Function.load_args_from_signature(getattr(cls, 'create'))
+        else:
+            args = cls._create_default_args()
         return RequestBodyDocumentation(
-            attributes=Function.load_args_from_signature(getattr(cls, 'create')),
+            attributes=args,
             description=cls._create_documentation_request_body_description(),
             examples=cls._create_documentation_request_body_examples()
         )
@@ -478,8 +481,12 @@ class AvishanModelDescriptorExtension:
     def _update_documentation_request_body(cls) -> RequestBodyDocumentation:
         from avishan.models import AvishanModel
         cls: AvishanModel
+        if len(Function.load_args_from_signature(getattr(cls, 'update'))) > 0:
+            args = Function.load_args_from_signature(getattr(cls, 'update'))
+        else:
+            args = cls._update_default_args()
         return RequestBodyDocumentation(
-            attributes=cls._update_default_args(),
+            attributes=args,
             description=cls._update_documentation_request_body_description()
         )
 
