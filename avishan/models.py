@@ -946,7 +946,7 @@ class AuthenticationVerification(AvishanModel):
     def check_code(self, entered_code: str, valid_seconds: int) -> bool:
         from avishan.exceptions import ErrorMessageException
 
-        if (timezone.now() - self.date_created).total_seconds() > valid_seconds:
+        if not self.date_created or (timezone.now() - self.date_created).total_seconds() > valid_seconds:
             self.remove()
             raise ErrorMessageException(AvishanTranslatable(
                 EN='Code Expired',
@@ -1244,8 +1244,10 @@ class VerifiableAuthenticationType(AuthenticationType):
         if not getattr(get_avishan_config(), stringcase.constcase(self.class_name()) + '_VERIFICATION_REQUIRED'):
             return
         if self.verification:
-            if (timezone.now() - self.verification.date_created).total_seconds() < getattr(
-                    get_avishan_config(), stringcase.constcase(self.class_name()) + '_VERIFICATION_CODE_GAP_SECONDS'):
+            if not self.verification.date_created or \
+                    (timezone.now() - self.verification.date_created).total_seconds() < \
+                    getattr(get_avishan_config(),
+                            stringcase.constcase(self.class_name()) + '_VERIFICATION_CODE_GAP_SECONDS'):
                 raise ErrorMessageException(AvishanTranslatable(
                     EN='Code created recently, try again later',
                     FA='کد به تازگی ایجاد شده است، کمی بعد تلاش کنید'
@@ -1447,7 +1449,7 @@ class KeyValueAuthentication(VerifiableAuthenticationType):
         if not found:
             raise AuthException(AuthException.ACCOUNT_NOT_FOUND)
 
-        if (timezone.now() - found.change_password_date).total_seconds() > getattr(
+        if not found.change_password_date or (timezone.now() - found.change_password_date).total_seconds() > getattr(
                 get_avishan_config(), stringcase.constcase(cls.class_name()) + '_RESET_PASSWORD_VALID_SECONDS'
         ):
             raise ErrorMessageException('Reset password code expired, apply for a new one')
