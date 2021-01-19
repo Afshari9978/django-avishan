@@ -27,3 +27,13 @@ Features
 * Configure django settings.py file
 * Handle CORS
 * Creates config.py file for each app and project
+
+Create a new version
+--------------------
+
+1. just run::
+
+    pip install -r requirements.txt
+    python setup.py sdist bdist_wheel
+    twine upload dist/* --repository-url https://upload.pypi.org/legacy/
+
