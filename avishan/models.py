@@ -143,13 +143,6 @@ class AvishanModel(
     @classmethod
     def filter(cls, **kwargs):
         # todo show filterable fields on doc
-        # todo use django-filter for on-url filter
-
-        if get_current_request():
-            for item in get_current_request().GET.keys():
-                if item.startswith('filter_'):
-                    field = cls.get_field(item[7:])
-                    kwargs[field.name] = field.related_model.get(id=get_current_request().GET[item])
 
         if len(kwargs.items()) > 0:
             return cls.objects.filter(**kwargs)

@@ -2,12 +2,16 @@ from typing import Optional, List, Union, Type
 
 import django_filters
 import stringcase
+from crum import get_current_request
+from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
 from django.db import models
 from django.db.models import NOT_PROVIDED, QuerySet, Field
 
 from avishan.descriptor import FunctionAttribute, DjangoFieldAttribute, ResponseBodyDocumentation, Attribute, \
     RequestBodyDocumentation, DataModel, Function
 from avishan.misc import status
+
+import ast
 
 
 class AvishanModelDjangoAdminExtension:
@@ -178,7 +182,28 @@ class AvishanModelFilterExtension:
 
     @classmethod
     def queryset_handler(cls, params: dict, queryset: QuerySet):
-        return cls.django_filter_class()(data=params, queryset=queryset).qs
+        queryset: QuerySet = cls.django_filter_class()(data=params, queryset=queryset).qs
+        if 'sort' in params.keys():
+            queryset = queryset.order_by(*params['sort'][1:-1].split(","))
+        if 'page' in params.keys():
+            paginator = Paginator(queryset, per_page=params.get('page_size', 20))
+            try:
+                page_object = paginator.page(int(params['page']))
+            except PageNotAnInteger:
+                page_object = paginator.page(1)
+            except EmptyPage:
+                page_object = paginator.page(paginator.num_pages)
+
+            get_current_request().avishan.response['pagination'] = {
+                'total_objects': paginator.count,
+                'pages_count': paginator.num_pages,
+                'has_next': page_object.has_next(),
+                'has_previous': page_object.has_previous(),
+                'start_index': page_object.start_index(),
+                'end_index': page_object.end_index()
+            }
+            queryset = page_object.object_list
+        return queryset
 
     @classmethod
     def django_filter_class(cls) -> Union[Type[django_filters.FilterSet], type]:
