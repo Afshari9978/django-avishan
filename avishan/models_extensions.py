@@ -339,7 +339,7 @@ class AvishanModelDescriptorExtension:
     def _create_default_args(cls) -> List[Union[FunctionAttribute, DjangoFieldAttribute]]:
         from avishan.models import AvishanModel
         cls: AvishanModel
-        return [DjangoFieldAttribute(target=item) for item in cls._meta.fields if not cls.is_field_readonly(field=item)]
+        return [DjangoFieldAttribute(target=item) for item in cls.get_full_fields() if not cls.is_field_readonly(field=item)]
 
     @classmethod
     def _update_default_args(cls) -> List[FunctionAttribute]:
@@ -354,7 +354,6 @@ class AvishanModelDescriptorExtension:
         """
         from avishan.models import AvishanModel
         cls: AvishanModel
-        total = list(cls._meta.fields + cls._meta.many_to_many)
         privates = []
         for item in cls.to_dict_private_fields:
             if not isinstance(item, str):
@@ -362,7 +361,7 @@ class AvishanModelDescriptorExtension:
             else:
                 privates.append(item)
 
-        return [field.name for field in total if field.name not in privates]
+        return [field.name for field in cls.get_full_fields() if field.name not in privates]
 
     @classmethod
     def _get_documentation_title(cls):

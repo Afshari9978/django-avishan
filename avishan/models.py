@@ -8,8 +8,10 @@ import stringcase
 from crum import get_current_request
 from django.conf import settings
 from django.core.files.uploadedfile import InMemoryUploadedFile
+from django.core.mail import EmailMultiAlternatives
 from django.template.loader import render_to_string
 from django.utils import timezone
+from django.utils.html import strip_tags
 from djmoney.models.fields import MoneyField
 from faker import Faker
 
@@ -798,8 +800,14 @@ class Email(Identifier):
     def send_bulk_mail(subject: str, message: str, recipient_list: List[str], html_message: str = None):
         from django.core.mail import send_mail
         if html_message is not None:
-            return send_mail(subject, message, get_avishan_config().DJANGO_SENDER_ADDRESS, recipient_list, html_message)
+            text_content = strip_tags(html_message)
+            msg = EmailMultiAlternatives(subject, text_content, get_avishan_config().DJANGO_SENDER_ADDRESS,
+                                         recipient_list)
+            msg.attach_alternative(html_message, "text/html")
+            msg.send()
+
         else:
+            print("here2")
             return send_mail(subject, message, get_avishan_config().DJANGO_SENDER_ADDRESS, recipient_list)
 
     @staticmethod
