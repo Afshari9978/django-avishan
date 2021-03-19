@@ -181,8 +181,17 @@ class AvishanModelModelDetailsExtension:
 class AvishanModelFilterExtension:
 
     @classmethod
+    def relational_filters(cls, queryset, data):
+        fields = [field for field in cls.get_fields() if isinstance(field, (models.ForeignKey, models.OneToOneField))]
+        for field in fields:
+            if field.name in data.keys():
+                queryset = queryset.filter(**{field.name: data[field.name]})
+        return queryset
+
+    @classmethod
     def queryset_handler(cls, params: dict, queryset: QuerySet):
         queryset: QuerySet = cls.django_filter_class()(data=params, queryset=queryset).qs
+        queryset = cls.relational_filters(queryset, data=params)
         if 'sort' in params.keys():
             queryset = queryset.order_by(*params['sort'][1:-1].split(","))
         if 'page' in params.keys():
@@ -247,6 +256,10 @@ class AvishanModelFilterExtension:
         data = {
             field.name + '__isnull': django_filters.BooleanFilter(field_name=field.name, lookup_expr='isnull')
         }
+
+        if isinstance(field, (models.ForeignKey, models.OneToOneField)):
+            data[field.name] = django_filters.ModelChoiceFilter(queryset=field.related_model.objects.all())
+
         # numerics
         if isinstance(field, (models.IntegerField, models.AutoField)):
             data[field.name] = django_filters.NumberFilter(field_name=field.name)
@@ -339,7 +352,8 @@ class AvishanModelDescriptorExtension:
     def _create_default_args(cls) -> List[Union[FunctionAttribute, DjangoFieldAttribute]]:
         from avishan.models import AvishanModel
         cls: AvishanModel
-        return [DjangoFieldAttribute(target=item) for item in cls.get_full_fields() if not cls.is_field_readonly(field=item)]
+        return [DjangoFieldAttribute(target=item) for item in cls.get_full_fields() if
+                not cls.is_field_readonly(field=item)]
 
     @classmethod
     def _update_default_args(cls) -> List[FunctionAttribute]:
