@@ -184,8 +184,11 @@ class AvishanModelFilterExtension:
     def relational_filters(cls, queryset, data):
         fields = [field for field in cls.get_fields() if isinstance(field, (models.ForeignKey, models.OneToOneField))]
         for field in fields:
-            if field.name in data.keys():
-                queryset = queryset.filter(**{field.name: data[field.name]})
+            for key in data.keys():
+                if key == field.name:
+                    queryset = queryset.filter(**{key: data[key]})
+                if key.startswith(field.name + "__"):
+                    queryset = queryset.filter(**{key: data[key]})
         return queryset
 
     @classmethod
