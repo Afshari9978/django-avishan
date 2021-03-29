@@ -175,6 +175,12 @@ class Wrapper:
             print("*DEBUG* response parse error:", request.avishan.response)
             response_data = 'NOT_AVAILABLE'
 
+        from avishan.models import UserUserGroup
+        if request.avishan.user_user_group:
+            try:
+                uug = UserUserGroup.objects.get(id=request.avishan.user_user_group.id)
+            except UserUserGroup.DoesNotExist:
+                uug = None
         try:
             created = request.avishan.request_track_object.update(
                 view_name=view_name,
@@ -184,7 +190,7 @@ class Wrapper:
                 json_unsafe=request.avishan.json_unsafe,
                 is_api=request.avishan.is_api,
                 add_token=request.avishan.add_token,
-                user_user_group=request.avishan.user_user_group,
+                user_user_group=uug,
                 request_data=request_data,
                 request_data_size=request_data_size,
                 request_headers=request_headers,
