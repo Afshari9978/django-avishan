@@ -896,35 +896,39 @@ class Phone(Identifier):
         if country_data is None:
             country_data = get_avishan_config().get_country_mobile_numbers_data()[0]
 
+        if phone.startswith('+'):
+            phone = "00" + phone[1:]
+
         # remove all non-numbers characters
         result = ''.join(re.findall('[0-9]', phone))
         # now match with validation regex
         # todo check for 09 programmatically
-        result = re.sub(f'({country_data["dialing_code"]}|00{country_data["dialing_code"]})?(0)?([0-9]*)', r'\3',
-                        result)
-        if len(result) < 10:
-            raise ErrorMessageException(
-                f'Smaller Number Extracted: {result}',
-                status_code=status.HTTP_406_NOT_ACCEPTABLE
-            )
-        elif len(result) != 10:
-            raise ErrorMessageException(
-                f'Bigger Number Extracted: {result}',
-                status_code=status.HTTP_406_NOT_ACCEPTABLE
-            )
-
-        temp = (some for some in country_data['mobile_providers'].values())
-        prefixes = []
-        for item in temp:
-            prefixes += item
-
-        if not result.startswith(tuple(prefixes)):
-            raise ErrorMessageException(
-                'Invalid Prefix',
-                status_code=status.HTTP_406_NOT_ACCEPTABLE
-            )
-
-        return f"00{country_data['dialing_code']}" + result
+        # result = re.sub(f'({country_data["dialing_code"]}|00{country_data["dialing_code"]})?(0)?([0-9]*)', r'\3',
+        #                 result)
+        # if len(result) < 10:
+        #     raise ErrorMessageException(
+        #         f'Smaller Number Extracted: {result}',
+        #         status_code=status.HTTP_406_NOT_ACCEPTABLE
+        #     )
+        # elif len(result) != 10:
+        #     raise ErrorMessageException(
+        #         f'Bigger Number Extracted: {result}',
+        #         status_code=status.HTTP_406_NOT_ACCEPTABLE
+        #     )
+        #
+        # temp = (some for some in country_data['mobile_providers'].values())
+        # prefixes = []
+        # for item in temp:
+        #     prefixes += item
+        #
+        # if not result.startswith(tuple(prefixes)):
+        #     raise ErrorMessageException(
+        #         'Invalid Prefix',
+        #         status_code=status.HTTP_406_NOT_ACCEPTABLE
+        #     )
+        #
+        # return f"00{country_data['dialing_code']}" + result
+        return result
 
 
 class AuthenticationVerification(AvishanModel):

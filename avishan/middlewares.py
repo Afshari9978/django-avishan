@@ -181,6 +181,8 @@ class Wrapper:
                 uug = UserUserGroup.objects.get(id=request.avishan.user_user_group.id)
             except UserUserGroup.DoesNotExist:
                 uug = None
+        else:
+            uug = None
         try:
             created = request.avishan.request_track_object.update(
                 view_name=view_name,
