@@ -1956,6 +1956,7 @@ class Country(AvishanModel):
     alpha_2_code = models.CharField(max_length=255)
     alpha_3_code = models.CharField(max_length=255)
     region = models.CharField(max_length=255)
+    back4app_object_id = models.CharField(max_length=255, blank=True, null=True)
     native_name = models.CharField(max_length=255, blank=True, null=True)
     numeric_code = models.CharField(max_length=255, unique=True)
     flag_url = models.CharField(max_length=255, blank=True, null=True)
@@ -2036,9 +2037,14 @@ class Country(AvishanModel):
         return self.name
 
 
-class Province(AvishanModel):
-    title = models.CharField(max_length=255)
-    country = models.ForeignKey(Country, on_delete=models.CASCADE, related_name='provinces')
+class City(AvishanModel):
+    title = models.CharField(max_length=255, blank=True, null=True)
+    country = models.ForeignKey(Country, on_delete=models.CASCADE, related_name='cities')
+    back4app_object_id = models.CharField(max_length=255, blank=True, null=True)
+    latitude = models.FloatField(blank=True, null=True)
+    longitude = models.FloatField(blank=True, null=True)
+
+    django_admin_list_display = ['title', 'country']
 
     @classmethod
     def create(cls, title: str, country: Country):
@@ -2047,18 +2053,9 @@ class Province(AvishanModel):
             country=country
         )
 
-
-class City(AvishanModel):
-    title = models.CharField(max_length=255)
-    province = models.ForeignKey(Province, on_delete=models.CASCADE, related_name='cities')
-
-    @classmethod
-    def create(cls, title: str, province: Province):
-        return super().create(
-            title=title,
-            province=province
-        )
-
     @classmethod
     def class_plural_name(cls) -> str:
         return 'Cities'
+
+    def __str__(self):
+        return self.title
